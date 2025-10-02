@@ -2,12 +2,30 @@
 // Handles search and pagination for dish-list partial
 
 var dishListModule = {
-    setHandlers: function() {
-        $(document).ready(dishListModule.loadDishes);
+    init: function() {
+        dishListModule.bindEvents();
+        dishListModule.loadDishes();
     },
-    loadDishes: async function() {
+    bindEvents: function() {
+        $('#searchBtn').on('click', dishListModule.handleSearch);
+        $('#searchInput').on('keypress', function(evt) {
+            if (evt.which === 13) {
+                evt.preventDefault();
+                dishListModule.handleSearch();
+            }
+        });
+    },
+    handleSearch: function() {
+        var term = $('#searchInput').val();
+        if (typeof term === 'string') {
+            term = term.trim();
+        }
+        dishListModule.loadDishes({ search: term });
+    },
+    loadDishes: async function(options) {
+        options = options || {};
         try {
-            var res = await $.get('/api/dishes', {
+            var query = {
                 fields: [
                     'dishId',
                     'restaurantId',
@@ -16,7 +34,13 @@ var dishListModule = {
                     'coverPhoto',
                     'reviewCount'
                 ]
-            });
+            };
+
+            if (typeof options.search === 'string' && options.search.length) {
+                query.search = options.search;
+            }
+
+            var res = await $.get('/api/dishes', query);
             if (res.success && Array.isArray(res.data)) {
                 dishListModule.renderDishes(res.data);
             }
@@ -92,9 +116,7 @@ var dishListModule = {
     }
 };
 
-$(document).ready(function() {
-    dishListModule.setHandlers();
-});
+$(document).ready(dishListModule.init);
 
 // Export for other scripts if needed
 window.dishListModule = dishListModule;

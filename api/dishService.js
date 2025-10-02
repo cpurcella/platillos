@@ -1,6 +1,11 @@
 var db = require('../connections');
 var config = require('../config');
 
+function escapeLikePattern(value) {
+    return value.replace(/[\\%_]/g, function(char) {
+        return '\\' + char;
+    });
+}
 
 async function getDishes(params) {
     params = params || {};
@@ -13,7 +18,6 @@ async function getDishes(params) {
         selectClause = 'd.*';
     }
 
-    // Always include restaurant name
     selectClause += ', r.name as restaurantName';
 
     var selectExtra = '';
@@ -55,6 +59,15 @@ async function getDishes(params) {
     if (params.prefix) {
         whereClauses.push('d.name LIKE ?');
         whereValues.push(params.prefix + '%');
+    }
+
+    if (typeof params.search === 'string') {
+        var searchTerm = params.search.trim();
+        if (searchTerm) {
+            var likeValue = '%' + escapeLikePattern(searchTerm) + '%';
+            whereClauses.push('(d.name LIKE ? OR r.name LIKE ?)');
+            whereValues.push(likeValue, likeValue);
+        }
     }
 
     var lat, lng;
