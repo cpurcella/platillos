@@ -13,11 +13,15 @@ var approvalsModule = {
             limit: 10,
             server: {
                 url: function(prev, page, limit) {
-                    var params = new URLSearchParams({
-                        status: statusGetter(),
+                    var currentStatus = statusGetter();
+                    var paramsObj = {
                         page: page + 1,
                         pageSize: limit
-                    });
+                    };
+                    if (currentStatus && String(currentStatus).toLowerCase() !== 'all') {
+                        paramsObj.status = currentStatus;
+                    }
+                    var params = new URLSearchParams(paramsObj);
                     return (prev || baseUrl) + '?' + params.toString();
                 }
             }
@@ -59,7 +63,7 @@ var approvalsModule = {
         status = status || approvalsModule.reviewStatus || 'pending';
         approvalsModule.reviewStatus = status;
         var baseUrl = '/api/reviews';
-        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.reviewStatus || 'pending'; });
+    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.reviewStatus || 'pending'; });
         var serverConfig = {
             url: baseUrl,
             then: function(res) {
@@ -112,7 +116,7 @@ var approvalsModule = {
         status = status || approvalsModule.dishStatus || 'pending';
         approvalsModule.dishStatus = status;
         var baseUrl = '/api/dishes';
-        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.dishStatus || 'pending'; });
+    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.dishStatus || 'pending'; });
         var serverConfig = {
             url: baseUrl,
             then: function(res) {
@@ -151,7 +155,7 @@ var approvalsModule = {
         status = status || approvalsModule.restaurantStatus || 'pending';
         approvalsModule.restaurantStatus = status;
         var baseUrl = '/api/restaurants';
-        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.restaurantStatus || 'pending'; });
+    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.restaurantStatus || 'pending'; });
         var serverConfig = {
             url: baseUrl,
             then: function(res) {
@@ -191,7 +195,7 @@ var approvalsModule = {
         status = status || approvalsModule.photoStatus || 'pending';
         approvalsModule.photoStatus = status;
         var baseUrl = '/api/approvals/photos';
-        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.photoStatus || 'pending'; });
+    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.photoStatus || 'pending'; });
         var serverConfig = {
             url: baseUrl,
             then: function(res) {

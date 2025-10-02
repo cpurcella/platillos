@@ -3,9 +3,16 @@
         <button class="close-modal" aria-label="Close">&times;</button>
         <h2>Approve Review</h2>
         <div id="approve-review-content">Loading...</div>
-        <div class="form-actions" style="margin-top:16px;gap:8px;">
-            <a href="javascript:void(0)" class="btn btn-turquoise" id="approve-review-btn">Approve</a>
-            <a href="javascript:void(0)" class="btn btn-red" id="reject-review-btn">Reject</a>
+        <div class="form-row" style="margin-top:16px;">
+            <label for="review-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
+            <select id="review-status-select" style="width:100%;padding:6px 8px;">
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+            </select>
+        </div>
+        <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
+            <a href="javascript:void(0)" class="btn btn-turquoise" id="save-review-status-btn">Submit</a>
         </div>
     </div>
     <script src="/js/approve-review.js"></script>

@@ -1,8 +1,7 @@
 var approveReviewModule = {
     setHandlers: function() {
         $(document).ready(approveReviewModule.loadReview);
-        $(document).on('click', '#approve-review-btn', approveReviewModule.handleApprove);
-        $(document).on('click', '#reject-review-btn', approveReviewModule.handleReject);
+        $(document).on('click', '#save-review-status-btn', approveReviewModule.handleSave);
     },
     loadReview: async function() {
         try {
@@ -17,6 +16,11 @@ var approveReviewModule = {
                 $('#approve-review-content').text('Review not found.');
                 return;
             }
+            var currentStatus = (r.status || 'pending').toLowerCase();
+            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+                currentStatus = 'pending';
+            }
+            $('#review-status-select').val(currentStatus);
             var reviewer = (r.firstName || r.lastName) ? ((r.firstName || '') + ' ' + (r.lastName || '')).trim() : (r.email || r.submittedBy);
             var html = `
                 <div style="display:flex;flex-direction:column;gap:10px;">
@@ -51,58 +55,32 @@ var approveReviewModule = {
             $('#approve-review-content').text('Failed to load review.');
         }
     },
-    handleApprove: async function(e) {
+    handleSave: async function(e) {
         e.preventDefault();
         var reviewId = window.approveReviewId;
         if (!reviewId) {
             common.showAlert('Missing reviewId.', 'error');
             return;
         }
+        var status = $('#review-status-select').val();
         try {
             var res = await $.ajax({
-                url: '/api/approvals/reviews/' + encodeURIComponent(reviewId) + '/approved',
+                url: '/api/approvals/reviews/' + encodeURIComponent(reviewId) + '/' + encodeURIComponent(status),
                 method: 'POST',
                 dataType: 'json'
             });
             if (res && res.success) {
-                common.showAlert('Review approved.', 'success');
+                common.showAlert('Review ' + status + '.', 'success');
                 $('#approve-review-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
                 if (window.approvalsModule && approvalsModule.initReviewsGrid) {
                     approvalsModule.initReviewsGrid();
                 }
             } else {
-                common.showAlert((res && res.message) || 'Failed to approve review.', 'error');
+                common.showAlert((res && res.message) || 'Failed to update review.', 'error');
             }
         } catch (err) {
-            common.showAlert('Failed to approve review.', 'error');
-        }
-    },
-    handleReject: async function(e) {
-        e.preventDefault();
-        var reviewId = window.approveReviewId;
-        if (!reviewId) {
-            common.showAlert('Missing reviewId.', 'error');
-            return;
-        }
-        try {
-            var res = await $.ajax({
-                url: '/api/approvals/reviews/' + encodeURIComponent(reviewId) + '/rejected',
-                method: 'POST',
-                dataType: 'json'
-            });
-            if (res && res.success) {
-                common.showAlert('Review rejected.', 'success');
-                $('#approve-review-modal').addClass('hidden');
-                $('.overlay').addClass('hidden');
-                if (window.approvalsModule && approvalsModule.initReviewsGrid) {
-                    approvalsModule.initReviewsGrid();
-                }
-            } else {
-                common.showAlert((res && res.message) || 'Failed to reject review.', 'error');
-            }
-        } catch (err) {
-            common.showAlert('Failed to reject review.', 'error');
+            common.showAlert('Failed to update review.', 'error');
         }
     }
 };

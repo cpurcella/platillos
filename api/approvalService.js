@@ -20,7 +20,7 @@ async function updateReviewStatus(params) {
         err.status = 400;
         throw err;
     }
-    if (status !== 'approved' && status !== 'rejected') {
+    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
         err = new Error('Invalid status');
         err.status = 400;
         throw err;
@@ -28,8 +28,10 @@ async function updateReviewStatus(params) {
 
     var approverUserId = auth.user.userId;
     var nowMs = Date.now();
+    var statusUpdated = status === 'pending' ? null : nowMs;
+    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
     var sql = 'UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewId = ?';
-    var result = await db.query(sql, [status, nowMs, approverUserId, reviewId]);
+    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, reviewId]);
     if (!result || result.affectedRows === 0) {
         err = new Error('Review not found');
         err.status = 404;
@@ -49,7 +51,7 @@ async function updateDishStatus(params) {
         err.status = 400;
         throw err;
     }
-    if (status !== 'approved' && status !== 'rejected') {
+    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
         err = new Error('Invalid status');
         err.status = 400;
         throw err;
@@ -57,8 +59,10 @@ async function updateDishStatus(params) {
 
     var approverUserId = auth.user.userId;
     var nowMs = Date.now();
+    var statusUpdated = status === 'pending' ? null : nowMs;
+    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
     var sql = 'UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ?';
-    var result = await db.query(sql, [status, nowMs, approverUserId, dishId]);
+    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, dishId]);
     if (!result || result.affectedRows === 0) {
         err = new Error('Dish not found');
         err.status = 404;
@@ -78,7 +82,7 @@ async function updateRestaurantStatus(params) {
         err.status = 400;
         throw err;
     }
-    if (status !== 'approved' && status !== 'rejected') {
+    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
         err = new Error('Invalid status');
         err.status = 400;
         throw err;
@@ -86,8 +90,10 @@ async function updateRestaurantStatus(params) {
 
     var approverUserId = auth.user.userId;
     var nowMs = Date.now();
+    var statusUpdated = status === 'pending' ? null : nowMs;
+    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
     var sql = 'UPDATE restaurants SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE restaurantId = ?';
-    var result = await db.query(sql, [status, nowMs, approverUserId, restaurantId]);
+    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, restaurantId]);
     if (!result || result.affectedRows === 0) {
         err = new Error('Restaurant not found');
         err.status = 404;
@@ -107,7 +113,7 @@ async function updatePhotoStatus(params) {
         err.status = 400;
         throw err;
     }
-    if (status !== 'approved' && status !== 'rejected') {
+    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
         err = new Error('Invalid status');
         err.status = 400;
         throw err;
@@ -115,8 +121,10 @@ async function updatePhotoStatus(params) {
 
     var approverUserId = auth.user.userId;
     var nowMs = Date.now();
+    var statusUpdated = status === 'pending' ? null : nowMs;
+    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
     var sql = 'UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ?';
-    var result = await db.query(sql, [status, nowMs, approverUserId, reviewPhotoId]);
+    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, reviewPhotoId]);
     if (!result || result.affectedRows === 0) {
         err = new Error('Photo not found');
         err.status = 404;

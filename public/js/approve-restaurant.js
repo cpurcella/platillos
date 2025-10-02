@@ -16,6 +16,11 @@ var approveRestaurantModule = {
                 $('#approve-restaurant-content').text('Restaurant not found.');
                 return;
             }
+            var currentStatus = (restaurant.status || 'pending').toLowerCase();
+            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+                currentStatus = 'pending';
+            }
+            $('#restaurant-status-select').val(currentStatus);
             var submittedDate = restaurant.submitted ? new Date(restaurant.submitted).toLocaleString() : '';
             var html = `
                 <div style="display:flex;flex-direction:column;gap:10px;">

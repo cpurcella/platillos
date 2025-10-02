@@ -16,6 +16,11 @@ var approveDishModule = {
                 $('#approve-dish-content').text('Dish not found.');
                 return;
             }
+            var currentStatus = (dish.status || 'pending').toLowerCase();
+            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+                currentStatus = 'pending';
+            }
+            $('#dish-status-select').val(currentStatus);
             var html = `
                 <div style="display:flex;flex-direction:column;gap:10px;">
                     <div>

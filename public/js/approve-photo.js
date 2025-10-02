@@ -1,8 +1,7 @@
 var approvePhotoModule = {
     setHandlers: function() {
         $(document).ready(approvePhotoModule.loadPhoto);
-        $(document).on('click', '#approve-photo-btn', approvePhotoModule.handleApprove);
-        $(document).on('click', '#reject-photo-btn', approvePhotoModule.handleReject);
+        $(document).on('click', '#save-photo-status-btn', approvePhotoModule.handleSave);
     },
     loadPhoto: async function() {
         try {
@@ -17,6 +16,11 @@ var approvePhotoModule = {
                 $('#approve-photo-content').text('Photo not found.');
                 return;
             }
+            var currentStatus = (photo.status || 'pending').toLowerCase();
+            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+                currentStatus = 'pending';
+            }
+            $('#photo-status-select').val(currentStatus);
 
             var reviewer = photo.reviewerName || photo.reviewerEmail || '';
             var submitted = photo.reviewSubmitted ? new Date(photo.reviewSubmitted).toLocaleString() : '';
@@ -59,13 +63,10 @@ var approvePhotoModule = {
             $('#approve-photo-content').text('Failed to load photo.');
         }
     },
-    handleApprove: function(e) {
+    handleSave: function(e) {
         e.preventDefault();
-        approvePhotoModule.submitStatus('approved');
-    },
-    handleReject: function(e) {
-        e.preventDefault();
-        approvePhotoModule.submitStatus('rejected');
+        var status = $('#photo-status-select').val();
+        approvePhotoModule.submitStatus(status);
     },
     submitStatus: async function(status) {
         var photoId = window.approvePhotoId;
