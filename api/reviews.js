@@ -23,8 +23,8 @@ router.post('/', async function(req, res) {
 router.get('/', async function(req, res) {
     try {
         var params = req.allParams || {};
-        var reviews = await reviewService.getReviews(params);
-        res.json({ success: true, data: reviews });
+        var result = await reviewService.getReviews(params);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });
@@ -36,8 +36,8 @@ router.get('/', async function(req, res) {
 router.get('/dish/:dishId', async function(req, res) {
     try {
         var params = Object.assign({}, req.allParams || {}, { dishId: req.params.dishId });
-        var reviews = await reviewService.getReviewsForDish(params);
-        res.json({ success: true, data: reviews });
+        var result = await reviewService.getReviewsForDish(params);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });
@@ -52,8 +52,8 @@ router.get('/:reviewId', async function(req, res) {
         params.reviewId = req.params.reviewId;
         params.pageSize = 1;
         params.page = 1;
-        var rows = await reviewService.getReviews(params);
-        var review = (rows && rows.length) ? rows[0] : null;
+        var result = await reviewService.getReviews(params);
+        var review = (result.rows && result.rows.length) ? result.rows[0] : null;
         if (!review) {
             return res.status(404).json({ success: false, message: 'Review not found' });
         }

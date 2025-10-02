@@ -3,14 +3,12 @@ var config = require('../config');
 
 
 async function getDishes(params) {
+    params = params || {};
     var selectFields = params.fields;
 
     var selectClause = '';
-    var vals = [];
-
     if (selectFields && selectFields.length) {
         selectClause = selectFields.map(function() { return 'd.??'; }).join(', ');
-        vals = vals.concat(selectFields);
     } else {
         selectClause = 'd.*';
     }
@@ -18,7 +16,12 @@ async function getDishes(params) {
     // Always include restaurant name
     selectClause += ', r.name as restaurantName';
 
-    var sql = 'SELECT ' + selectClause + ' FROM dishes d JOIN restaurants r ON d.restaurantId = r.restaurantId WHERE 1=1';
+    var selectExtra = '';
+    var selectExtraValues = [];
+
+    var fromClause = ' FROM dishes d JOIN restaurants r ON d.restaurantId = r.restaurantId';
+    var whereClauses = ['1=1'];
+    var whereValues = [];
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
@@ -30,30 +33,30 @@ async function getDishes(params) {
             err.status = 403;
             throw err;
         }
-        sql += " AND d.status = 'pending'";
+        whereClauses.push("d.status = 'pending'");
     } else if (!isAdmin) {
-        sql += " AND d.status = 'approved' AND r.status = 'approved'";
+        whereClauses.push("d.status = 'approved'");
+        whereClauses.push("r.status = 'approved'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
-        sql += ' AND d.status = ?';
-        vals.push(statusFilter);
+        whereClauses.push('d.status = ?');
+        whereValues.push(statusFilter);
     }
 
     if (params.restaurantId) {
-        sql += ' AND d.restaurantId = ?';
-        vals.push(params.restaurantId);
+        whereClauses.push('d.restaurantId = ?');
+        whereValues.push(params.restaurantId);
     }
 
     if (params.dishId) {
-        sql += ' AND d.dishId = ?';
-        vals.push(params.dishId);
+        whereClauses.push('d.dishId = ?');
+        whereValues.push(params.dishId);
     }
 
     if (params.prefix) {
-        sql += ' AND d.name LIKE ?';
-        vals.push(params.prefix + '%');
+        whereClauses.push('d.name LIKE ?');
+        whereValues.push(params.prefix + '%');
     }
 
-    // Default: filter by 30 mile radius if lat/lng is provided or in user session
     var lat, lng;
     if (params.lat && params.lng) {
         lat = parseFloat(params.lat);
@@ -64,16 +67,44 @@ async function getDishes(params) {
     }
 
     if (lat && lng && !params.ignoreRadius) {
-        sql += ` AND d.restaurantId IN (
+        whereClauses.push(`d.restaurantId IN (
             SELECT restaurantId FROM restaurants
             WHERE ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) <= 48280
-        )`;
-        vals.push('POINT(' + lat + ' ' + lng + ')');
+        )`);
+        whereValues.push('POINT(' + lat + ' ' + lng + ')');
     }
 
-    var rows = await db.query(sql, vals);
+    if (lat && lng && params.useLocation == '1') {
+        selectExtra = ', ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) AS distance';
+        selectExtraValues.push('POINT(' + lat + ' ' + lng + ')');
+    }
 
-    if (rows && rows.length) {
+    var whereSql = ' WHERE ' + whereClauses.join(' AND ');
+
+    var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
+    var countRows = await db.query(countSql, whereValues) || [];
+    var total = countRows.length ? countRows[0].total : 0;
+
+    var pageSize = parseInt(params.pageSize, 10) || 10;
+    var page = parseInt(params.page, 10) || 1;
+    if (page < 1) page = 1;
+    var offset = (page - 1) * pageSize;
+
+    var orderClause = '';
+    if (lat && lng && params.useLocation == '1') {
+        orderClause = ' ORDER BY distance ASC';
+    }
+
+    var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
+    var dataValues = selectExtraValues.slice();
+    if (selectFields && selectFields.length) {
+        dataValues = selectFields.concat(dataValues);
+    }
+    dataValues = dataValues.concat(whereValues, [pageSize, offset]);
+
+    var rows = await db.query(dataSql, dataValues) || [];
+
+    if (rows.length) {
         rows = rows.map(function(row) {
             if (row.coverPhoto) {
                 row.coverPhoto = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.coverPhoto;
@@ -81,7 +112,11 @@ async function getDishes(params) {
             return row;
         });
     }
-    return rows;
+
+    return {
+        rows: rows,
+        total: total
+    };
 }
 
 async function getDish(params) {

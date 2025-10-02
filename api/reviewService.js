@@ -142,41 +142,46 @@ async function saveReview(allParams) {
     }
 }
 async function getReviews(params) {
+    params = params || {};
     var pageSize = parseInt(params.pageSize, 10) || 10;
     var page = parseInt(params.page, 10) || 1;
     if (page < 1) page = 1;
     var offset = (page - 1) * pageSize;
 
-    var vals = [];
-    var sql = `
+    var selectClause = `
         SELECT
-            r.reviewId, r.rating, r.review as reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
+            r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
             r.status, r.statusUpdated, r.statusUpdatedBy,
             d.name AS dishName, s.name AS restaurantName,
             u.firstName, u.lastName, u.email
+    `;
+    var fromClause = `
         FROM reviews r
         JOIN dishes d ON r.dishId = d.dishId
         JOIN restaurants s ON d.restaurantId = s.restaurantId
         JOIN users u ON r.submittedBy = u.userId
-        WHERE 1=1
     `;
 
+    var whereClauses = ['1=1'];
+    var whereValues = [];
+
     if (params.reviewId) {
-        sql += ' AND r.reviewId = ?';
-        vals.push(params.reviewId);
+        whereClauses.push('r.reviewId = ?');
+        whereValues.push(params.reviewId);
     }
     if (params.userId) {
-        sql += ' AND r.submittedBy = ?';
-        vals.push(params.userId);
+        whereClauses.push('r.submittedBy = ?');
+        whereValues.push(params.userId);
     }
     if (params.dishId) {
-        sql += ' AND r.dishId = ?';
-        vals.push(params.dishId);
+        whereClauses.push('r.dishId = ?');
+        whereValues.push(params.dishId);
     }
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
+    var normalizedStatusExpr = "LOWER(COALESCE(r.status, 'pending'))";
 
     if (shouldFilterPending) {
         if (!isAdmin) {
@@ -184,16 +189,22 @@ async function getReviews(params) {
             err.status = 403;
             throw err;
         }
-        sql += ' AND r.status IS NULL';
+        whereClauses.push(normalizedStatusExpr + " = 'pending'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
-        sql += ' AND r.status = ?';
-        vals.push(statusFilter);
+        whereClauses.push(normalizedStatusExpr + ' = ?');
+        whereValues.push(statusFilter);
     }
 
-    sql += ' ORDER BY r.submitted DESC LIMIT ? OFFSET ?';
-    vals.push(pageSize, offset);
+    var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
-    var reviews = await db.query(sql, vals) || [];
+    var countSql = 'SELECT COUNT(*) AS total ' + fromClause + whereSql;
+    var countRows = await db.query(countSql, whereValues) || [];
+    var total = countRows.length ? countRows[0].total : 0;
+
+    var dataSql = selectClause + fromClause + whereSql + ' ORDER BY r.submitted DESC LIMIT ? OFFSET ?';
+    var dataValues = whereValues.slice();
+    dataValues.push(pageSize, offset);
+    var reviews = await db.query(dataSql, dataValues) || [];
 
     if (reviews.length) {
         var reviewIds = reviews.map(function(r) { return r.reviewId; });
@@ -212,7 +223,10 @@ async function getReviews(params) {
         }
     }
 
-    return reviews;
+    return {
+        rows: reviews,
+        total: total
+    };
 }
 
 async function getReviewsForDish(params) {

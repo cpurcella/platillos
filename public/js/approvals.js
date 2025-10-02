@@ -8,6 +8,21 @@ var approvalsModule = {
     restaurantStatus: 'pending',
     photoStatus: 'pending',
 
+    buildPaginationConfig: function(baseUrl, statusGetter) {
+        return {
+            limit: 10,
+            server: {
+                url: function(prev, page, limit) {
+                    var params = new URLSearchParams({
+                        status: statusGetter(),
+                        page: page + 1,
+                        pageSize: limit
+                    });
+                    return (prev || baseUrl) + '?' + params.toString();
+                }
+            }
+        };
+    },
     setHandlers: function() {
         $(document).ready(function() {
             approvalsModule.initReviewsGrid();
@@ -40,147 +55,183 @@ var approvalsModule = {
             approvalsModule.initPhotosGrid(status);
         });
     },
-    initReviewsGrid: async function(status) {
+    initReviewsGrid: function(status) {
         status = status || approvalsModule.reviewStatus || 'pending';
         approvalsModule.reviewStatus = status;
-        try {
-            var res = await $.get('/api/reviews', { status: status, pageSize: 10, page: 1 });
-            var rows = (res.data || []).map(function(r) {
-                var reviewer = (r.firstName || r.lastName) ? ((r.firstName || '') + ' ' + (r.lastName || '')).trim() : (r.email || r.submittedBy);
-                return [
-                    r.dishName || '',
-                    r.restaurantName || '',
-                    reviewer || '',
-                    r.rating,
-                    r.reviewContent || '',
-                    new Date(r.submitted).toLocaleString(),
-                    (r.photos || []).length,
-                    gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise approve-btn" data-review-id="' + r.reviewId + '">Approve</a>')
-                ];
-            });
-            if (approvalsModule.reviewGrid) {
-                approvalsModule.reviewGrid.updateConfig({ data: rows }).forceRender();
-            } else {
-                approvalsModule.reviewGrid = new gridjs.Grid({
-                    columns: [
-                        'Dish',
-                        'Restaurant',
-                        'Reviewer',
-                        'Rating',
-                        'Review',
-                        'Submitted',
-                        'Photos',
-                        'Actions'
-                    ],
-                    search: true,
-                    sort: true,
-                    pagination: { limit: 10 },
-                    data: rows
+        var baseUrl = '/api/reviews';
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.reviewStatus || 'pending'; });
+        var serverConfig = {
+            url: baseUrl,
+            then: function(res) {
+                var data = (res && res.data) || [];
+                return data.map(function(r) {
+                    var reviewer = (r.firstName || r.lastName) ? ((r.firstName || '') + ' ' + (r.lastName || '')).trim() : (r.email || r.submittedBy);
+                    return [
+                        r.dishName || '',
+                        r.restaurantName || '',
+                        reviewer || '',
+                        r.rating,
+                        r.reviewContent || '',
+                        new Date(r.submitted).toLocaleString(),
+                        (r.photos || []).length,
+                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise approve-btn" data-review-id="' + r.reviewId + '">Approve</a>')
+                    ];
                 });
-                approvalsModule.reviewGrid.render(document.getElementById('reviews-grid'));
+            },
+            total: function(res) {
+                return (res && typeof res.total === 'number') ? res.total : 0;
             }
-            $('#reviews-status-filter').val(status);
-        } catch (err) {
-            common.showAlert('Failed to load reviews', 'error');
+        };
+        if (approvalsModule.reviewGrid) {
+            approvalsModule.reviewGrid.updateConfig({
+                server: serverConfig,
+                pagination: paginationConfig
+            }).forceRender();
+        } else {
+            approvalsModule.reviewGrid = new gridjs.Grid({
+                columns: [
+                    'Dish',
+                    'Restaurant',
+                    'Reviewer',
+                    'Rating',
+                    'Review',
+                    'Submitted',
+                    'Photos',
+                    'Actions'
+                ],
+                search: true,
+                sort: true,
+                server: serverConfig,
+                pagination: paginationConfig
+            });
+            approvalsModule.reviewGrid.render(document.getElementById('reviews-grid'));
         }
+        $('#reviews-status-filter').val(status);
     },
-    initDishesGrid: async function(status) {
+    initDishesGrid: function(status) {
         status = status || approvalsModule.dishStatus || 'pending';
         approvalsModule.dishStatus = status;
-        try {
-            var res = await $.get('/api/dishes', { status: status, pageSize: 10, page: 1 });
-            var rows = (res.data || []).map(function(d) {
-                return [
-                    d.name || '',
-                    d.restaurantName || '',
-                    new Date(d.submitted).toLocaleString(),
-                    gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-dish-btn" data-dish-id="' + d.dishId + '">Review</a>')
-                ];
-            });
-            if (approvalsModule.dishGrid) {
-                approvalsModule.dishGrid.updateConfig({ data: rows }).forceRender();
-            } else {
-                approvalsModule.dishGrid = new gridjs.Grid({
-                    columns: ['Dish', 'Restaurant', 'Submitted', 'Actions'],
-                    search: true,
-                    sort: true,
-                    pagination: { limit: 10 },
-                    data: rows
+        var baseUrl = '/api/dishes';
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.dishStatus || 'pending'; });
+        var serverConfig = {
+            url: baseUrl,
+            then: function(res) {
+                var data = (res && res.data) || [];
+                return data.map(function(d) {
+                    return [
+                        d.name || '',
+                        d.restaurantName || '',
+                        new Date(d.submitted).toLocaleString(),
+                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-dish-btn" data-dish-id="' + d.dishId + '">Review</a>')
+                    ];
                 });
-                approvalsModule.dishGrid.render(document.getElementById('dishes-grid'));
+            },
+            total: function(res) {
+                return (res && typeof res.total === 'number') ? res.total : 0;
             }
-            $('#dishes-status-filter').val(status);
-        } catch (err) {
-            common.showAlert('Failed to load dishes', 'error');
+        };
+        if (approvalsModule.dishGrid) {
+            approvalsModule.dishGrid.updateConfig({
+                server: serverConfig,
+                pagination: paginationConfig
+            }).forceRender();
+        } else {
+            approvalsModule.dishGrid = new gridjs.Grid({
+                columns: ['Dish', 'Restaurant', 'Submitted', 'Actions'],
+                search: true,
+                sort: true,
+                server: serverConfig,
+                pagination: paginationConfig
+            });
+            approvalsModule.dishGrid.render(document.getElementById('dishes-grid'));
         }
+        $('#dishes-status-filter').val(status);
     },
-    initRestaurantsGrid: async function(status) {
+    initRestaurantsGrid: function(status) {
         status = status || approvalsModule.restaurantStatus || 'pending';
         approvalsModule.restaurantStatus = status;
-        try {
-            var res = await $.get('/api/restaurants', { status: status, pageSize: 10, page: 1 });
-            var rows = (res.data || []).map(function(r) {
-                return [
-                    r.name || '',
-                    r.cityName || '',
-                    r.address || '',
-                    new Date(r.submitted).toLocaleString(),
-                    gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-restaurant-btn" data-restaurant-id="' + r.restaurantId + '">Review</a>')
-                ];
-            });
-            if (approvalsModule.restaurantGrid) {
-                approvalsModule.restaurantGrid.updateConfig({ data: rows }).forceRender();
-            } else {
-                approvalsModule.restaurantGrid = new gridjs.Grid({
-                    columns: ['Restaurant', 'City', 'Address', 'Submitted', 'Actions'],
-                    search: true,
-                    sort: true,
-                    pagination: { limit: 10 },
-                    data: rows
+        var baseUrl = '/api/restaurants';
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.restaurantStatus || 'pending'; });
+        var serverConfig = {
+            url: baseUrl,
+            then: function(res) {
+                var data = (res && res.data) || [];
+                return data.map(function(r) {
+                    return [
+                        r.name || '',
+                        r.cityName || '',
+                        r.address || '',
+                        new Date(r.submitted).toLocaleString(),
+                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-restaurant-btn" data-restaurant-id="' + r.restaurantId + '">Review</a>')
+                    ];
                 });
-                approvalsModule.restaurantGrid.render(document.getElementById('restaurants-grid'));
+            },
+            total: function(res) {
+                return (res && typeof res.total === 'number') ? res.total : 0;
             }
-            $('#restaurants-status-filter').val(status);
-        } catch (err) {
-            common.showAlert('Failed to load restaurants', 'error');
+        };
+        if (approvalsModule.restaurantGrid) {
+            approvalsModule.restaurantGrid.updateConfig({
+                server: serverConfig,
+                pagination: paginationConfig
+            }).forceRender();
+        } else {
+            approvalsModule.restaurantGrid = new gridjs.Grid({
+                columns: ['Restaurant', 'City', 'Address', 'Submitted', 'Actions'],
+                search: true,
+                sort: true,
+                server: serverConfig,
+                pagination: paginationConfig
+            });
+            approvalsModule.restaurantGrid.render(document.getElementById('restaurants-grid'));
         }
+        $('#restaurants-status-filter').val(status);
     },
-    initPhotosGrid: async function(status) {
+    initPhotosGrid: function(status) {
         status = status || approvalsModule.photoStatus || 'pending';
         approvalsModule.photoStatus = status;
-        try {
-            var res = await $.get('/api/approvals/photos', { status: status, pageSize: 10, page: 1 });
-            var rows = (res.data || []).map(function(p) {
-                var reviewer = p.reviewerName || p.reviewerEmail || '';
-                var reviewSnippet = (p.reviewContent || '').length > 120 ? (p.reviewContent || '').substring(0, 117) + '...' : (p.reviewContent || '');
-                var thumbHtml = p.photoUrl ? '<img src="' + p.photoUrl + '" alt="Review photo" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />' : '';
-                var submitted = p.reviewSubmitted ? new Date(p.reviewSubmitted).toLocaleString() : '';
-                return [
-                    gridjs.html('<div style="display:flex;align-items:center;gap:8px;">' + thumbHtml + '</div>'),
-                    p.dishName || '',
-                    p.restaurantName || '',
-                    reviewer || '',
-                    reviewSnippet,
-                    submitted,
-                    gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-photo-btn" data-photo-id="' + p.reviewPhotoId + '">Review</a>')
-                ];
-            });
-            if (approvalsModule.photoGrid) {
-                approvalsModule.photoGrid.updateConfig({ data: rows }).forceRender();
-            } else {
-                approvalsModule.photoGrid = new gridjs.Grid({
-                    columns: ['Photo', 'Dish', 'Restaurant', 'Reviewer', 'Review', 'Submitted', 'Actions'],
-                    search: true,
-                    sort: true,
-                    pagination: { limit: 10 },
-                    data: rows
+        var baseUrl = '/api/approvals/photos';
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.photoStatus || 'pending'; });
+        var serverConfig = {
+            url: baseUrl,
+            then: function(res) {
+                var data = (res && res.data) || [];
+                return data.map(function(p) {
+                    var reviewer = p.reviewerName || p.reviewerEmail || '';
+                    var reviewSnippet = (p.reviewContent || '').length > 120 ? (p.reviewContent || '').substring(0, 117) + '...' : (p.reviewContent || '');
+                    var thumbHtml = p.photoUrl ? '<img src="' + p.photoUrl + '" alt="Review photo" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />' : '';
+                    var submitted = p.reviewSubmitted ? new Date(p.reviewSubmitted).toLocaleString() : '';
+                    return [
+                        gridjs.html('<div style="display:flex;align-items:center;gap:8px;">' + thumbHtml + '</div>'),
+                        p.dishName || '',
+                        p.restaurantName || '',
+                        reviewer || '',
+                        reviewSnippet,
+                        submitted,
+                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise review-photo-btn" data-photo-id="' + p.reviewPhotoId + '">Review</a>')
+                    ];
                 });
-                approvalsModule.photoGrid.render(document.getElementById('photos-grid'));
+            },
+            total: function(res) {
+                return (res && typeof res.total === 'number') ? res.total : 0;
             }
-            $('#photos-status-filter').val(status);
-        } catch (err) {
-            common.showAlert('Failed to load photos', 'error');
+        };
+        if (approvalsModule.photoGrid) {
+            approvalsModule.photoGrid.updateConfig({
+                server: serverConfig,
+                pagination: paginationConfig
+            }).forceRender();
+        } else {
+            approvalsModule.photoGrid = new gridjs.Grid({
+                columns: ['Photo', 'Dish', 'Restaurant', 'Reviewer', 'Review', 'Submitted', 'Actions'],
+                search: true,
+                sort: true,
+                server: serverConfig,
+                pagination: paginationConfig
+            });
+            approvalsModule.photoGrid.render(document.getElementById('photos-grid'));
         }
+        $('#photos-status-filter').val(status);
     },
     openDishModal: function(e) {
         e.preventDefault();

@@ -5,8 +5,8 @@ var restaurantService = require('./restaurantService');
 router.get('/', async function(req, res) {
     try {
         var data = req.allParams;
-        var restaurants = await restaurantService.getRestaurants(data);
-        res.json({ success: true, data: restaurants });
+        var result = await restaurantService.getRestaurants(data);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -16,8 +16,8 @@ router.get('/pending', async function(req, res) {
     try {
         var params = req.allParams || {};
         params.pending = 1;
-        var restaurants = await restaurantService.getRestaurants(params);
-        res.json({ success: true, data: restaurants });
+        var result = await restaurantService.getRestaurants(params);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });

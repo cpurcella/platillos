@@ -126,8 +126,9 @@ async function updatePhotoStatus(params) {
 }
 
 async function getReviewPhotos(params) {
-    var vals = [];
-    var sql = `
+    params = params || {};
+
+    var selectClause = `
         SELECT
             rp.reviewPhotoId,
             rp.reviewId,
@@ -149,14 +150,18 @@ async function getReviewPhotos(params) {
             u.firstName AS reviewerFirstName,
             u.lastName AS reviewerLastName,
             u.email AS reviewerEmail
+    `;
+    var fromClause = `
         FROM reviews_photos rp
         JOIN reviews r ON rp.reviewId = r.reviewId
         JOIN dishes d ON r.dishId = d.dishId
         JOIN restaurants s ON d.restaurantId = s.restaurantId
         JOIN files f ON rp.fileId = f.fileId
         JOIN users u ON r.submittedBy = u.userId
-        WHERE 1=1
     `;
+
+    var whereClauses = ['1=1'];
+    var whereValues = [];
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
@@ -168,30 +173,29 @@ async function getReviewPhotos(params) {
             err.status = 403;
             throw err;
         }
-        sql += " AND rp.status = 'pending'";
+        whereClauses.push("rp.status = 'pending'");
     } else if (!isAdmin) {
-        sql += " AND rp.status = 'approved'";
+        whereClauses.push("rp.status = 'approved'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
-        sql += ' AND rp.status = ?';
-        vals.push(statusFilter);
+        whereClauses.push('rp.status = ?');
+        whereValues.push(statusFilter);
     }
 
     if (params.reviewPhotoId) {
-        sql += ' AND rp.reviewPhotoId = ?';
-        vals.push(params.reviewPhotoId);
+        whereClauses.push('rp.reviewPhotoId = ?');
+        whereValues.push(params.reviewPhotoId);
     }
 
     if (params.reviewId) {
-        sql += ' AND rp.reviewId = ?';
-        vals.push(params.reviewId);
+        whereClauses.push('rp.reviewId = ?');
+        whereValues.push(params.reviewId);
     }
 
-    if (params.status) {
-        sql += ' AND rp.status = ?';
-        vals.push(params.status);
-    }
+    var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
-    sql += ' ORDER BY rp.reviewPhotoId DESC';
+    var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
+    var countRows = await db.query(countSql, whereValues) || [];
+    var total = countRows.length ? countRows[0].total : 0;
 
     var pageSize = parseInt(params.pageSize, 10) || 10;
     var page = parseInt(params.page, 10) || 1;
@@ -200,16 +204,22 @@ async function getReviewPhotos(params) {
     }
     var offset = (page - 1) * pageSize;
 
-    sql += ' LIMIT ? OFFSET ?';
-    vals.push(pageSize, offset);
+    var dataSql = selectClause + fromClause + whereSql + ' ORDER BY rp.reviewPhotoId DESC LIMIT ? OFFSET ?';
+    var dataValues = whereValues.slice();
+    dataValues.push(pageSize, offset);
 
-    var rows = await db.query(sql, vals) || [];
-    return rows.map(function(row) {
+    var rows = await db.query(dataSql, dataValues) || [];
+    var mappedRows = rows.map(function(row) {
         return Object.assign({}, row, {
             reviewerName: ((row.reviewerFirstName || '') + ' ' + (row.reviewerLastName || '')).trim(),
             photoUrl: buildPhotoUrl(row.fileId)
         });
     });
+
+    return {
+        rows: mappedRows,
+        total: total
+    };
 }
 
 async function getReviewPhoto(params) {
@@ -223,8 +233,8 @@ async function getReviewPhoto(params) {
         page: 1
     });
 
-    var rows = await getReviewPhotos(queryParams);
-    return (rows && rows.length) ? rows[0] : null;
+    var result = await getReviewPhotos(queryParams);
+    return (result.rows && result.rows.length) ? result.rows[0] : null;
 }
 
 module.exports = {

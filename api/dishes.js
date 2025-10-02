@@ -6,8 +6,8 @@ var approvalService = require('./approvalService');
 router.get('/', async function(req, res) {
     try {
         var data = req.allParams;
-        var dishes = await dishService.getDishes(data);
-        res.json({ success: true, data: dishes });
+        var result = await dishService.getDishes(data);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -20,8 +20,8 @@ router.get('/pending', async function(req, res) {
     try {
         var params = req.allParams || {};
         params.pending = 1;
-        var dishes = await dishService.getDishes(params);
-        res.json({ success: true, data: dishes });
+        var result = await dishService.getDishes(params);
+        res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });

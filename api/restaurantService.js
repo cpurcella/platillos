@@ -19,6 +19,8 @@ var allowedFields = [
 ];
 
 async function getRestaurants(params) {
+    params = params || {};
+
     var selectFields;
     if (params.fields) {
         selectFields = params.fields.filter(function(field) {
@@ -28,9 +30,7 @@ async function getRestaurants(params) {
 
     var useLocation = params.useLocation == '1';
     var lat, lng;
-    var selectClause = '';
-    var vals = [];
-
+    var selectClause;
     if (!selectFields || !selectFields.length) {
         selectClause = 'r.*';
     } else {
@@ -41,6 +41,9 @@ async function getRestaurants(params) {
 
     selectClause += ', c.city as cityName';
 
+    var selectExtra = '';
+    var selectExtraValues = [];
+
     if (useLocation) {
         if (params.lat && params.lng) {
             lat = parseFloat(params.lat); // latitude
@@ -50,12 +53,14 @@ async function getRestaurants(params) {
             lng = parseFloat(params.auth.user.addressLng);
         }
         if (lat && lng) {
-            selectClause += (selectClause ? ', ' : '') + 'ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) as distance';
-            vals.push('POINT(' + lat + ' ' + lng + ')');
+            selectExtra = ', ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) as distance';
+            selectExtraValues.push('POINT(' + lat + ' ' + lng + ')');
         }
     }
 
-    var sql = 'SELECT ' + selectClause + ' FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId WHERE 1=1';
+    var fromClause = ' FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId';
+    var whereClauses = ['1=1'];
+    var whereValues = [];
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
@@ -67,44 +72,34 @@ async function getRestaurants(params) {
             err.status = 403;
             throw err;
         }
-        sql += " AND r.status = 'pending'";
+        whereClauses.push("r.status = 'pending'");
     } else if (!isAdmin) {
-        sql += " AND r.status = 'approved'";
+        whereClauses.push("r.status = 'approved'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
-        sql += ' AND r.status = ?';
-        vals.push(statusFilter);
+        whereClauses.push('r.status = ?');
+        whereValues.push(statusFilter);
     }
 
     if (params.restaurantId) {
-        sql += ' AND r.restaurantId = ?';
-        vals.push(params.restaurantId);
+        whereClauses.push('r.restaurantId = ?');
+        whereValues.push(params.restaurantId);
     }
-
-    var take = 10;
-    var skip = 0;
 
     if (params.prefix) {
-        sql += ' AND r.name LIKE ?';
-        vals.push(params.prefix + '%');
+        whereClauses.push('r.name LIKE ?');
+        whereValues.push(params.prefix + '%');
     }
 
-    if (useLocation && lat && lng) {
-        sql += ' ORDER BY distance ASC';
-    }
+    var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
-    if (params.pageSize) {
-        var parsedPageSize = parseInt(params.pageSize, 10);
-        if (!isNaN(parsedPageSize) && parsedPageSize > 0) {
-            take = parsedPageSize;
-        }
-    }
+    var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
+    var countRows = await db.query(countSql, whereValues) || [];
+    var total = countRows.length ? countRows[0].total : 0;
 
-    if (params.page) {
-        var parsedPage = parseInt(params.page, 10);
-        if (!isNaN(parsedPage) && parsedPage > 0) {
-            skip = (parsedPage - 1) * take;
-        }
-    }
+    var take = parseInt(params.pageSize, 10) || 10;
+    var page = parseInt(params.page, 10) || 1;
+    if (page < 1) page = 1;
+    var skip = (page - 1) * take;
 
     if (params.take) {
         var parsedTake = parseInt(params.take, 10);
@@ -120,11 +115,24 @@ async function getRestaurants(params) {
         }
     }
 
-    sql += ' LIMIT ? OFFSET ?';
-    vals.push(take, skip);
+    var orderClause = '';
+    if (useLocation && lat && lng) {
+        orderClause = ' ORDER BY distance ASC';
+    }
 
-    var rows = await db.query(sql, vals);
-    return rows;
+    var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
+    var dataValues = [];
+    if (selectFields && selectFields.length) {
+        dataValues = dataValues.concat(selectFields);
+    }
+    dataValues = dataValues.concat(selectExtraValues, whereValues, [take, skip]);
+
+    var rows = await db.query(dataSql, dataValues) || [];
+
+    return {
+        rows: rows,
+        total: total
+    };
 }
 
 async function getRestaurant(params) {
