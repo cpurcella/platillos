@@ -31,6 +31,33 @@ var dishListModule = {
             $container.html('<div>No dishes found.</div>');
             return;
         }
+        function renderStars(score) {
+            if (score == null || isNaN(score)) {
+                return '<span class="dish-score-value">No ratings yet</span>';
+            }
+            var numericScore = Number(score);
+            var normalizedScore = numericScore;
+            if (normalizedScore > 5) {
+                normalizedScore = normalizedScore / 2;
+            }
+            var clampedScore = Math.max(0, Math.min(5, normalizedScore));
+            var fullStars = Math.floor(clampedScore);
+            var hasHalf = (clampedScore - fullStars) >= 0.5;
+            var emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+            var starsHtml = '';
+            for (var i = 0; i < fullStars; i++) {
+                starsHtml += '<span class="dish-star dish-star-full">★</span>';
+            }
+            if (hasHalf) {
+                starsHtml += '<span class="dish-star dish-star-half">★</span>';
+            }
+            for (var j = 0; j < emptyStars; j++) {
+                starsHtml += '<span class="dish-star dish-star-empty">★</span>';
+            }
+            var scoreText = numericScore % 1 === 0 ? numericScore.toString() : numericScore.toFixed(1);
+            //starsHtml += '<span class="dish-score-value">' + scoreText + '</span>';
+            return '<span class="dish-stars" aria-label="Rating ' + clampedScore.toFixed(1) + ' out of 5">' + starsHtml + '</span>';
+        }
         dishes.forEach(function(dish) {
             var slug = (dish.name || '').toLowerCase().trim()
                 .replace(/[^a-z0-9\s-]/g, '')
@@ -46,11 +73,13 @@ var dishListModule = {
                             <div class="dish-name">${dish.name}</div>
                             <div class="dish-meta">
                                 <span class="dish-restaurant">${dish.restaurantName || dish.restaurantId}</span>
+                            </div>
+                            <div class="dish-rating">
                                 <span class="dish-score">
-                                    ${dish.score != null ? dish.score : 'N/A'}
-                                    <span class="dish-review-count">
-                                        (${dish.reviewCount || 0} review${dish.reviewCount == 1 ? '' : 's'})
-                                    </span>
+                                    ${renderStars(dish.score)}
+                                </span>
+                                <span class="dish-review-count">
+                                    (${dish.reviewCount || 0} review${dish.reviewCount == 1 ? '' : 's'})
                                 </span>
                             </div>
                         </div>

@@ -121,11 +121,7 @@ async function getRestaurants(params) {
     }
 
     var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
-    var dataValues = [];
-    if (selectFields && selectFields.length) {
-        dataValues = dataValues.concat(selectFields);
-    }
-    dataValues = dataValues.concat(selectExtraValues, whereValues, [take, skip]);
+    var dataValues = [].concat(selectExtraValues, whereValues, [take, skip]);
 
     var rows = await db.query(dataSql, dataValues) || [];
 

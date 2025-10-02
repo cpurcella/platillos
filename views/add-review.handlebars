@@ -16,7 +16,7 @@
                 </div>
             </form>
         </div>
-        <div id="add-restaurant-section" class="hidden" style="margin-top:16px;">
+        <div id="add-restaurant-section" class="hidden section-block">
             <h3>Add a Restaurant</h3>
             <div class="form-row">
                 <div class="form-group">
@@ -44,17 +44,17 @@
                     <input type="text" id="new-restaurant-zip" class="form-input" placeholder="Zip code">
                 </div>
             </div>
-            <div style="margin-top:8px;">
+            <div class="button-row">
                 <a href="javascript:void(0)" class="btn btn-turquoise" id="save-restaurant-btn">Add Restaurant</a>
-                <a href="javascript:void(0)" class="btn" id="cancel-add-restaurant-btn" style="margin-left:8px;">Cancel</a>
+                <a href="javascript:void(0)" class="btn" id="cancel-add-restaurant-btn">Cancel</a>
             </div>
         </div>
-        <div id="dish-search-section" class="hidden" style="margin-top:16px;">
+        <div id="dish-search-section" class="hidden section-block">
             <label class="form-label" for="dish-list">What did you eat?</label>
             <input type="text" id="dish-search" class="form-input" placeholder="Type to search...">
             <div id="dish-list"></div>
         </div>
-        <div id="add-dish-section" class="hidden" style="margin-top:16px;">
+        <div id="add-dish-section" class="hidden section-block">
             <h3>Add a Dish</h3>
             <div class="form-row">
                 <div class="form-group">
@@ -62,12 +62,12 @@
                     <input type="text" id="new-dish-name" class="form-input" placeholder="Dish name">
                 </div>
             </div>
-            <div style="margin-top:8px;">
+            <div class="button-row">
                 <a href="javascript:void(0)" class="btn btn-turquoise" id="save-dish-btn">Save Dish</a>
-                <a href="javascript:void(0)" class="btn" id="cancel-add-dish-btn" style="margin-left:8px;">Cancel</a>
+                <a href="javascript:void(0)" class="btn" id="cancel-add-dish-btn">Cancel</a>
             </div>
         </div>
-        <div id="review-section" class="hidden" style="margin-top:16px;">
+        <div id="review-section" class="hidden section-block">
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label" for="rating">Rating (1-10)</label>
@@ -103,11 +103,11 @@
                     <label class="form-label">Upload Photos</label>
                     <button type="button" class="btn btn-turquoise" id="photo-upload-btn">Choose Photos</button>
                     <input type="file" id="photo-upload" class="hidden" accept=".jpg" multiple>
-                    <div id="photo-upload-preview" style="margin-top: 8px;"></div>
+                    <div id="photo-upload-preview"></div>
                 </div>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-turquoise" id="submit-review" style="width:100%">Submit Review</button>
+                <button type="button" class="btn btn-turquoise btn-block" id="submit-review">Submit Review</button>
             </div>
         </div>
     </div>

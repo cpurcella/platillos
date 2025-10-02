@@ -16,4 +16,4 @@ CREATE TABLE `reviews` (
   KEY `idx_reviews_dishId_submittedBy` (`dishId`,`submittedBy`),
   KEY `idx_reviews_submitted` (`submitted`),
   CONSTRAINT `fk_reviews_dish` FOREIGN KEY (`dishId`) REFERENCES `dishes` (`dishId`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

@@ -12,6 +12,31 @@
     margin-bottom: 4px;
 }
 
+.restaurant-city {
+    font-size: 0.95rem;
+    color: #6b7280;
+}
+
+.section-block {
+    margin-top: 16px;
+}
+
+.button-row {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.btn.is-loading {
+    opacity: 0.75;
+    pointer-events: none;
+}
+
 
 #restaurant-search,#dish-search {
     margin-bottom: 16px; /* Increase space under the search bar */
@@ -52,10 +77,6 @@
     font-weight: 500;
 }
 
-#review-section {
-    margin-top: 16px;
-}
-
 #review-section .form-group {
     margin-bottom: 16px;
 }
@@ -66,6 +87,7 @@
 }
 
 #photo-upload-preview {
+    margin-top: 8px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -99,4 +121,45 @@
 
 .remove-photo-btn:hover {
     background: #4b5563;
+}
+
+.list-footer,
+.empty-state {
+    padding: 12px;
+    text-align: center;
+    color: #4b5563;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.loading-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    font-size: 0.95rem;
+    color: #4b5563;
+}
+
+.loading-indicator .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(14, 116, 144, 0.15);
+    border-top-color: var(--color-turquoise-dark);
+    animation: add-review-spin 0.75s linear infinite;
+}
+
+.empty-actions .btn,
+.list-footer .btn {
+    width: auto;
+}
+
+@keyframes add-review-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
