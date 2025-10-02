@@ -1,0 +1,102 @@
+#add-review-modal .btn {
+   
+}
+#add-review-modal h2 {
+    text-align: center;
+}
+
+
+.restaurant-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+
+#restaurant-search,#dish-search {
+    margin-bottom: 16px; /* Increase space under the search bar */
+}
+
+.restaurant-item.card {
+    margin-bottom: 8px; /* Reduce space between restaurant cards */
+}
+
+.selected-restaurant,.selected-dish {
+    position: relative;
+    border: 2px solid var(--color-turquoise-dark);
+    background-color: var(--color-mint-bg);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin-bottom: 16px;
+}
+
+
+
+.cancel-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    font-size: 0.875rem;
+    line-height: 1.2;
+}
+
+#cancel-selection-btn {
+    display: block;
+    margin-top: 8px;
+    text-align: center;
+}
+
+
+.dish-name {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+#review-section {
+    margin-top: 16px;
+}
+
+#review-section .form-group {
+    margin-bottom: 16px;
+}
+
+#photo-upload {
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+#photo-upload-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#photo-upload-preview img {
+    display: inline-block;
+    margin-right: 8px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid #d1d5db;
+}
+
+.remove-photo-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6b7280;
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease;
+}
+
+.remove-photo-btn:hover {
+    background: #4b5563;
+}

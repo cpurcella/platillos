@@ -1,0 +1,117 @@
+<div id="add-review-modal" class="modal">
+    <link rel="stylesheet" href="/styles/add-review.css">
+    <div class="modal-content">
+        <button class="close-modal" aria-label="Close">&times;</button>
+        <h2>Review a Dish!</h2>
+        <div id="selected-restaurant-container"></div>
+        <div id="selected-dish-container"></div>
+        <div id="restaurant-search-section">
+            <form id="add-review-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="restaurant-search">Where did you eat this dish?</label>
+                        <input type="text" id="restaurant-search" class="form-input" placeholder="Type to search...">
+                        <div id="restaurant-list"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div id="add-restaurant-section" class="hidden" style="margin-top:16px;">
+            <h3>Add a Restaurant</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="new-restaurant-name">Name</label>
+                    <input type="text" id="new-restaurant-name" class="form-input" placeholder="Restaurant name">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="new-restaurant-address">Address</label>
+                    <input type="text" id="new-restaurant-address" class="form-input" placeholder="Street address">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="new-restaurant-city">City</label>
+                    <input type="text" id="new-restaurant-city" class="form-input" placeholder="City name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="new-restaurant-state">State</label>
+                    <input type="text" id="new-restaurant-state" class="form-input" placeholder="State">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="new-restaurant-zip">Zip</label>
+                    <input type="text" id="new-restaurant-zip" class="form-input" placeholder="Zip code">
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <a href="javascript:void(0)" class="btn btn-turquoise" id="save-restaurant-btn">Add Restaurant</a>
+                <a href="javascript:void(0)" class="btn" id="cancel-add-restaurant-btn" style="margin-left:8px;">Cancel</a>
+            </div>
+        </div>
+        <div id="dish-search-section" class="hidden" style="margin-top:16px;">
+            <label class="form-label" for="dish-list">What did you eat?</label>
+            <input type="text" id="dish-search" class="form-input" placeholder="Type to search...">
+            <div id="dish-list"></div>
+        </div>
+        <div id="add-dish-section" class="hidden" style="margin-top:16px;">
+            <h3>Add a Dish</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="new-dish-name">Dish Name</label>
+                    <input type="text" id="new-dish-name" class="form-input" placeholder="Dish name">
+                </div>
+            </div>
+            <div style="margin-top:8px;">
+                <a href="javascript:void(0)" class="btn btn-turquoise" id="save-dish-btn">Save Dish</a>
+                <a href="javascript:void(0)" class="btn" id="cancel-add-dish-btn" style="margin-left:8px;">Cancel</a>
+            </div>
+        </div>
+        <div id="review-section" class="hidden" style="margin-top:16px;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="rating">Rating (1-10)</label>
+                    <select id="rating" class="form-input" required>
+                        <option value="" disabled selected>Select a rating</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="review">What did you think?</label>
+                    <textarea id="review" class="form-input" rows="4" required></textarea>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="modifications">Any modifications to your dish?</label>
+                    <input type="text" id="modifications" class="form-input" placeholder="No onions, extra cheese, etc.">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Upload Photos</label>
+                    <button type="button" class="btn btn-turquoise" id="photo-upload-btn">Choose Photos</button>
+                    <input type="file" id="photo-upload" class="hidden" accept=".jpg" multiple>
+                    <div id="photo-upload-preview" style="margin-top: 8px;"></div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-turquoise" id="submit-review" style="width:100%">Submit Review</button>
+            </div>
+        </div>
+    </div>
+    <script src="/js/add-review.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@latest/dist/browser-image-compression.js"></script>
+</div>
+<div class="overlay"></div>

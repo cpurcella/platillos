@@ -1,0 +1,68 @@
+/* footer.css - Styles for Platillos footer partial */
+
+.footer-bar {
+    width: 100%;
+    background: var(--color-turquoise-dark);
+    color: #fff;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.footer-text {
+    font-size: 1rem;
+    color: #fff;
+    opacity: 0.85;
+}
+
+.footer-nav {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.footer-plus-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    margin: 0 1.5rem;
+    box-shadow: 0 2px 8px rgba(21,211,201,0.13);
+    border-radius: 50%;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.footer-plus-btn:hover, .footer-plus-btn:focus {
+    box-shadow: 0 4px 16px rgba(21,211,201,0.22);
+    transform: scale(1.08);
+}
+
+.footer-plus-btn svg {
+    display: block;
+}
+
+.footer-spacer {
+    flex: 1 1 0;
+}
+
+@media (max-width: 700px) {
+    .footer-content {
+        padding: 1rem 0.7rem;
+    }
+}

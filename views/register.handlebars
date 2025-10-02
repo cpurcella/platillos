@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Platillos - Register</title>
+    <link href="/styles/register.css" rel="stylesheet">
+    {{> head}}
+</head>
+<body>
+    <div class="register-container">
+        <h1 class="platillos-title">Platillos</h1>
+        <form id="register-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="firstName">First Name</label>
+                    <input class="form-input" type="text" id="firstName" name="firstName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="lastName">Last Name</label>
+                    <input class="form-input" type="text" id="lastName" name="lastName" required>
+                </div>
+            <div class="form-group">
+                <label class="form-label" for="dob">Date of Birth</label>
+                <input class="form-input" type="date" id="dob" name="dob" required>
+            </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="email">Email</label>
+                    <input class="form-input" type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmEmail">Confirm Email</label>
+                    <input class="form-input" type="email" id="confirmEmail" name="confirmEmail" required data-confirm="email">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="phone">Phone</label>
+                    <input class="form-input" type="tel" id="phone" name="phone" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmPhone">Confirm Phone</label>
+                    <input class="form-input" type="tel" id="confirmPhone" name="confirmPhone" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="confirmationCode">Ad&#8204;dress
+                    <span class="tooltip" tabindex="0"><span class="tooltip-icon" aria-label="More info" role="img">?</span><span class="tooltip-content"><strong>Why do I need to provide this?</strong><br>Your address will only be used to highlight dishes and restaurants close to you.</span></span>
+                </label>
+                <input class="form-input" type="text" id="confirmationCode" name="confirmationCode" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="newPassword">Password</label>
+                    <input class="form-input" type="password" id="newPassword" name="password" required minlength="10">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">Confirm Password</label>
+                    <input class="form-input" type="password" id="confirmPassword" name="confirmPassword" required data-confirm="newPassword" minlength="10">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="agreedToTerms" required>
+                    I agree to the <a href="/terms-and-conditions" target="_blank" rel="noopener" class="text-turquoise">terms and conditions</a>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="consentSms" required>
+                    I consent to receive a text message for the purpose of verifying my account
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="optInUpdates">
+                    Send me email updates on the best food in my area
+                </label>
+            </div>
+            <div class="form-group">
+                <div class="g-recaptcha" data-sitekey="REMOVED_CREDENTIAL"></div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-turquoise">Create Account</button>
+                <a href="/login" class="btn text-turquoise">Back to Login</a>
+            </div>
+        </form>
+
+        <div id="register-success-message" class="hidden">
+            <h2 class="platillos-title">Account Created!</h2>
+            <p class="success-message">Your account has been created. You won't be able to submit reviews or photos until you've confirmed your phone number.</p>
+            <button id="goToHomeBtn" class="btn btn-turquoise" type="button">Go to Home</button>
+        </div>
+    </div>
+    <script src="/js/google-places.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=REMOVED_CREDENTIAL&libraries=places" async defer></script>
+    <script src="/js/register.js"></script>
+</body>
+</html>

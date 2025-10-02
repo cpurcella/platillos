@@ -1,0 +1,9 @@
+.register-container {
+    background: var(--color-mint-bg);
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 75vw;
+    margin: 2rem auto;
+}

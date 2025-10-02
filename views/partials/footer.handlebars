@@ -1,0 +1,21 @@
+<footer class="footer-bar">
+    <link rel="stylesheet" href="/styles/footer.css">
+    <div class="footer-content">
+        <nav class="footer-nav">
+            <div class="footer-spacer"></div>
+            <a href="javascript:void(0)" class="footer-plus-btn logged-in-only" aria-label="Add">
+                <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="22" cy="22" r="22" fill="#15D3C9"/>
+                    <rect x="20" y="12" width="4" height="20" rx="2" fill="#fff"/>
+                    <rect x="12" y="20" width="20" height="4" rx="2" fill="#fff"/>
+                </svg>
+            </a>
+            <div class="footer-spacer"></div>
+        </nav>
+    </div>
+</footer>
+{{#unless user}}
+{{> login-popup}}
+{{/unless}}
+<script src="/js/footer.js"></script>
+

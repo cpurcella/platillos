@@ -1,0 +1,19 @@
+<div id="approve-restaurant-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-modal" aria-label="Close">&times;</button>
+        <h2>Review Restaurant</h2>
+        <div id="approve-restaurant-content">Loading...</div>
+        <div class="form-row" style="margin-top:16px;">
+            <label for="restaurant-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
+            <select id="restaurant-status-select" style="width:100%;padding:6px 8px;">
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+            </select>
+        </div>
+        <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
+            <a href="javascript:void(0)" class="btn btn-turquoise" id="save-restaurant-status-btn">Submit</a>
+        </div>
+    </div>
+    <script src="/js/approve-restaurant.js"></script>
+</div>
+<div class="overlay"></div>

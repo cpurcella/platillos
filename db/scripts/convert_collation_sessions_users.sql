@@ -1,0 +1,31 @@
+-- Check current collations
+SELECT TABLE_NAME, TABLE_COLLATION
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN ('sessions','users');
+
+-- Convert 'sessions' if needed
+SELECT COUNT(*) INTO @needs FROM INFORMATION_SCHEMA.TABLES
+ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sessions' AND TABLE_COLLATION = 'utf8mb4_0900_ai_ci';
+SET @sql = IF(@needs > 0,
+    'ALTER TABLE `sessions` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    'SELECT \"sessions_no_change\"');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Convert 'users' if needed
+SELECT COUNT(*) INTO @needs FROM INFORMATION_SCHEMA.TABLES
+ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND TABLE_COLLATION = 'utf8mb4_0900_ai_ci';
+SET @sql = IF(@needs > 0,
+    'ALTER TABLE `users` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    'SELECT \"users_no_change\"');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Verify changes
+SELECT TABLE_NAME, TABLE_COLLATION
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN ('sessions','users');

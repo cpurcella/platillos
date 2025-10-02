@@ -1,0 +1,20 @@
+CREATE TABLE `restaurants` (
+  `restaurantId` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cityId` int NOT NULL,
+  `address` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `zip` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `lat` decimal(12,9) NOT NULL,
+  `lng` decimal(12,9) NOT NULL,
+  `submitted` bigint NOT NULL,
+  `submittedBy` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `coords` point GENERATED ALWAYS AS (st_srid(point(`lng`,`lat`),4326)) STORED,
+  `coverImage` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `statusUpdated` bigint DEFAULT NULL,
+  `statusUpdatedBy` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`restaurantId`),
+  UNIQUE KEY `idx_restaurants_name_address` (`name`,`address`),
+  KEY `idx_restaurants_cityId` (`cityId`),
+  KEY `idx_restaurants_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

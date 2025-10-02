@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Platillos - Dish</title>
+    {{> head}}
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/dish.css">
+</head>
+<body class="bg-mint">
+    {{> header}}
+    <div class="main-container dish-page">
+        <section class="dish-header" id="dish-header">
+            <div class="dish-header-info">
+                <h1 id="dish-name" class="platillos-title"></h1>
+                <div class="dish-meta">
+                    <div id="dish-restaurant" class="dish-restaurant"></div>
+                    <div id="dish-score" class="dish-score"></div>
+                </div>
+            </div>
+            <div class="dish-header-photo" id="dish-cover-container"></div>
+        </section>
+        <section class="dish-reviews" id="dish-reviews">
+            <h2 class="section-title">Reviews</h2>
+            <div id="reviews-list" class="reviews-list"></div>
+            <div class="reviews-pagination">
+                <button id="reviews-prev" class="reviews-page-btn" disabled>Previous</button>
+                <span id="reviews-page" class="reviews-page-label">Page 1</span>
+                <button id="reviews-next" class="reviews-page-btn" disabled>Next</button>
+            </div>
+        </section>
+    </div>
+    {{> footer}}
+    <script src="/js/dish.js"></script>
+</body>
+</html>

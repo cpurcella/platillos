@@ -1,0 +1,47 @@
+/* terms-and-conditions.css - Styles for Platillos Terms and Conditions page */
+.terms-container {
+    background: #fff;
+    padding: 2.5rem 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 48rem;
+    margin: 2.5rem auto;
+    font-size: 1.08rem;
+    color: #222;
+}
+.terms-container h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.2rem;
+    color: var(--color-turquoise-dark);
+    text-align: center;
+}
+.terms-container h3 {
+    font-size: 1.13rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-turquoise-dark);
+}
+.terms-container p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+.terms-container a {
+    color: var(--color-turquoise-dark);
+    text-decoration: underline;
+    word-break: break-all;
+}
+@media (max-width: 700px) {
+    .terms-container {
+        padding: 1.2rem 0.5rem;
+        font-size: 1rem;
+    }
+    .terms-container h2 {
+        font-size: 1.15rem;
+    }
+    .terms-container h3 {
+        font-size: 1.01rem;
+    }
+}

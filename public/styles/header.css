@@ -1,0 +1,52 @@
+/* header.css - Styles for Platillos header partial */
+
+.header-bar {
+    width: 100%;
+    background: var(--color-turquoise-dark);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 0;
+    margin: 0;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header-logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    letter-spacing: 0.03em;
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+}
+
+.header-welcome {
+    font-size: 1.05rem;
+    margin-right: 0.7rem;
+    color: #fff;
+    font-weight: 500;
+}
+
+@media (max-width: 700px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.7rem;
+        padding: 1rem 0.7rem;
+    }
+    .header-nav {
+        gap: 0.7rem;
+    }
+}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Platillos - Approvals</title>
+    {{> head}}
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/approvals.css">
+    <link rel="stylesheet" href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css">
+    <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+</head>
+<body class="bg-mint">
+    {{> header}}
+    <div id="approvals-container" class="approvals-page">
+
+        <div class="tabs">
+            <a href="javascript:void(0)">Reviews</a>
+            <a href="javascript:void(0)">Dishes</a>
+            <a href="javascript:void(0)">Restaurants</a>
+            <a href="javascript:void(0)">Photos</a>
+        </div>
+
+        <div class="tab-panels">
+            <div class="tab-content" id="tab-reviews">
+                <div id="reviews-grid"></div>
+            </div>
+            <div class="tab-content" id="tab-dishes">
+                <div id="dishes-grid"></div>
+            </div>
+            <div class="tab-content" id="tab-restaurants">
+                <div id="restaurants-grid"></div>
+            </div>
+            <div class="tab-content" id="tab-images">
+                <div id="photos-grid"></div>
+            </div>
+        </div>
+    </div>
+    {{> footer}}
+    <script src="/js/approvals.js"></script>
+</body>
+</html>

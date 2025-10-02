@@ -1,0 +1,53 @@
+/* approvals.css - Styles for Platillos approvals page */
+
+
+
+#approvals-container {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    padding: 2.5rem 1.5rem; /* gutters left/right */
+    margin: 0; /* full width, no centering */
+}
+
+.approvals-page .card {
+    color: #222;
+}
+
+#approvals-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+#pending-reviews, #pending-dishes, #pending-restaurants, #pending-images {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+#pending-reviews h2, #pending-dishes h2, #pending-restaurants h2, #pending-images h2 {
+    margin-top: 0;
+    color: var(--color-turquoise-dark);
+}
+
+#reviews-grid .gridjs-table {
+    table-layout: fixed;
+}
+#reviews-grid .gridjs-th,
+#reviews-grid .gridjs-td,
+#reviews-grid .nowrap-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#reviews-grid .col-rating {
+    text-align: center;
+}
+/* Optional: keep review column from expanding too much on narrow screens */
+@media (max-width: 900px) {
+    #reviews-grid .col-review {
+        max-width: 260px;
+    }
+}

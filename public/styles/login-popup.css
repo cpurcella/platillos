@@ -1,0 +1,29 @@
+#login-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--color-mint-bg);
+    border-radius: 0.5rem;
+    z-index: 1001;
+    padding: 20px;
+}
+
+#login-popup .popup-content {
+    text-align: center;
+}
+
+#login-popup .btn {
+    margin: 10px;
+}
+
+#login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.32);
+    z-index: 1000;
+    display: none;
+}
