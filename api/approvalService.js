@@ -8,6 +8,67 @@ function buildPhotoUrl(fileId) {
     return 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId;
 }
 
+function normalizeIdList(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    var list;
+    if (Array.isArray(value)) {
+        list = value;
+    } else if (value === null || value === '') {
+        list = [];
+    } else if (typeof value === 'string') {
+        list = value.split(',').map(function(part) {
+            return part.trim();
+        });
+    } else {
+        list = [value];
+    }
+
+    var normalized = [];
+    for (var i = 0; i < list.length; i++) {
+        var item = list[i];
+        if (item === null || item === undefined || item === '') continue;
+        var num = Number(item);
+        if (!isNaN(num)) {
+            var intVal = parseInt(num, 10);
+            if (!isNaN(intVal) && intVal > 0) {
+                normalized.push(intVal);
+            }
+        }
+    }
+
+    if (!normalized.length) {
+        return [];
+    }
+
+    var seen = {};
+    var unique = [];
+    for (var j = 0; j < normalized.length; j++) {
+        var val = normalized[j];
+        if (!seen[val]) {
+            seen[val] = true;
+            unique.push(val);
+        }
+    }
+    return unique;
+}
+
+async function replaceDishMappings(connection, dishId, ids, tableName, columnName) {
+    await connection.query('DELETE FROM ' + tableName + ' WHERE dishId = ?', [dishId]);
+    if (!ids || !ids.length) {
+        return;
+    }
+
+    var placeholders = ids.map(function() { return '(?, ?)'; }).join(', ');
+    var params = [];
+    for (var i = 0; i < ids.length; i++) {
+        params.push(dishId, ids[i]);
+    }
+    await connection.query('INSERT INTO ' + tableName + ' (dishId, ' + columnName + ') VALUES ' + placeholders, params);
+}
+
 async function updateReviewStatus(params) {
     var auth = params && params.auth;
     var reviewId = params && params.reviewId;
@@ -57,17 +118,54 @@ async function updateDishStatus(params) {
         throw err;
     }
 
-    var approverUserId = auth.user.userId;
-    var nowMs = Date.now();
-    var statusUpdated = status === 'pending' ? null : nowMs;
-    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
-    var sql = 'UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ?';
-    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, dishId]);
-    if (!result || result.affectedRows === 0) {
-        err = new Error('Dish not found');
-        err.status = 404;
-        throw err;
+    var categories = normalizeIdList(params ? params.categories : undefined);
+    var dishTypes = normalizeIdList(params ? params.dishTypes : undefined);
+    var tags = normalizeIdList(params ? params.tags : undefined);
+    var shouldUpdateMetadata = categories !== undefined || dishTypes !== undefined || tags !== undefined;
+
+    var connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        var approverUserId = auth.user.userId;
+        var nowMs = Date.now();
+        var statusUpdated = status === 'pending' ? null : nowMs;
+        var statusUpdatedBy = status === 'pending' ? null : approverUserId;
+        var sql = 'UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ?';
+        var updateResult = await connection.query(sql, [status, statusUpdated, statusUpdatedBy, dishId]);
+        var affectedRows = Array.isArray(updateResult) ? updateResult[0] && updateResult[0].affectedRows : updateResult && updateResult.affectedRows;
+        if (!affectedRows) {
+            err = new Error('Dish not found');
+            err.status = 404;
+            throw err;
+        }
+
+        if (shouldUpdateMetadata) {
+            if (categories !== undefined) {
+                await replaceDishMappings(connection, dishId, categories, 'dishes_categories', 'categoryId');
+            }
+            if (dishTypes !== undefined) {
+                await replaceDishMappings(connection, dishId, dishTypes, 'dishes_dishTypes', 'dishTypeId');
+            }
+            if (tags !== undefined) {
+                await replaceDishMappings(connection, dishId, tags, 'dishes_tags', 'tagId');
+            }
+        }
+
+        await connection.commit();
+    } catch (e) {
+        try {
+            await connection.rollback();
+        } catch (rollbackErr) {
+            // swallow rollback errors
+        }
+        throw e;
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
+
     return true;
 }
 

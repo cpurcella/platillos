@@ -7,6 +7,63 @@ function escapeLikePattern(value) {
     });
 }
 
+async function getDishMetadata(dishId) {
+    if (!dishId) {
+        return {
+            categories: [],
+            dishTypes: [],
+            tags: []
+        };
+    }
+
+    var metadataQueries = await Promise.all([
+        db.query(
+            `SELECT c.categoryId, c.category
+             FROM dishes_categories dc
+             JOIN categories c ON dc.categoryId = c.categoryId
+             WHERE dc.dishId = ?
+             ORDER BY c.category`,
+            [dishId]
+        ),
+        db.query(
+            `SELECT dt.dishTypeId, dt.dishType
+             FROM dishes_dishTypes dd
+             JOIN dishTypes dt ON dd.dishTypeId = dt.dishTypeId
+             WHERE dd.dishId = ?
+             ORDER BY dt.dishType`,
+            [dishId]
+        ),
+        db.query(
+            `SELECT t.tagId, t.tag
+             FROM dishes_tags dtag
+             JOIN tags t ON dtag.tagId = t.tagId
+             WHERE dtag.dishId = ?
+             ORDER BY t.tag`,
+            [dishId]
+        )
+    ]);
+
+    return {
+        categories: metadataQueries[0] || [],
+        dishTypes: metadataQueries[1] || [],
+        tags: metadataQueries[2] || []
+    };
+}
+
+async function getDishMetadataOptions() {
+    var metadataRows = await Promise.all([
+        db.query('SELECT categoryId, category FROM categories ORDER BY category'),
+        db.query('SELECT dishTypeId, dishType FROM dishTypes ORDER BY dishType'),
+        db.query('SELECT tagId, tag FROM tags ORDER BY tag')
+    ]);
+
+    return {
+        categories: metadataRows[0] || [],
+        dishTypes: metadataRows[1] || [],
+        tags: metadataRows[2] || []
+    };
+}
+
 async function getDishes(params) {
     params = params || {};
     var selectFields = params.fields;
@@ -159,6 +216,12 @@ async function getDish(params) {
     if (dish.coverPhoto) {
         dish.coverPhoto = 'https://' + config.bucket + '.s3.amazonaws.com/' + dish.coverPhoto;
     }
+
+    var metadata = await getDishMetadata(dish.dishId);
+    dish.categories = metadata.categories;
+    dish.dishTypes = metadata.dishTypes;
+    dish.tags = metadata.tags;
+
     return dish;
 }
 
@@ -212,6 +275,7 @@ async function setDishScores() {
 module.exports = {
     getDishes: getDishes,
     getDish: getDish,
+    getDishMetadataOptions: getDishMetadataOptions,
     setDishScores: setDishScores
 };
 

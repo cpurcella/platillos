@@ -30,6 +30,15 @@ router.get('/pending', async function(req, res) {
     }
 });
 
+router.get('/metadata/options', async function(req, res) {
+    try {
+        var options = await dishService.getDishMetadataOptions();
+        res.json({ success: true, data: options });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 router.get('/:dishId', async function(req, res) {
     try {
         var dish = await dishService.getDish(req.allParams);

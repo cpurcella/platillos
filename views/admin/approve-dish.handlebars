@@ -2,17 +2,53 @@
     <div class="modal-content">
         <button class="close-modal" aria-label="Close">&times;</button>
         <h2>Review Dish</h2>
-        <div id="approve-dish-content">Loading...</div>
-        <div class="form-row" style="margin-top:16px;">
-            <label for="dish-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
-            <select id="dish-status-select" style="width:100%;padding:6px 8px;">
+        <div id="approve-dish-content">
+            <div class="dish-summary">
+                <div>
+                    <div class="dish-summary-label">Dish</div>
+                    <div id="approve-dish-name">Loading...</div>
+                </div>
+                <div>
+                    <div class="dish-summary-label">Restaurant</div>
+                    <div id="approve-dish-restaurant"></div>
+                </div>
+                <div>
+                    <div class="dish-summary-label">Submitted</div>
+                    <div id="approve-dish-submitted"></div>
+                </div>
+            </div>
+            <div class="metadata-section">
+                <div class="metadata-section-title">Metadata</div>
+                <div id="metadata-error" class="metadata-error"></div>
+                <div class="metadata-groups">
+                    <div class="metadata-group" data-field="categories">
+                        <label class="metadata-group-label">Categories</label>
+                        <input type="text" class="metadata-filter-input" data-target="dish-categories-chips" placeholder="Filter categories">
+                        <div id="dish-categories-chips" class="metadata-chip-list" role="listbox" aria-multiselectable="true"></div>
+                    </div>
+                    <div class="metadata-group" data-field="dishTypes">
+                        <label class="metadata-group-label">Dish Types</label>
+                        <input type="text" class="metadata-filter-input" data-target="dish-types-chips" placeholder="Filter dish types">
+                        <div id="dish-types-chips" class="metadata-chip-list" role="listbox" aria-multiselectable="true"></div>
+                    </div>
+                    <div class="metadata-group" data-field="tags">
+                        <label class="metadata-group-label">Tags</label>
+                        <input type="text" class="metadata-filter-input" data-target="dish-tags-chips" placeholder="Filter tags">
+                        <div id="dish-tags-chips" class="metadata-chip-list" role="listbox" aria-multiselectable="true"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-row approve-dish-status-row">
+            <label for="dish-status-select" class="approve-dish-status-label">Status</label>
+            <select id="dish-status-select" class="approve-dish-status-select">
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
             </select>
         </div>
-        <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
-            <a href="javascript:void(0)" class="btn btn-turquoise" id="save-dish-status-btn">Submit</a>
+        <div class="form-actions approve-dish-actions">
+            <button type="button" class="btn btn-turquoise" id="save-dish-status-btn">Submit</button>
         </div>
     </div>
     <script src="/js/approve-dish.js"></script>
