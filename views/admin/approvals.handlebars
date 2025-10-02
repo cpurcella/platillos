@@ -21,15 +21,43 @@
 
         <div class="tab-panels">
             <div class="tab-content" id="tab-reviews">
+                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                    <label for="reviews-status-filter" style="font-weight:600;">Show</label>
+                    <select id="reviews-status-filter" style="padding:6px 8px;">
+                        <option value="pending" selected>Pending</option>
+                        <option value="approved">Approved</option>
+                    </select>
+                </div>
                 <div id="reviews-grid"></div>
             </div>
             <div class="tab-content" id="tab-dishes">
+                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                    <label for="dishes-status-filter" style="font-weight:600;">Show</label>
+                    <select id="dishes-status-filter" style="padding:6px 8px;">
+                        <option value="pending" selected>Pending</option>
+                        <option value="approved">Approved</option>
+                    </select>
+                </div>
                 <div id="dishes-grid"></div>
             </div>
             <div class="tab-content" id="tab-restaurants">
+                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                    <label for="restaurants-status-filter" style="font-weight:600;">Show</label>
+                    <select id="restaurants-status-filter" style="padding:6px 8px;">
+                        <option value="pending" selected>Pending</option>
+                        <option value="approved">Approved</option>
+                    </select>
+                </div>
                 <div id="restaurants-grid"></div>
             </div>
             <div class="tab-content" id="tab-images">
+                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                    <label for="photos-status-filter" style="font-weight:600;">Show</label>
+                    <select id="photos-status-filter" style="padding:6px 8px;">
+                        <option value="pending" selected>Pending</option>
+                        <option value="approved">Approved</option>
+                    </select>
+                </div>
                 <div id="photos-grid"></div>
             </div>
         </div>

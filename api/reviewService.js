@@ -175,13 +175,19 @@ async function getReviews(params) {
     }
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    if (String(params.pending) === '1') {
+    var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
+
+    if (shouldFilterPending) {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
             throw err;
         }
         sql += ' AND r.status IS NULL';
+    } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+        sql += ' AND r.status = ?';
+        vals.push(statusFilter);
     }
 
     sql += ' ORDER BY r.submitted DESC LIMIT ? OFFSET ?';

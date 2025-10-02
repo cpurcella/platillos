@@ -50,9 +50,22 @@ router.post('/photos/:reviewPhotoId/:status', async function(req, res) {
     }
 });
 
+router.get('/photos', async function(req, res) {
+    try {
+        var params = Object.assign({ pageSize: 10, page: 1 }, req.allParams || {});
+        var rows = await approvalService.getReviewPhotos(params);
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        if (err.status) {
+            return res.status(err.status).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 router.get('/photos/pending', async function(req, res) {
     try {
-        var params = Object.assign({}, req.allParams || {}, { pending: 1, pageSize: 10, page: 1 });
+        var params = Object.assign({ pageSize: 10, page: 1 }, req.allParams || {}, { pending: 1 });
         var rows = await approvalService.getReviewPhotos(params);
         res.json({ success: true, data: rows });
     } catch (err) {

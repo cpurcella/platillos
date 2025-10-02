@@ -21,7 +21,10 @@ async function getDishes(params) {
     var sql = 'SELECT ' + selectClause + ' FROM dishes d JOIN restaurants r ON d.restaurantId = r.restaurantId WHERE 1=1';
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    if (String(params.pending) === '1') {
+    var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
+
+    if (shouldFilterPending) {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
@@ -30,6 +33,9 @@ async function getDishes(params) {
         sql += " AND d.status = 'pending'";
     } else if (!isAdmin) {
         sql += " AND d.status = 'approved' AND r.status = 'approved'";
+    } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+        sql += ' AND d.status = ?';
+        vals.push(statusFilter);
     }
 
     if (params.restaurantId) {

@@ -58,7 +58,10 @@ async function getRestaurants(params) {
     var sql = 'SELECT ' + selectClause + ' FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId WHERE 1=1';
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    if (String(params.pending) === '1') {
+    var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
+
+    if (shouldFilterPending) {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
@@ -67,6 +70,9 @@ async function getRestaurants(params) {
         sql += " AND r.status = 'pending'";
     } else if (!isAdmin) {
         sql += " AND r.status = 'approved'";
+    } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+        sql += ' AND r.status = ?';
+        vals.push(statusFilter);
     }
 
     if (params.restaurantId) {

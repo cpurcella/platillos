@@ -3,6 +3,10 @@ var approvalsModule = {
     dishGrid: null,
     restaurantGrid: null,
     photoGrid: null,
+    reviewStatus: 'pending',
+    dishStatus: 'pending',
+    restaurantStatus: 'pending',
+    photoStatus: 'pending',
 
     setHandlers: function() {
         $(document).ready(function() {
@@ -15,10 +19,32 @@ var approvalsModule = {
         $('#dishes-grid').on('click', '.review-dish-btn', approvalsModule.openDishModal);
         $('#restaurants-grid').on('click', '.review-restaurant-btn', approvalsModule.openRestaurantModal);
         $('#photos-grid').on('click', '.review-photo-btn', approvalsModule.openPhotoModal);
+        $('#reviews-status-filter').on('change', function() {
+            var status = $(this).val();
+            approvalsModule.reviewStatus = status;
+            approvalsModule.initReviewsGrid(status);
+        });
+        $('#dishes-status-filter').on('change', function() {
+            var status = $(this).val();
+            approvalsModule.dishStatus = status;
+            approvalsModule.initDishesGrid(status);
+        });
+        $('#restaurants-status-filter').on('change', function() {
+            var status = $(this).val();
+            approvalsModule.restaurantStatus = status;
+            approvalsModule.initRestaurantsGrid(status);
+        });
+        $('#photos-status-filter').on('change', function() {
+            var status = $(this).val();
+            approvalsModule.photoStatus = status;
+            approvalsModule.initPhotosGrid(status);
+        });
     },
-    initReviewsGrid: async function() {
+    initReviewsGrid: async function(status) {
+        status = status || approvalsModule.reviewStatus || 'pending';
+        approvalsModule.reviewStatus = status;
         try {
-            var res = await $.get('/api/reviews', { pending: 1, pageSize: 10, page: 1 });
+            var res = await $.get('/api/reviews', { status: status, pageSize: 10, page: 1 });
             var rows = (res.data || []).map(function(r) {
                 var reviewer = (r.firstName || r.lastName) ? ((r.firstName || '') + ' ' + (r.lastName || '')).trim() : (r.email || r.submittedBy);
                 return [
@@ -53,13 +79,16 @@ var approvalsModule = {
                 });
                 approvalsModule.reviewGrid.render(document.getElementById('reviews-grid'));
             }
+            $('#reviews-status-filter').val(status);
         } catch (err) {
             common.showAlert('Failed to load reviews', 'error');
         }
     },
-    initDishesGrid: async function() {
+    initDishesGrid: async function(status) {
+        status = status || approvalsModule.dishStatus || 'pending';
+        approvalsModule.dishStatus = status;
         try {
-            var res = await $.get('/api/dishes/pending', { pending: 1, pageSize: 10, page: 1 });
+            var res = await $.get('/api/dishes', { status: status, pageSize: 10, page: 1 });
             var rows = (res.data || []).map(function(d) {
                 return [
                     d.name || '',
@@ -80,13 +109,16 @@ var approvalsModule = {
                 });
                 approvalsModule.dishGrid.render(document.getElementById('dishes-grid'));
             }
+            $('#dishes-status-filter').val(status);
         } catch (err) {
             common.showAlert('Failed to load dishes', 'error');
         }
     },
-    initRestaurantsGrid: async function() {
+    initRestaurantsGrid: async function(status) {
+        status = status || approvalsModule.restaurantStatus || 'pending';
+        approvalsModule.restaurantStatus = status;
         try {
-            var res = await $.get('/api/restaurants/pending', { pending: 1, pageSize: 10, page: 1 });
+            var res = await $.get('/api/restaurants', { status: status, pageSize: 10, page: 1 });
             var rows = (res.data || []).map(function(r) {
                 return [
                     r.name || '',
@@ -108,13 +140,16 @@ var approvalsModule = {
                 });
                 approvalsModule.restaurantGrid.render(document.getElementById('restaurants-grid'));
             }
+            $('#restaurants-status-filter').val(status);
         } catch (err) {
             common.showAlert('Failed to load restaurants', 'error');
         }
     },
-    initPhotosGrid: async function() {
+    initPhotosGrid: async function(status) {
+        status = status || approvalsModule.photoStatus || 'pending';
+        approvalsModule.photoStatus = status;
         try {
-            var res = await $.get('/api/approvals/photos/pending', { pending: 1, pageSize: 10, page: 1 });
+            var res = await $.get('/api/approvals/photos', { status: status, pageSize: 10, page: 1 });
             var rows = (res.data || []).map(function(p) {
                 var reviewer = p.reviewerName || p.reviewerEmail || '';
                 var reviewSnippet = (p.reviewContent || '').length > 120 ? (p.reviewContent || '').substring(0, 117) + '...' : (p.reviewContent || '');
@@ -142,6 +177,7 @@ var approvalsModule = {
                 });
                 approvalsModule.photoGrid.render(document.getElementById('photos-grid'));
             }
+            $('#photos-status-filter').val(status);
         } catch (err) {
             common.showAlert('Failed to load photos', 'error');
         }

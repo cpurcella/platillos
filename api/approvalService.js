@@ -159,7 +159,10 @@ async function getReviewPhotos(params) {
     `;
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    if (String(params.pending) === '1') {
+    var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
+
+    if (shouldFilterPending) {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
@@ -168,6 +171,9 @@ async function getReviewPhotos(params) {
         sql += " AND rp.status = 'pending'";
     } else if (!isAdmin) {
         sql += " AND rp.status = 'approved'";
+    } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+        sql += ' AND rp.status = ?';
+        vals.push(statusFilter);
     }
 
     if (params.reviewPhotoId) {
