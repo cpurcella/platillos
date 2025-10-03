@@ -14,18 +14,6 @@ router.post('/reviews/:reviewId/:status', async function(req, res) {
     }
 });
 
-router.post('/dishes/:dishId/:status', async function(req, res) {
-    try {
-        await approvalService.updateDishStatus(req.allParams);
-        res.json({ success: true, message: 'Dish ' + String(req.allParams.status || '').toLowerCase() });
-    } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ success: false, message: err.message });
-        }
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
 router.post('/restaurants/:restaurantId/:status', async function(req, res) {
     try {
         await approvalService.updateRestaurantStatus(req.allParams);

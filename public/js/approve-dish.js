@@ -175,7 +175,15 @@ var approveDishModule = {
         }
 
         var status = $('#dish-status-select').val();
-        var payload = {};
+        var normalizedStatus = (status || '').toLowerCase();
+        if (!['approved', 'rejected', 'pending'].includes(normalizedStatus)) {
+            common.showAlert('Please select a valid status.', 'error');
+            return;
+        }
+
+        var payload = {
+            status: normalizedStatus
+        };
         var categories = approveDishModule.getSelectedIdsFromChips('#dish-categories-chips');
         if (categories !== undefined) {
             payload.categories = categories;
@@ -197,15 +205,16 @@ var approveDishModule = {
 
         try {
             var res = await $.ajax({
-                url: '/api/approvals/dishes/' + encodeURIComponent(dishId) + '/' + encodeURIComponent(status),
-                method: 'POST',
+                url: '/api/dishes/' + encodeURIComponent(dishId),
+                method: 'PATCH',
                 dataType: 'json',
                 contentType: 'application/json',
                 processData: false,
                 data: JSON.stringify(payload)
             });
             if (res && res.success) {
-                common.showAlert('Dish ' + status + '.', 'success');
+                var message = (res && res.message) || ('Dish ' + normalizedStatus + '.');
+                common.showAlert(message, 'success');
                 $('#approve-dish-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
                 if (window.approvalsModule && approvalsModule.initDishesGrid) {

@@ -1,6 +1,67 @@
 var db = require('../connections');
 var config = require('../config');
 
+function normalizeIdList(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    var list;
+    if (Array.isArray(value)) {
+        list = value;
+    } else if (value === null || value === '') {
+        list = [];
+    } else if (typeof value === 'string') {
+        list = value.split(',').map(function(part) {
+            return part.trim();
+        });
+    } else {
+        list = [value];
+    }
+
+    var normalized = [];
+    for (var i = 0; i < list.length; i++) {
+        var item = list[i];
+        if (item === null || item === undefined || item === '') continue;
+        var num = Number(item);
+        if (!isNaN(num)) {
+            var intVal = parseInt(num, 10);
+            if (!isNaN(intVal) && intVal > 0) {
+                normalized.push(intVal);
+            }
+        }
+    }
+
+    if (!normalized.length) {
+        return [];
+    }
+
+    var seen = {};
+    var unique = [];
+    for (var j = 0; j < normalized.length; j++) {
+        var val = normalized[j];
+        if (!seen[val]) {
+            seen[val] = true;
+            unique.push(val);
+        }
+    }
+    return unique;
+}
+
+async function replaceDishMappings(connection, dishId, ids, tableName, columnName) {
+    await connection.query('DELETE FROM ' + tableName + ' WHERE dishId = ?', [dishId]);
+    if (!ids || !ids.length) {
+        return;
+    }
+
+    var placeholders = ids.map(function() { return '(?, ?)'; }).join(', ');
+    var params = [];
+    for (var i = 0; i < ids.length; i++) {
+        params.push(dishId, ids[i]);
+    }
+    await connection.query('INSERT INTO ' + tableName + ' (dishId, ' + columnName + ') VALUES ' + placeholders, params);
+}
+
 function escapeLikePattern(value) {
     return value.replace(/[\\%_]/g, function(char) {
         return '\\' + char;
@@ -272,11 +333,94 @@ async function setDishScores() {
     }
 }
 
+async function updateDish(params) {
+    params = params || {};
+
+    var err;
+    var dishId = params.dishId;
+    if (!dishId) {
+        err = new Error('Missing dishId');
+        err.status = 400;
+        throw err;
+    }
+
+    var shouldUpdateStatus = Object.prototype.hasOwnProperty.call(params, 'status');
+    var statusValue = shouldUpdateStatus ? String(params.status || '').toLowerCase() : undefined;
+    if (shouldUpdateStatus && ['approved', 'rejected', 'pending'].indexOf(statusValue) === -1) {
+        err = new Error('Invalid status');
+        err.status = 400;
+        throw err;
+    }
+
+    var categories = normalizeIdList(params.categories);
+    var dishTypes = normalizeIdList(params.dishTypes);
+    var tags = normalizeIdList(params.tags);
+    var shouldUpdateMetadata = categories !== undefined || dishTypes !== undefined || tags !== undefined;
+
+    if (!shouldUpdateStatus && !shouldUpdateMetadata) {
+        return { updated: false };
+    }
+
+    var connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        var dishRowsResult = await connection.query('SELECT dishId FROM dishes WHERE dishId = ? FOR UPDATE', [dishId]);
+        var dishRows = Array.isArray(dishRowsResult) ? dishRowsResult[0] : dishRowsResult;
+        if (!dishRows || !dishRows.length) {
+            err = new Error('Dish not found');
+            err.status = 404;
+            throw err;
+        }
+
+        if (shouldUpdateStatus) {
+            var approverUserId = params?.auth?.user?.userId || null;
+            var nowMs = Date.now();
+            var statusUpdated = statusValue === 'pending' ? null : nowMs;
+            var statusUpdatedBy = statusValue === 'pending' ? null : approverUserId;
+            var statusSql = 'UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ?';
+            var statusResult = await connection.query(statusSql, [statusValue, statusUpdated, statusUpdatedBy, dishId]);
+            var statusAffected = Array.isArray(statusResult) ? statusResult[0] && statusResult[0].affectedRows : statusResult && statusResult.affectedRows;
+            if (!statusAffected) {
+                err = new Error('Dish not found');
+                err.status = 404;
+                throw err;
+            }
+        }
+
+        if (shouldUpdateMetadata) {
+            if (categories !== undefined) {
+                await replaceDishMappings(connection, dishId, categories, 'dishes_categories', 'categoryId');
+            }
+            if (dishTypes !== undefined) {
+                await replaceDishMappings(connection, dishId, dishTypes, 'dishes_dishTypes', 'dishTypeId');
+            }
+            if (tags !== undefined) {
+                await replaceDishMappings(connection, dishId, tags, 'dishes_tags', 'tagId');
+            }
+        }
+
+        await connection.commit();
+    } catch (e) {
+        try {
+            await connection.rollback();
+        } catch (rollbackErr) {
+            // ignore rollback errors
+        }
+        throw e;
+    } finally {
+        connection.release();
+    }
+
+    return { updated: true };
+}
+
 module.exports = {
     getDishes: getDishes,
     getDish: getDish,
     getDishMetadataOptions: getDishMetadataOptions,
-    setDishScores: setDishScores
+    setDishScores: setDishScores,
+    updateDish: updateDish
 };
 
 setDishScores();

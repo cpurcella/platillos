@@ -1,7 +1,6 @@
 var express = require('express');
 var router = express.Router();
 var dishService = require('./dishService');
-var approvalService = require('./approvalService');
 
 router.get('/', async function(req, res) {
     try {
@@ -54,11 +53,13 @@ router.get('/:dishId', async function(req, res) {
     }
 });
 
-// Approve/Reject a dish
-router.post('/:dishId/:status', async function(req, res) {
+router.patch('/:dishId', async function(req, res) {
     try {
-        await approvalService.updateDishStatus(req.allParams);
-        res.json({ success: true, message: 'Dish ' + String(req.allParams.status || '').toLowerCase() });
+        var params = Object.assign({}, req.allParams || {}, { dishId: req.params.dishId });
+        var result = await dishService.updateDish(params);
+        var status = params.status ? String(params.status).toLowerCase() : '';
+        var message = status ? 'Dish ' + status : 'Dish updated';
+        res.json({ success: true, message: message, data: result });
     } catch (err) {
         if (err.status) {
             return res.status(err.status).json({ success: false, message: err.message });
