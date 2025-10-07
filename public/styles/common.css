@@ -4,6 +4,10 @@
     --color-mint-bg: #e6f9f8;
 }
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, 'Liberation Sans', sans-serif;
     background: var(--color-mint-bg);
@@ -110,7 +114,7 @@ header .btn-turquoise {
     border-radius: 0.5rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     width: 100%;
-    max-width: 24rem;
+    max-width: min(24rem, 98vw);
     margin: 2rem auto;
 }
 .tooltip {
@@ -235,7 +239,7 @@ header .btn-turquoise {
     overflow-y: auto;
     bottom: 0;
     transform: translateX(-50%) translateY(100%);
-    width: 75vw;
+    width: 90vw;
     max-width: 800px;
     background: var(--color-mint-bg);
     z-index: 1001;

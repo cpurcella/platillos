@@ -8,6 +8,7 @@ router.get('/', async function(req, res) {
         var result = await dishService.getDishes(data);
         res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
+        console.log(err)
         res.status(500).json({ success: false, message: err.message });
     }
 });

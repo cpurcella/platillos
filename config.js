@@ -8,7 +8,8 @@ var config = {
     dbUser: "REMOVED_CONFIGURATION",
     perplexityKey: "REMOVED_CREDENTIAL",
     cookieSecret: "REMOVED_CREDENTIAL",
-    awsRegion: "us-east-1" // Always use us-east-1
+    awsRegion: "us-east-1",
+    env: env
 };
 
 var envConfig = {
@@ -20,10 +21,15 @@ var envConfig = {
         awsSecretKey: "REMOVED_CREDENTIAL"
     },
     prod: {
-        database: 'platillos_prod',
+        database: 'prod',
         bucket: 'platillos-prod',
-        awsAccessKey: process.env.AWS_ACCESS_KEY_ID,
-        awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY
+        awsAccessKey: process.env.awsAccessKey,
+        awsSecretKey: process.env.awsSecretKey,
+        dbPassword: process.env.dbPassword,
+        dbUrl: process.env.dbUrl,
+        dbUser: process.env.dbUser,
+        awsRegion: "us-west-2",
+        cookieSecret: process.env.cookieSecret
     }
 };
 

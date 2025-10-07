@@ -91,10 +91,23 @@ async function extendSession(sessionId) {
     return newSession;
 }
 
+async function endSession(sessionId) {
+    if (!sessionId) {
+        return;
+    }
+    try {
+        await db.query('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
+    } catch (err) {
+        // Ignore errors during logout to avoid blocking the user
+        console.warn('Failed to delete session during logout', err);
+    }
+}
+
 module.exports = {
     verifyRecaptchaToken: verifyRecaptchaToken,
     authenticate: authenticate,
     startSession: startSession,
     getSession: getSession,
-    extendSession: extendSession
+    extendSession: extendSession,
+    endSession: endSession
 };

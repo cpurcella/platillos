@@ -8,21 +8,27 @@ var approvalsModule = {
     restaurantStatus: 'pending',
     photoStatus: 'pending',
 
+    buildDataUrl: function(baseUrl, statusGetter, page, limit) {
+        var normalizedLimit = limit || 10;
+        var normalizedPage = (typeof page === 'number' && page >= 0) ? page : 0;
+        var paramsObj = {
+            page: normalizedPage + 1,
+            pageSize: normalizedLimit
+        };
+        var currentStatus = statusGetter ? statusGetter() : null;
+        if (currentStatus && String(currentStatus).toLowerCase() !== 'all') {
+            paramsObj.status = currentStatus;
+        }
+        var params = new URLSearchParams(paramsObj).toString();
+        return baseUrl + '?' + params;
+    },
     buildPaginationConfig: function(baseUrl, statusGetter) {
+        var defaultLimit = 10;
         return {
-            limit: 10,
+            limit: defaultLimit,
             server: {
                 url: function(prev, page, limit) {
-                    var currentStatus = statusGetter();
-                    var paramsObj = {
-                        page: page + 1,
-                        pageSize: limit
-                    };
-                    if (currentStatus && String(currentStatus).toLowerCase() !== 'all') {
-                        paramsObj.status = currentStatus;
-                    }
-                    var params = new URLSearchParams(paramsObj);
-                    return (prev || baseUrl) + '?' + params.toString();
+                    return approvalsModule.buildDataUrl(baseUrl, statusGetter, page, limit || defaultLimit);
                 }
             }
         };
@@ -63,9 +69,10 @@ var approvalsModule = {
         status = status || approvalsModule.reviewStatus || 'pending';
         approvalsModule.reviewStatus = status;
         var baseUrl = '/api/reviews';
-    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.reviewStatus || 'pending'; });
+        var statusGetter = function() { return approvalsModule.reviewStatus || 'pending'; };
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, statusGetter);
         var serverConfig = {
-            url: baseUrl,
+            url: function() { return approvalsModule.buildDataUrl(baseUrl, statusGetter, 0, paginationConfig.limit); },
             then: function(res) {
                 var data = (res && res.data) || [];
                 return data.map(function(r) {
@@ -116,9 +123,10 @@ var approvalsModule = {
         status = status || approvalsModule.dishStatus || 'pending';
         approvalsModule.dishStatus = status;
         var baseUrl = '/api/dishes';
-    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.dishStatus || 'pending'; });
+        var statusGetter = function() { return approvalsModule.dishStatus || 'pending'; };
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, statusGetter);
         var serverConfig = {
-            url: baseUrl,
+            url: function() { return approvalsModule.buildDataUrl(baseUrl, statusGetter, 0, paginationConfig.limit); },
             then: function(res) {
                 var data = (res && res.data) || [];
                 return data.map(function(d) {
@@ -155,9 +163,10 @@ var approvalsModule = {
         status = status || approvalsModule.restaurantStatus || 'pending';
         approvalsModule.restaurantStatus = status;
         var baseUrl = '/api/restaurants';
-    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.restaurantStatus || 'pending'; });
+        var statusGetter = function() { return approvalsModule.restaurantStatus || 'pending'; };
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, statusGetter);
         var serverConfig = {
-            url: baseUrl,
+            url: function() { return approvalsModule.buildDataUrl(baseUrl, statusGetter, 0, paginationConfig.limit); },
             then: function(res) {
                 var data = (res && res.data) || [];
                 return data.map(function(r) {
@@ -195,9 +204,10 @@ var approvalsModule = {
         status = status || approvalsModule.photoStatus || 'pending';
         approvalsModule.photoStatus = status;
         var baseUrl = '/api/approvals/photos';
-    var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, function() { return approvalsModule.photoStatus || 'pending'; });
+        var statusGetter = function() { return approvalsModule.photoStatus || 'pending'; };
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, statusGetter);
         var serverConfig = {
-            url: baseUrl,
+            url: function() { return approvalsModule.buildDataUrl(baseUrl, statusGetter, 0, paginationConfig.limit); },
             then: function(res) {
                 var data = (res && res.data) || [];
                 return data.map(function(p) {

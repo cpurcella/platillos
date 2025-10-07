@@ -36,6 +36,8 @@ async function onRegisterSubmit(e) {
     var form = e.target;
     if (!validate.validateForm(form)) return;
     var data = $(form).serializeObject();
+    var email = data.email;
+    var password = data.password;
     // Get address components from Google Places Autocomplete directly
     var place = window._platillosAutocomplete.getPlace();
     if (place && place.address_components) {
@@ -71,8 +73,26 @@ async function onRegisterSubmit(e) {
             dataType: 'json'
         });
         if (response.success) {
-            $('#register-form').hide();
-            $('#register-success-message').show();
+            try {
+                var loginResponse = await $.ajax({
+                    url: '/api/auth/authenticate',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        email: email,
+                        password: password
+                    }
+                });
+
+                window.location.href = '/';
+                return;
+            } catch (authErr) {
+                common.showAlert('Account created, but automatic login failed. Please sign in manually.', 'warning');
+            }
+
+            $('#register-form').addClass('hidden');
+            $('#register-success-message').removeClass('hidden');
+            $('#register-success-message').attr('tabindex', '-1').focus();
         } else {
             common.showAlert(response.message || 'Registration failed.', 'error');
             window.grecaptcha.reset();

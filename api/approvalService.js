@@ -1,104 +1,105 @@
 var db = require('../connections');
 var config = require('../config');
+var dishService = require('./dishService');
+
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
 
 function buildPhotoUrl(fileId) {
-    if (!fileId) {
-        return null;
+    return fileId ? 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId : null;
+}
+
+function createError(message, status) {
+    var err = new Error(message);
+    err.status = status;
+    return err;
+}
+
+function normalizeStatus(rawStatus) {
+    var normalized = String(rawStatus || '').toLowerCase();
+    if (!VALID_STATUSES.has(normalized)) {
+        throw createError('Invalid status', 400);
     }
-    return 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId;
+    return normalized;
+}
+
+function resolveAuditColumns(status, userId) {
+    if (status === 'pending') {
+        return [status, null, null];
+    }
+    var now = Date.now();
+    return [status, now, userId];
+}
+
+async function applyStatusUpdate(options) {
+    var status = normalizeStatus(options.status);
+    var audit = resolveAuditColumns(status, options.userId);
+    var sql = 'UPDATE ' + options.table + ' SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE ' + options.idColumn + ' = ?';
+    var params = audit.concat(options.idValue);
+    var result = await db.query(sql, params);
+    var affected = result && (result.affectedRows || (Array.isArray(result) && result[0] && result[0].affectedRows));
+    if (!affected) {
+        throw createError(options.notFoundMessage, 404);
+    }
+    return status;
 }
 
 async function updateReviewStatus(params) {
-    var auth = params && params.auth;
-    var reviewId = params && params.reviewId;
-    var status = String(params && params.status || '').toLowerCase();
-    var err;
-
-
-    if (!reviewId) {
-        err = new Error('Missing reviewId');
-        err.status = 400;
-        throw err;
-    }
-    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
-        err = new Error('Invalid status');
-        err.status = 400;
-        throw err;
+    if (!params || !params.reviewId) {
+        throw createError('Missing reviewId', 400);
     }
 
-    var approverUserId = auth.user.userId;
-    var nowMs = Date.now();
-    var statusUpdated = status === 'pending' ? null : nowMs;
-    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
-    var sql = 'UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewId = ?';
-    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, reviewId]);
-    if (!result || result.affectedRows === 0) {
-        err = new Error('Review not found');
-        err.status = 404;
-        throw err;
+    var reviewRows = await db.query('SELECT dishId FROM reviews WHERE reviewId = ? LIMIT 1', [params.reviewId]) || [];
+    var review = reviewRows[0];
+    if (!review) {
+        throw createError('Review not found', 404);
+    }
+
+    var status = await applyStatusUpdate({
+        table: 'reviews',
+        idColumn: 'reviewId',
+        idValue: params.reviewId,
+        status: params.status,
+        userId: params.auth.user.userId,
+        notFoundMessage: 'Review not found'
+    });
+
+    if (status === 'approved' && review.dishId) {
+        await dishService.setDishScores(review.dishId).catch(function(scoreErr) {
+            console.error('[approvalService] Failed to update dish scores after review approval:', scoreErr);
+        });
     }
     return true;
 }
 
 async function updateRestaurantStatus(params) {
-    var auth = params && params.auth;
-    var restaurantId = params && params.restaurantId;
-    var status = String(params && params.status || '').toLowerCase();
-    var err;
-
-    if (!restaurantId) {
-        err = new Error('Missing restaurantId');
-        err.status = 400;
-        throw err;
-    }
-    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
-        err = new Error('Invalid status');
-        err.status = 400;
-        throw err;
+    if (!params || !params.restaurantId) {
+        throw createError('Missing restaurantId', 400);
     }
 
-    var approverUserId = auth.user.userId;
-    var nowMs = Date.now();
-    var statusUpdated = status === 'pending' ? null : nowMs;
-    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
-    var sql = 'UPDATE restaurants SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE restaurantId = ?';
-    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, restaurantId]);
-    if (!result || result.affectedRows === 0) {
-        err = new Error('Restaurant not found');
-        err.status = 404;
-        throw err;
-    }
+    await applyStatusUpdate({
+        table: 'restaurants',
+        idColumn: 'restaurantId',
+        idValue: params.restaurantId,
+        status: params.status,
+        userId: params.auth.user.userId,
+        notFoundMessage: 'Restaurant not found'
+    });
     return true;
 }
 
 async function updatePhotoStatus(params) {
-    var auth = params && params.auth;
-    var reviewPhotoId = params && params.reviewPhotoId;
-    var status = String(params && params.status || '').toLowerCase();
-    var err;
-
-    if (!reviewPhotoId) {
-        err = new Error('Missing reviewPhotoId');
-        err.status = 400;
-        throw err;
-    }
-    if (['approved', 'rejected', 'pending'].indexOf(status) === -1) {
-        err = new Error('Invalid status');
-        err.status = 400;
-        throw err;
+    if (!params || !params.reviewPhotoId) {
+        throw createError('Missing reviewPhotoId', 400);
     }
 
-    var approverUserId = auth.user.userId;
-    var nowMs = Date.now();
-    var statusUpdated = status === 'pending' ? null : nowMs;
-    var statusUpdatedBy = status === 'pending' ? null : approverUserId;
-    var sql = 'UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ?';
-    var result = await db.query(sql, [status, statusUpdated, statusUpdatedBy, reviewPhotoId]);
-    if (!result || result.affectedRows === 0) {
-        err = new Error('Photo not found');
-        err.status = 404;
-        throw err;
-    }
+    await applyStatusUpdate({
+        table: 'reviews_photos',
+        idColumn: 'reviewPhotoId',
+        idValue: params.reviewPhotoId,
+        status: params.status,
+        userId: params.auth.user.userId,
+        notFoundMessage: 'Photo not found'
+    });
     return true;
 }
 
@@ -141,19 +142,17 @@ async function getReviewPhotos(params) {
     var whereValues = [];
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var statusFilter = params.status ? normalizeStatus(params.status) : '';
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
 
     if (shouldFilterPending) {
         if (!isAdmin) {
-            var err = new Error('Forbidden');
-            err.status = 403;
-            throw err;
+            throw createError('Forbidden', 403);
         }
         whereClauses.push("rp.status = 'pending'");
     } else if (!isAdmin) {
         whereClauses.push("rp.status = 'approved'");
-    } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
+    } else if (statusFilter) {
         whereClauses.push('rp.status = ?');
         whereValues.push(statusFilter);
     }
@@ -172,29 +171,24 @@ async function getReviewPhotos(params) {
 
     var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
     var countRows = await db.query(countSql, whereValues) || [];
-    var total = countRows.length ? countRows[0].total : 0;
+    var total = (countRows[0] && countRows[0].total) || 0;
 
     var pageSize = parseInt(params.pageSize, 10) || 10;
     var page = parseInt(params.page, 10) || 1;
-    if (page < 1) {
-        page = 1;
-    }
+    page = page < 1 ? 1 : page;
     var offset = (page - 1) * pageSize;
 
     var dataSql = selectClause + fromClause + whereSql + ' ORDER BY rp.reviewPhotoId DESC LIMIT ? OFFSET ?';
-    var dataValues = whereValues.slice();
-    dataValues.push(pageSize, offset);
+    var dataValues = whereValues.concat([pageSize, offset]);
 
     var rows = await db.query(dataSql, dataValues) || [];
-    var mappedRows = rows.map(function(row) {
-        return Object.assign({}, row, {
-            reviewerName: ((row.reviewerFirstName || '') + ' ' + (row.reviewerLastName || '')).trim(),
-            photoUrl: buildPhotoUrl(row.fileId)
-        });
-    });
-
     return {
-        rows: mappedRows,
+        rows: rows.map(function(row) {
+            return Object.assign({}, row, {
+                reviewerName: ((row.reviewerFirstName || '') + ' ' + (row.reviewerLastName || '')).trim(),
+                photoUrl: buildPhotoUrl(row.fileId)
+            });
+        }),
         total: total
     };
 }
@@ -204,14 +198,12 @@ async function getReviewPhoto(params) {
         return null;
     }
 
-    var queryParams = Object.assign({}, params, {
+    var result = await getReviewPhotos(Object.assign({}, params, {
         reviewPhotoId: params.reviewPhotoId,
         pageSize: 1,
         page: 1
-    });
-
-    var result = await getReviewPhotos(queryParams);
-    return (result.rows && result.rows.length) ? result.rows[0] : null;
+    }));
+    return result.rows[0] || null;
 }
 
 module.exports = {

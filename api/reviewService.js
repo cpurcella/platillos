@@ -1,5 +1,7 @@
 var db = require('../connections');
 var crypto = require('crypto');
+var axios = require('axios');
+var config = require('../config');
 
 async function hasRecentReview(dishId, userId) {
     var thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -27,6 +29,49 @@ async function getOrCreateCityId(connection, cityName) {
     return insert[0].insertId;
 }
 
+async function geocodeRestaurantLocation(restaurantData) {
+    if (!restaurantData || !config.googleMapsKey) {
+        return null;
+    }
+
+    var parts = [restaurantData.address, restaurantData.city, restaurantData.state, restaurantData.zip]
+        .map(function(part) {
+            return typeof part === 'string' ? part.trim() : (part || '');
+        })
+        .filter(function(part) {
+            return Boolean(part);
+        });
+
+    if (!parts.length) {
+        return null;
+    }
+
+    var formattedAddress = parts.join(', ');
+
+    try {
+        var response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+            params: {
+                address: formattedAddress,
+                key: config.googleMapsKey
+            }
+        });
+
+        if (response.data && Array.isArray(response.data.results) && response.data.results.length) {
+            var location = response.data.results[0].geometry && response.data.results[0].geometry.location;
+            if (location && typeof location.lat === 'number' && typeof location.lng === 'number') {
+                return {
+                    lat: location.lat,
+                    lng: location.lng
+                };
+            }
+        }
+    } catch (err) {
+        console.error('[reviewService] Failed to geocode restaurant address:', err.message || err);
+    }
+
+    return null;
+}
+
 async function saveReview(allParams) {
     var connection = await db.getConnection();
     try {
@@ -38,10 +83,39 @@ async function saveReview(allParams) {
         var isNewRestaurant = String(allParams.newRestaurant).toLowerCase() === 'true';
         var isNewDish = String(allParams.newDish).toLowerCase() === 'true';
 
+        var photoPayload = allParams.photos;
+        if (!photoPayload && allParams['photos[]']) {
+            photoPayload = allParams['photos[]'];
+        }
+        if (typeof photoPayload === 'string') {
+            try {
+                photoPayload = JSON.parse(photoPayload);
+            } catch (err) {
+                photoPayload = [];
+            }
+        }
+        if (!Array.isArray(photoPayload)) {
+            photoPayload = [];
+        }
+        allParams.photos = photoPayload;
+
         var restaurantId = allParams.restaurantId || null;
         if (isNewRestaurant && allParams.newRestaurantData) {
             var cityId = await getOrCreateCityId(connection, allParams.newRestaurantData.city);
             restaurantId = crypto.randomUUID();
+
+            var geocodeResult = await geocodeRestaurantLocation(allParams.newRestaurantData);
+            var lat = 0;
+            var lng = 0;
+            if (geocodeResult) {
+                var parsedLat = parseFloat(geocodeResult.lat);
+                var parsedLng = parseFloat(geocodeResult.lng);
+                if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                    lat = parsedLat;
+                    lng = parsedLng;
+                }
+            }
+
             await connection.query(
                 `
                 INSERT INTO restaurants
@@ -55,8 +129,8 @@ async function saveReview(allParams) {
                     cityId,
                     allParams.newRestaurantData.address || '',
                     allParams.newRestaurantData.zip || '',
-                    0,
-                    0,
+                    lat,
+                    lng,
                     nowMs,
                     userId,
                     'pending',

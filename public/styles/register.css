@@ -4,6 +4,11 @@
     border-radius: 0.5rem;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     width: 100%;
-    max-width: 75vw;
+    max-width: 98vw;
     margin: 2rem auto;
+}
+
+.register-container .form-group.date-compact .form-input {
+    max-width: 14rem;
+    min-width: 10rem;
 }

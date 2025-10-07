@@ -25,15 +25,16 @@ var dishListModule = {
     loadDishes: async function(options) {
         options = options || {};
         try {
+            var fields = [
+                'dishId',
+                'restaurantId',
+                'name',
+                'score',
+                'coverPhoto',
+                'reviewCount'
+            ];
             var query = {
-                fields: [
-                    'dishId',
-                    'restaurantId',
-                    'name',
-                    'score',
-                    'coverPhoto',
-                    'reviewCount'
-                ]
+                fields: JSON.stringify(fields)
             };
 
             if (typeof options.search === 'string' && options.search.length) {
@@ -55,6 +56,15 @@ var dishListModule = {
             $container.html('<div>No dishes found.</div>');
             return;
         }
+        function buildVariantUrl(url, suffix) {
+            if (!url) return '';
+            var index = url.indexOf('?');
+            if (index === -1) {
+                return url + suffix;
+            }
+            return url.slice(0, index) + suffix + url.slice(index);
+        }
+
         function renderStars(score) {
             if (score == null || isNaN(score)) {
                 return '<span class="dish-score-value">No ratings yet</span>';
@@ -90,6 +100,11 @@ var dishListModule = {
                 .substring(0, 80);
             if (!slug) slug = 'dish';
             var dishUrl = '/dishes/' + encodeURIComponent(dish.dishId) + '/' + slug;
+            var coverPhotoSmall = '';
+            if (dish.coverPhoto) {
+                coverPhotoSmall = buildVariantUrl(dish.coverPhoto, '_s');
+            }
+            var coverPhotoSmallEscaped = coverPhotoSmall ? $('<div>').text(coverPhotoSmall).html() : '';
             var html = `
                 <a href="${dishUrl}" class="card dish-card" data-dish-id="${dish.dishId}">
                     <div class="dish-card-content">
@@ -107,7 +122,7 @@ var dishListModule = {
                                 </span>
                             </div>
                         </div>
-                        ${dish.coverPhoto ? `<img src="${dish.coverPhoto}" class="dish-cover-photo">` : ''}
+                        ${coverPhotoSmallEscaped ? `<img src="${coverPhotoSmallEscaped}" class="dish-cover-photo" loading="lazy">` : ''}
                     </div>
                 </a>
             `;

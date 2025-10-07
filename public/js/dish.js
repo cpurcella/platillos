@@ -58,10 +58,9 @@ var dishPage = {
     },
 
     renderDishLoading: function() {
-        $('#dish-name').text('Loading...');
         $('#dish-restaurant').text('');
         $('#dish-score').text('');
-        $('#dish-cover-container').empty();
+        $('#dish-cover-container').empty().hide();
     },
 
     renderDishError: function(message) {
@@ -69,7 +68,9 @@ var dishPage = {
         $('#dish-name').text('Dish');
         $('#dish-restaurant').text('');
         $('#dish-score').text('');
-        $('#dish-cover-container').html('<div class="dish-cover-placeholder">' + safeMessage + '</div>');
+        $('#dish-cover-container')
+            .html('<div class="dish-cover-placeholder">' + safeMessage + '</div>')
+            .show();
     },
 
     renderDish: function(dish) {
@@ -84,10 +85,15 @@ var dishPage = {
         }
         $('#dish-score').text(scoreText);
 
+        var $cover = $('#dish-cover-container');
+        $cover.empty();
+
         if (dish.coverPhoto) {
-            $('#dish-cover-container').html('<img src="' + dish.coverPhoto + '" alt="' + (dish.name || 'Dish') + ' cover photo">');
+            $cover
+                .html('<img src="' + dish.coverPhoto + '" alt="' + (dish.name || 'Dish') + ' cover photo">')
+                .show();
         } else {
-            $('#dish-cover-container').html('<div class="dish-cover-placeholder">No photo available</div>');
+            $cover.hide();
         }
     },
 

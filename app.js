@@ -7,6 +7,15 @@ var authService = require("./api/authService")
 var cookieParser = require('cookie-parser')
 var config = require("./config")
 
+process.on('uncaughtException', function(err) {
+    console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+
+process.on('unhandledRejection', function(reason, promise) {
+    var message = reason && reason.stack ? reason.stack : reason;
+    console.error('[unhandledRejection]', message);
+});
+
 if (!process.env.env) {
     var { spawn } = require('child_process');
     var exportDDL = spawn('node', [path.join(__dirname, 'db', 'export-ddl.js')]);
@@ -102,6 +111,20 @@ router.use(async function(req, res, next) {
 
 router.use('/api', require('./api/index'));
 
+router.get('/logout', async function(req, res) {
+    var sessionId = req.signedCookies ? req.signedCookies.sessionId : null;
+    if (sessionId) {
+        await authService.endSession(sessionId);
+    }
+    res.clearCookie('sessionId', {
+        httpOnly: true,
+        sameSite: 'lax',
+        signed: true,
+        path: '/'
+    });
+    res.redirect('/');
+});
+
 router.get('*', async function(req, res, next) {
     var _urlPath = req.path;
     if (path.extname(_urlPath)) {
@@ -132,9 +155,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', router);
 
-var port = process.env.PORT || 3000;
-app.listen(port, function() {
-    console.log('Platillos server running on http://localhost:' + port);
+app.use(function(err, req, res, next) {
+    console.error('[express-error]', err && err.stack ? err.stack : err);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(err.status || 500).json({ success: false, message: 'Internal Server Error' });
 });
 
-module.exports = app;
+if(!process.env.env) {
+    var port = process.env.PORT || 3000;
+    app.listen(port, function() {
+        console.log('Platillos server running on http://localhost:' + port);
+    });
+} else {
+    module.exports = app;
+}

@@ -125,13 +125,58 @@ async function getDishMetadataOptions() {
     };
 }
 
+function normalizeFieldSelection(value) {
+    if (value === undefined || value === null) {
+        return [];
+    }
+
+    var list;
+    if (typeof value === 'string') {
+        try {
+            var parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                list = parsed;
+            }
+        } catch (err) {
+            list = undefined;
+        }
+    }
+
+    if (!list) {
+        list = Array.isArray(value) ? value : [value];
+    }
+
+    var normalized = [];
+    for (var i = 0; i < list.length; i++) {
+        var field = list[i];
+        if (field === undefined || field === null) continue;
+        var str = String(field).trim();
+        if (!str) continue;
+        if (!/^[a-zA-Z0-9_]+$/.test(str)) continue;
+        if (normalized.indexOf(str) === -1) {
+            normalized.push(str);
+        }
+    }
+    return normalized;
+}
+
 async function getDishes(params) {
     params = params || {};
-    var selectFields = params.fields;
+    var selectFields = normalizeFieldSelection(params.fields);
+    var altFields = normalizeFieldSelection(params['fields[]']);
+    if (altFields.length) {
+        for (var i = 0; i < altFields.length; i++) {
+            if (selectFields.indexOf(altFields[i]) === -1) {
+                selectFields.push(altFields[i]);
+            }
+        }
+    }
 
     var selectClause = '';
     if (selectFields && selectFields.length) {
-        selectClause = selectFields.map(function() { return 'd.??'; }).join(', ');
+        selectClause = selectFields.map(function(field) {
+            return 'd.' + field;
+        }).join(', ');
     } else {
         selectClause = 'd.*';
     }
@@ -145,8 +190,10 @@ async function getDishes(params) {
     var whereClauses = ['1=1'];
     var whereValues = [];
 
-    var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
+    var userAdminFlag = params && params.auth && params.auth.user ? params.auth.user.isAdmin : 0;
+    var isAdmin = userAdminFlag === 1;
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var shouldApplyLocationFilters = !(isAdmin && statusFilter);
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
 
     if (shouldFilterPending) {
@@ -197,7 +244,7 @@ async function getDishes(params) {
         lng = parseFloat(params.auth.user.addressLng);
     }
 
-    if (lat && lng && !params.ignoreRadius) {
+    if (lat && lng && !params.ignoreRadius && shouldApplyLocationFilters) {
         whereClauses.push(`d.restaurantId IN (
             SELECT restaurantId FROM restaurants
             WHERE ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) <= 48280
@@ -205,7 +252,7 @@ async function getDishes(params) {
         whereValues.push('POINT(' + lat + ' ' + lng + ')');
     }
 
-    if (lat && lng && params.useLocation == '1') {
+    if (lat && lng && params.useLocation == '1' && shouldApplyLocationFilters) {
         selectExtra = ', ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) AS distance';
         selectExtraValues.push('POINT(' + lat + ' ' + lng + ')');
     }
@@ -222,15 +269,12 @@ async function getDishes(params) {
     var offset = (page - 1) * pageSize;
 
     var orderClause = '';
-    if (lat && lng && params.useLocation == '1') {
+    if (lat && lng && params.useLocation == '1' && shouldApplyLocationFilters) {
         orderClause = ' ORDER BY distance ASC';
     }
 
     var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
     var dataValues = selectExtraValues.slice();
-    if (selectFields && selectFields.length) {
-        dataValues = selectFields.concat(dataValues);
-    }
     dataValues = dataValues.concat(whereValues, [pageSize, offset]);
 
     var rows = await db.query(dataSql, dataValues) || [];
@@ -286,47 +330,71 @@ async function getDish(params) {
     return dish;
 }
 
-async function setDishScores() {
+async function setDishScores(dishId) {
     var connection = await db.getConnection();
     try {
-        var [dishRows] = await connection.query('SELECT dishId FROM dishes');
         var chunkSize = 100;
-        for (var i = 0; i < dishRows.length; i += chunkSize) {
-            var dishIds = dishRows.slice(i, i + chunkSize).map(d => d.dishId);
-            if (!dishIds.length) continue;
+        var batches = [];
 
-            var updateSql = `
-                UPDATE dishes d
-                JOIN (
-                    SELECT
-                        r.dishId,
-                        SUM(r.rating * 
-                            (CASE
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY)) * 1000 THEN 4
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000 THEN 2
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 YEAR)) * 1000 THEN 1
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 2 YEAR)) * 1000 THEN 0.5
-                                ELSE 0
-                            END)
-                        ) / NULLIF(SUM(
-                            (CASE
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY)) * 1000 THEN 4
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000 THEN 2
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 YEAR)) * 1000 THEN 1
-                                WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 2 YEAR)) * 1000 THEN 0.5
-                                ELSE 0
-                            END)
-                        ),0) AS score,
-                        COUNT(*) AS reviewCount
-                    FROM reviews r
-                    WHERE r.dishId IN (?)
-                    GROUP BY r.dishId
-                ) scores ON d.dishId = scores.dishId
-                SET d.score = scores.score,
-                    d.reviewCount = scores.reviewCount
-                WHERE d.dishId IN (?)
-            `;
-            await connection.query(updateSql, [dishIds, dishIds]);
+        if (dishId !== undefined && dishId !== null) {
+            var normalizedId = dishId;
+            if (typeof normalizedId === 'string') {
+                normalizedId = normalizedId.trim();
+            }
+
+            if (normalizedId !== '' && normalizedId !== null) {
+                batches.push([normalizedId]);
+            } else {
+                return;
+            }
+        } else {
+            var [dishRows] = await connection.query('SELECT dishId FROM dishes');
+            for (var i = 0; i < dishRows.length; i += chunkSize) {
+                var dishIds = dishRows.slice(i, i + chunkSize).map(function(d) { return d.dishId; });
+                if (dishIds.length) {
+                    batches.push(dishIds);
+                }
+            }
+        }
+
+        if (!batches.length) {
+            return;
+        }
+
+        var updateSql = `
+            UPDATE dishes d
+            JOIN (
+                SELECT
+                    r.dishId,
+                    SUM(r.rating * 
+                        (CASE
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY)) * 1000 THEN 4
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000 THEN 2
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 YEAR)) * 1000 THEN 1
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 2 YEAR)) * 1000 THEN 0.5
+                            ELSE 0
+                        END)
+                    ) / NULLIF(SUM(
+                        (CASE
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY)) * 1000 THEN 4
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000 THEN 2
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 YEAR)) * 1000 THEN 1
+                            WHEN r.submitted >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 2 YEAR)) * 1000 THEN 0.5
+                            ELSE 0
+                        END)
+                    ),0) AS score,
+                    COUNT(*) AS reviewCount
+                FROM reviews r
+                WHERE r.dishId IN (?)
+                GROUP BY r.dishId
+            ) scores ON d.dishId = scores.dishId
+            SET d.score = scores.score,
+                d.reviewCount = scores.reviewCount
+            WHERE d.dishId IN (?)
+        `;
+
+        for (var b = 0; b < batches.length; b++) {
+            await connection.query(updateSql, [batches[b], batches[b]]);
         }
     } finally {
         connection.release();
@@ -422,5 +490,3 @@ module.exports = {
     setDishScores: setDishScores,
     updateDish: updateDish
 };
-
-setDishScores();

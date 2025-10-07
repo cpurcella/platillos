@@ -18,13 +18,48 @@ var allowedFields = [
     'statusUpdatedBy'
 ];
 
+function normalizeFieldSelection(rawFields) {
+    if (rawFields === undefined || rawFields === null) {
+        return [];
+    }
+
+    var parsed;
+
+    if (typeof rawFields === 'string') {
+        try {
+            parsed = JSON.parse(rawFields);
+        } catch (err) {
+            parsed = rawFields.split(',');
+        }
+    } else if (Array.isArray(rawFields)) {
+        parsed = rawFields;
+    } else {
+        parsed = [rawFields];
+    }
+
+    if (!Array.isArray(parsed)) {
+        parsed = [parsed];
+    }
+
+    return parsed
+        .map(function(field) {
+            return typeof field === 'string' ? field.trim() : '';
+        })
+        .filter(function(field, index, arr) {
+            return field && allowedFields.includes(field) && arr.indexOf(field) === index;
+        });
+}
+
 async function getRestaurants(params) {
     params = params || {};
 
-    var selectFields;
-    if (params.fields) {
-        selectFields = params.fields.filter(function(field) {
-            return allowedFields.includes(field);
+    var selectFields = normalizeFieldSelection(params.fields);
+    var selectFieldArrayParams = normalizeFieldSelection(params['fields[]']);
+    if (selectFieldArrayParams.length) {
+        selectFieldArrayParams.forEach(function(field) {
+            if (!selectFields.includes(field)) {
+                selectFields.push(field);
+            }
         });
     }
 

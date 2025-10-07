@@ -14,7 +14,7 @@ function castField(field, useDefaultTypeCasting) {
     return useDefaultTypeCasting();
 }
 
-var _pool = mysql.createPool({
+var poolConfig = {
     host: config.dbUrl,
     user: config.dbUser,
     password: config.dbPassword,
@@ -23,7 +23,10 @@ var _pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
     typeCast: castField
-});
+};
+
+
+var _pool = mysql.createPool(poolConfig);
 
 function getPool() {
     return _pool.promise();

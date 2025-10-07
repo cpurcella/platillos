@@ -3,10 +3,13 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: var(--color-mint-bg);
-    border-radius: 0.5rem;
+    background: #fff;
+    border-radius: 0.75rem;
     z-index: 1001;
-    padding: 20px;
+    padding: 28px 32px;
+    width: calc(100vw - 2.5rem);
+    max-width: 22rem;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2);
 }
 
 #login-popup .popup-content {
@@ -26,4 +29,8 @@
     background: rgba(0, 0, 0, 0.32);
     z-index: 1000;
     display: none;
+}
+
+#login-overlay.is-visible {
+    display: block;
 }

@@ -31,6 +31,7 @@ var templates = {
             if (err.code === 'ENOENT') {
                 res.status(404).send('Template not found');
             } else {
+                console.error('[template-error]', err && err.stack ? err.stack : err);
                 res.status(500).send('Server error');
             }
         }

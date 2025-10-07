@@ -1,8 +1,8 @@
 var express = require('express');
 var multer = require('multer');
-var multerS3 = require('multer-s3');
-var { S3Client } = require('@aws-sdk/client-s3');
-var { v4: uuidv4 } = require('uuid');
+var Jimp = require('jimp');
+var { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+var { randomUUID } = require('crypto');
 var config = require('../config');
 var fileService = require('./fileService');
 var router = express.Router();
@@ -16,20 +16,41 @@ var s3 = new S3Client({
     region: config.awsRegion
 });
 
-// Configure multer-s3 for S3 storage with a size limit of 2.1 MB
 var upload = multer({
-    storage: multerS3({
-        s3: s3,
-        bucket: config.bucket,
-        acl: 'public-read',
-        key: function(req, file, cb) {
-            var uniqueName = uuidv4();
-            req.fileId = uniqueName;
-            cb(null, uniqueName);
-        }
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 2.1 * 1024 * 1024 } // 2.1 MB size limit
 });
+
+function getPublicUrl(key) {
+    return 'https://' + config.bucket + '.s3.amazonaws.com/' + key;
+}
+
+async function uploadToS3(key, buffer, contentType) {
+    await s3.send(new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        ACL: 'public-read'
+    }));
+}
+
+function getVariantMimeType(mimeType) {
+    switch ((mimeType || '').toLowerCase()) {
+        case Jimp.MIME_PNG:
+            return Jimp.MIME_PNG;
+        case Jimp.MIME_BMP:
+            return Jimp.MIME_BMP;
+        case Jimp.MIME_TIFF:
+            return Jimp.MIME_TIFF;
+        case Jimp.MIME_GIF:
+            return Jimp.MIME_GIF;
+        case Jimp.MIME_WEBP:
+            return Jimp.MIME_WEBP;
+        default:
+            return Jimp.MIME_JPEG;
+    }
+}
 
 router.post('/upload', async function(req, res, next) {
     if (!req.allParams.auth || !req.allParams.auth.user) {
@@ -42,9 +63,37 @@ router.post('/upload', async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'No file uploaded.' });
         }
 
+        var fileId = randomUUID();
+        req.fileId = fileId;
+        var mimeType = req.file.mimetype || 'application/octet-stream';
+        var variantMime = getVariantMimeType(mimeType);
+        var originalBuffer = req.file.buffer;
+
+        await uploadToS3(fileId, originalBuffer, mimeType);
+
+        try {
+            var baseImage = await Jimp.read(originalBuffer);
+            var variantDefinitions = [
+                { suffix: '_m', size: 512 },
+                { suffix: '_s', size: 256 }
+            ];
+
+            await Promise.all(variantDefinitions.map(async function(def) {
+                var variant = baseImage.clone().cover(def.size, def.size);
+                if (variantMime === Jimp.MIME_JPEG) {
+                    variant.quality(80);
+                }
+                var buffer = await variant.getBufferAsync(variantMime);
+                await uploadToS3(fileId + def.suffix, buffer, variantMime);
+            }));
+        } catch (imageErr) {
+            console.error('[files] Failed to create resized variants for file', fileId, imageErr);
+            return res.status(400).json({ success: false, message: 'Uploaded file must be a supported image.' });
+        }
+
         var fileData = {
-            fileId: req.fileId,
-            fileType: req.file.mimetype.split('/')[1],
+            fileId: fileId,
+            fileType: (mimeType.split('/') || [])[1] || '',
             fileName: req.file.originalname,
             size: req.file.size,
             uploadedBy: req.allParams.auth.user.userId,
@@ -56,8 +105,8 @@ router.post('/upload', async function(req, res, next) {
         res.json({
             success: true,
             data: {
-                fileId: req.fileId,
-                url: req.file.location
+                fileId: fileId,
+                url: getPublicUrl(fileId)
             }
         });
     } catch (err) {

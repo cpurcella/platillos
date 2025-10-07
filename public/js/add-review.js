@@ -195,6 +195,8 @@ var addReviewModule = {
             }
         }
 
+        data.photos = JSON.stringify(data.photos);
+
         try {
             var response = await $.ajax({
                 url: '/api/reviews',
@@ -406,8 +408,8 @@ var addReviewModule = {
         var state = $('#new-restaurant-state').val().trim();
         var zip = $('#new-restaurant-zip').val().trim();
 
-        if (!name || !address) {
-            common.showAlert('Please provide restaurant name and address', 'error');
+        if (!name) {
+            common.showAlert('Please provide the restaurant name', 'error');
             return;
         }
 
@@ -470,7 +472,7 @@ var addReviewModule = {
                   data-state="${restaurant.state || ''}"
                   data-zip="${restaurant.zip || ''}">
                 <div class="restaurant-name">${restaurant.name}</div>
-                <div class="restaurant-address">${addressLine}</div>
+                ${addressLine ? `<div class="restaurant-address">${addressLine}</div>` : ''}
                 ${cityLine ? `<div class="restaurant-city">${cityLine}</div>` : ''}
             </div>`
         );
@@ -515,9 +517,10 @@ var addReviewModule = {
     loadRestaurants: async function(lat, lng, prefix) {
         var $list = $('#restaurant-list');
         addReviewModule.renderLoading($list, prefix ? 'Searching for matching restaurants…' : 'Finding restaurants near you…');
+        var fields = ['restaurantId', 'name', 'address', 'city', 'state', 'zip'];
         var query = {
             useLocation: 1,
-            fields: ['restaurantId', 'name', 'address', 'city', 'state', 'zip']
+            fields: JSON.stringify(fields)
         };
         if (lat && lng) {
             query.lat = lat;
