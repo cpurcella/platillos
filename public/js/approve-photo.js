@@ -1,21 +1,26 @@
 var approvePhotoModule = {
+    isSaving: false,
     setHandlers: function() {
-        $(document).ready(approvePhotoModule.loadPhoto);
-        $(document).on('click', '#save-photo-status-btn', approvePhotoModule.handleSave);
+        $(document).ready(function() {
+            approvePhotoModule.loadPhoto();
+        });
+        $(document).on('submit', '#approve-photo-form', approvePhotoModule.handleSave);
     },
     loadPhoto: async function() {
+        var photoId = window.approvePhotoId;
+        if (!photoId) {
+            $('#approve-photo-content').text('Missing reviewPhotoId.');
+            return;
+        }
+
         try {
-            var photoId = window.approvePhotoId;
-            if (!photoId) {
-                $('#approve-photo-content').text('Missing reviewPhotoId.');
-                return;
-            }
-            var res = await $.get('/api/approvals/photos/' + encodeURIComponent(photoId));
+            var res = await $.get('/api/review-photos/' + encodeURIComponent(photoId));
             var photo = res && res.data ? res.data : null;
             if (!photo) {
                 $('#approve-photo-content').text('Photo not found.');
                 return;
             }
+
             var currentStatus = (photo.status || 'pending').toLowerCase();
             if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
@@ -24,16 +29,31 @@ var approvePhotoModule = {
 
             var reviewer = photo.reviewerName || photo.reviewerEmail || '';
             var submitted = photo.reviewSubmitted ? new Date(photo.reviewSubmitted).toLocaleString() : '';
+            var updated = photo.statusUpdated ? new Date(photo.statusUpdated).toLocaleString() : '';
+            var fileMetaParts = [];
+            if (photo.fileName) {
+                fileMetaParts.push(photo.fileName);
+            }
+            if (photo.fileType) {
+                fileMetaParts.push(photo.fileType);
+            }
+            if (photo.size) {
+                var sizeKb = Math.round((photo.size / 1024) * 10) / 10;
+                fileMetaParts.push(sizeKb + ' KB');
+            }
+            var fileMeta = fileMetaParts.join(' • ');
+
             var html = `
                 <div style="display:flex;flex-direction:column;gap:12px;">
                     <div style="display:flex;gap:16px;flex-wrap:wrap;">
                         <div style="flex:0 0 220px;max-width:220px;">
                             <div style="font-weight:600;margin-bottom:6px;">Photo</div>
-                            <div style="border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fafafa;">
+                            <div style="border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fafafa;min-height:200px;display:flex;align-items:center;justify-content:center;">
                                 ${photo.photoUrl ? '<img src="' + photo.photoUrl + '" alt="Review photo" style="display:block;width:100%;height:auto;" />' : '<div style="padding:16px;text-align:center;">No preview</div>'}
                             </div>
+                            ${fileMeta ? '<div style="font-size:12px;color:#666;margin-top:6px;">' + fileMeta + '</div>' : ''}
                         </div>
-                        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:10px;">
+                        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;">
                             <div>
                                 <div style="font-weight:600;margin-bottom:4px;">Dish</div>
                                 <div>${photo.dishName || ''}</div>
@@ -50,6 +70,10 @@ var approvePhotoModule = {
                                 <div style="font-weight:600;margin-bottom:4px;">Submitted</div>
                                 <div>${submitted}</div>
                             </div>
+                            <div>
+                                <div style="font-weight:600;margin-bottom:4px;">Last Status Update</div>
+                                <div>${updated || 'Not set'}</div>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -63,28 +87,48 @@ var approvePhotoModule = {
             $('#approve-photo-content').text('Failed to load photo.');
         }
     },
-    handleSave: function(e) {
+    handleSave: async function(e) {
         e.preventDefault();
-        var status = $('#photo-status-select').val();
-        approvePhotoModule.submitStatus(status);
-    },
-    submitStatus: async function(status) {
+        if (approvePhotoModule.isSaving) {
+            return;
+        }
+
         var photoId = window.approvePhotoId;
         if (!photoId) {
             common.showAlert('Missing reviewPhotoId.', 'error');
             return;
         }
+
+        var status = $('#photo-status-select').val();
+        var normalized = (status || '').toLowerCase();
+        if (!['pending', 'approved', 'rejected'].includes(normalized)) {
+            common.showAlert('Please select a valid status.', 'error');
+            return;
+        }
+
+        var payload = { status: normalized };
+        var $btn = $('#save-photo-status-btn');
+        var originalText = $btn.text();
+        approvePhotoModule.isSaving = true;
+        $btn.prop('disabled', true).text('Saving...');
+
         try {
             var res = await $.ajax({
-                url: '/api/approvals/photos/' + encodeURIComponent(photoId) + '/' + encodeURIComponent(status),
-                method: 'POST',
-                dataType: 'json'
+                url: '/api/review-photos/' + encodeURIComponent(photoId),
+                method: 'PATCH',
+                dataType: 'json',
+                contentType: 'application/json',
+                processData: false,
+                data: JSON.stringify(payload)
             });
             if (res && res.success) {
-                common.showAlert('Photo ' + status + '.', 'success');
+                var message = (res && res.message) || 'Photo updated.';
+                common.showAlert(message, 'success');
                 $('#approve-photo-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
                 if (window.approvalsModule && approvalsModule.initPhotosGrid) {
+                    $('#photos-grid').empty();
+                    approvalsModule.photoGrid = null;
                     approvalsModule.initPhotosGrid();
                 }
             } else {
@@ -92,6 +136,9 @@ var approvePhotoModule = {
             }
         } catch (err) {
             common.showAlert('Failed to update photo.', 'error');
+        } finally {
+            approvePhotoModule.isSaving = false;
+            $btn.prop('disabled', false).text(originalText);
         }
     }
 };

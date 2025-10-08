@@ -2,6 +2,62 @@ var db = require('../connections');
 var crypto = require('crypto');
 var axios = require('axios');
 var config = require('../config');
+var dishService = require('./dishService');
+
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
+
+function hasProp(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
+function normalizeStatus(rawStatus) {
+    if (rawStatus === undefined) {
+        return undefined;
+    }
+    var status = String(rawStatus || '').toLowerCase();
+    if (!VALID_STATUSES.has(status)) {
+        var err = new Error('Invalid status');
+        err.status = 400;
+        throw err;
+    }
+    return status;
+}
+
+function resolveAuditColumns(status, userId) {
+    if (status === undefined) {
+        return [];
+    }
+    if (status === 'pending') {
+        return [status, null, null];
+    }
+    var now = Date.now();
+    return [status, now, userId || null];
+}
+
+function normalizeRating(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (value === null || value === '') {
+        return null;
+    }
+    var num = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(num)) {
+        var err = new Error('Invalid rating');
+        err.status = 400;
+        throw err;
+    }
+    if (num < 0) num = 0;
+    if (num > 10) num = 10;
+    return Math.round(num * 10) / 10;
+}
+
+function normalizeString(value) {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    return String(value);
+}
 
 async function hasRecentReview(dishId, userId) {
     var thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -321,9 +377,125 @@ async function getReviewsForDish(params) {
     return getReviews(queryParams);
 }
 
+async function updateReview(params) {
+    params = params || {};
+
+    var reviewId = params.reviewId || params.id;
+    if (!reviewId) {
+        var missingErr = new Error('Missing reviewId');
+        missingErr.status = 400;
+        throw missingErr;
+    }
+
+    var statusValue = normalizeStatus(params.status);
+    var ratingValue = normalizeRating(params.rating);
+    var reviewProvided = hasProp(params, 'review') || hasProp(params, 'reviewContent');
+    var reviewValue = reviewProvided
+        ? normalizeString(hasProp(params, 'reviewContent') ? params.reviewContent : params.review)
+        : undefined;
+    var modificationsProvided = hasProp(params, 'modifications');
+    var modificationsValue = modificationsProvided ? normalizeString(params.modifications) : undefined;
+
+    if (
+        statusValue === undefined &&
+        ratingValue === undefined &&
+        reviewValue === undefined &&
+        modificationsValue === undefined
+    ) {
+        return { updated: false };
+    }
+
+    if (ratingValue === null) {
+        var ratingErr = new Error('Rating is required');
+        ratingErr.status = 400;
+        throw ratingErr;
+    }
+
+    var connection = await db.getConnection();
+    var previousStatus;
+    var dishId;
+    try {
+        await connection.beginTransaction();
+
+        var rowsResult = await connection.query('SELECT reviewId, dishId, status FROM reviews WHERE reviewId = ? FOR UPDATE', [reviewId]);
+        var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
+        if (!rows || !rows.length) {
+            var notFoundErr = new Error('Review not found');
+            notFoundErr.status = 404;
+            throw notFoundErr;
+        }
+
+        var reviewRow = rows[0];
+        previousStatus = String(reviewRow.status || 'pending').toLowerCase();
+        dishId = reviewRow.dishId;
+
+        var updates = [];
+        var values = [];
+
+        if (ratingValue !== undefined) {
+            updates.push('rating = ?');
+            values.push(ratingValue);
+        }
+
+        if (reviewValue !== undefined) {
+            updates.push('review = ?');
+            values.push(reviewValue);
+        }
+
+        if (modificationsValue !== undefined) {
+            updates.push('modifications = ?');
+            values.push(modificationsValue);
+        }
+
+        if (statusValue !== undefined) {
+            var audit = resolveAuditColumns(statusValue, params?.auth?.user?.userId);
+            updates.push('status = ?', 'statusUpdated = ?', 'statusUpdatedBy = ?');
+            values.push(audit[0], audit[1], audit[2]);
+        }
+
+        if (!updates.length) {
+            await connection.rollback();
+            return { updated: false };
+        }
+
+        values.push(reviewId);
+        var sql = 'UPDATE reviews SET ' + updates.join(', ') + ' WHERE reviewId = ?';
+        await connection.query(sql, values);
+
+        await connection.commit();
+    } catch (err) {
+        try {
+            await connection.rollback();
+        } catch (rollbackErr) {
+            // ignore rollback errors
+        }
+        throw err;
+    } finally {
+        connection.release();
+    }
+
+    var shouldRecalculate = false;
+    if (statusValue !== undefined) {
+        shouldRecalculate = statusValue === 'approved';
+    } else if (ratingValue !== undefined && previousStatus === 'approved') {
+        shouldRecalculate = true;
+    }
+
+    if (shouldRecalculate && dishId) {
+        try {
+            await dishService.setDishScores(dishId);
+        } catch (scoreErr) {
+            console.error('[reviewService] Failed to update dish scores after review update:', scoreErr);
+        }
+    }
+
+    return { updated: true };
+}
+
 module.exports = {
     saveReview: saveReview,
     hasRecentReview: hasRecentReview,
     getReviews: getReviews,
-    getReviewsForDish: getReviewsForDish
+    getReviewsForDish: getReviewsForDish,
+    updateReview: updateReview
 };

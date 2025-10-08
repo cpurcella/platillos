@@ -1,76 +1,96 @@
 var approveReviewModule = {
+    isSaving: false,
     setHandlers: function() {
-        $(document).ready(approveReviewModule.loadReview);
-        $(document).on('click', '#save-review-status-btn', approveReviewModule.handleSave);
+        $(document).ready(function() {
+            approveReviewModule.loadReview();
+        });
+        $(document).on('submit', '#approve-review-form', approveReviewModule.handleSave);
     },
     loadReview: async function() {
+        var reviewId = window.approveReviewId;
+        if (!reviewId) {
+            $('#approve-review-content').text('Missing reviewId.');
+            return;
+        }
+
         try {
-            var reviewId = window.approveReviewId;
-            if (!reviewId) {
-                $('#approve-review-content').text('Missing reviewId.');
-                return;
-            }
             var res = await $.get('/api/reviews/' + encodeURIComponent(reviewId));
-            var r = res && res.data ? res.data : null;
-            if (!r) {
+            var review = res && res.data ? res.data : null;
+            if (!review) {
                 $('#approve-review-content').text('Review not found.');
                 return;
             }
-            var currentStatus = (r.status || 'pending').toLowerCase();
+
+            $('#approve-review-dish').text(review.dishName || '');
+            $('#approve-review-restaurant').text(review.restaurantName || '');
+            var reviewer = (review.firstName || review.lastName)
+                ? ((review.firstName || '') + ' ' + (review.lastName || '')).trim()
+                : (review.email || review.submittedBy || '');
+            $('#approve-review-author').text(reviewer);
+            var submittedText = review.submitted ? new Date(review.submitted).toLocaleString() : '';
+            $('#approve-review-submitted').text(submittedText);
+            $('#approve-review-photos').text((review.photos || []).length);
+
+            if (review.rating !== undefined && review.rating !== null) {
+                $('#review-rating-input').val(review.rating);
+            } else {
+                $('#review-rating-input').val('');
+            }
+
+            $('#review-content-input').val(review.reviewContent || '');
+            $('#review-modifications-input').val(review.modifications || '');
+
+            var currentStatus = (review.status || 'pending').toLowerCase();
             if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#review-status-select').val(currentStatus);
-            var reviewer = (r.firstName || r.lastName) ? ((r.firstName || '') + ' ' + (r.lastName || '')).trim() : (r.email || r.submittedBy);
-            var html = `
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Dish</div>
-                        <div>${r.dishName || ''}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Restaurant</div>
-                        <div>${r.restaurantName || ''}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Reviewer</div>
-                        <div>${reviewer || ''}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Rating</div>
-                        <div>${r.rating}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Review</div>
-                        <div>${r.reviewContent || ''}</div>
-                    </div>
-                    <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Photos</div>
-                        <div>${(r.photos || []).length}</div>
-                    </div>
-                </div>
-            `;
-            $('#approve-review-content').html(html);
         } catch (err) {
             $('#approve-review-content').text('Failed to load review.');
         }
     },
     handleSave: async function(e) {
         e.preventDefault();
+        if (approveReviewModule.isSaving) {
+            return;
+        }
+
         var reviewId = window.approveReviewId;
         if (!reviewId) {
             common.showAlert('Missing reviewId.', 'error');
             return;
         }
-        var status = $('#review-status-select').val();
+
+        var ratingValue = $('#review-rating-input').val();
+        if (ratingValue === '') {
+            common.showAlert('Rating is required.', 'error');
+            return;
+        }
+
+        var payload = {
+            rating: ratingValue,
+            review: $('#review-content-input').val() || '',
+            modifications: $('#review-modifications-input').val() || '',
+            status: $('#review-status-select').val()
+        };
+
+        var $btn = $('#save-review-status-btn');
+        var originalText = $btn.text();
+        approveReviewModule.isSaving = true;
+        $btn.prop('disabled', true).text('Saving...');
+
         try {
             var res = await $.ajax({
-                url: '/api/approvals/reviews/' + encodeURIComponent(reviewId) + '/' + encodeURIComponent(status),
-                method: 'POST',
-                dataType: 'json'
+                url: '/api/reviews/' + encodeURIComponent(reviewId),
+                method: 'PATCH',
+                dataType: 'json',
+                contentType: 'application/json',
+                processData: false,
+                data: JSON.stringify(payload)
             });
             if (res && res.success) {
-                common.showAlert('Review ' + status + '.', 'success');
+                var message = (res && res.message) || 'Review updated.';
+                common.showAlert(message, 'success');
                 $('#approve-review-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
                 if (window.approvalsModule && approvalsModule.initReviewsGrid) {
@@ -81,6 +101,9 @@ var approveReviewModule = {
             }
         } catch (err) {
             common.showAlert('Failed to update review.', 'error');
+        } finally {
+            approveReviewModule.isSaving = false;
+            $btn.prop('disabled', false).text(originalText);
         }
     }
 };

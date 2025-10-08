@@ -66,4 +66,19 @@ router.get('/:reviewId', async function(req, res) {
     }
 });
 
+router.patch('/:reviewId', async function(req, res) {
+    try {
+        var params = Object.assign({}, req.allParams || {}, { reviewId: req.params.reviewId });
+        var result = await reviewService.updateReview(params);
+        var status = params.status ? String(params.status).toLowerCase() : '';
+        var message = status ? 'Review ' + status : 'Review updated';
+        res.json({ success: true, message: message, data: result });
+    } catch (err) {
+        if (err.status) {
+            return res.status(err.status).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 module.exports = router;

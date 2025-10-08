@@ -203,7 +203,7 @@ var approvalsModule = {
     initPhotosGrid: function(status) {
         status = status || approvalsModule.photoStatus || 'pending';
         approvalsModule.photoStatus = status;
-        var baseUrl = '/api/approvals/photos';
+        var baseUrl = '/api/review-photos';
         var statusGetter = function() { return approvalsModule.photoStatus || 'pending'; };
         var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, statusGetter);
         var serverConfig = {
@@ -211,9 +211,16 @@ var approvalsModule = {
             then: function(res) {
                 var data = (res && res.data) || [];
                 return data.map(function(p) {
+                    var thumbUrl = '';
+                    if (p.photoUrl) {
+                        var queryIndex = p.photoUrl.indexOf('?');
+                        thumbUrl = queryIndex === -1
+                            ? p.photoUrl + '_s'
+                            : p.photoUrl.slice(0, queryIndex) + '_s' + p.photoUrl.slice(queryIndex);
+                    }
                     var reviewer = p.reviewerName || p.reviewerEmail || '';
                     var reviewSnippet = (p.reviewContent || '').length > 120 ? (p.reviewContent || '').substring(0, 117) + '...' : (p.reviewContent || '');
-                    var thumbHtml = p.photoUrl ? '<img src="' + p.photoUrl + '" alt="Review photo" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />' : '';
+                    var thumbHtml = thumbUrl ? '<img src="' + thumbUrl + '" alt="Review photo" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />' : '';
                     var submitted = p.reviewSubmitted ? new Date(p.reviewSubmitted).toLocaleString() : '';
                     return [
                         gridjs.html('<div style="display:flex;align-items:center;gap:8px;">' + thumbHtml + '</div>'),

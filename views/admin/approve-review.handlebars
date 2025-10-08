@@ -1,18 +1,57 @@
 <div id="approve-review-modal" class="modal">
     <div class="modal-content">
         <button class="close-modal" aria-label="Close">&times;</button>
-        <h2>Approve Review</h2>
-        <div id="approve-review-content">Loading...</div>
-        <div class="form-row" style="margin-top:16px;">
-            <label for="review-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
-            <select id="review-status-select" style="width:100%;padding:6px 8px;">
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-            </select>
-        </div>
-        <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
-            <a href="javascript:void(0)" class="btn btn-turquoise" id="save-review-status-btn">Submit</a>
+        <h2>Review Submission</h2>
+        <div id="approve-review-content">
+            <form id="approve-review-form" class="approve-review-form">
+                <div class="review-summary">
+                    <div class="review-summary-item">
+                        <div class="label">Dish</div>
+                        <div id="approve-review-dish" class="value">Loading…</div>
+                    </div>
+                    <div class="review-summary-item">
+                        <div class="label">Restaurant</div>
+                        <div id="approve-review-restaurant" class="value"></div>
+                    </div>
+                    <div class="review-summary-item">
+                        <div class="label">Reviewer</div>
+                        <div id="approve-review-author" class="value"></div>
+                    </div>
+                    <div class="review-summary-item">
+                        <div class="label">Submitted</div>
+                        <div id="approve-review-submitted" class="value"></div>
+                    </div>
+                    <div class="review-summary-item">
+                        <div class="label">Photos</div>
+                        <div id="approve-review-photos" class="value"></div>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="review-rating-input">Rating</label>
+                        <input type="number" id="review-rating-input" name="rating" min="0" max="10" step="0.1" required>
+                    </div>
+                    <div class="form-field form-field-full">
+                        <label for="review-content-input">Review</label>
+                        <textarea id="review-content-input" name="review" rows="4"></textarea>
+                    </div>
+                    <div class="form-field form-field-full">
+                        <label for="review-modifications-input">Modifications</label>
+                        <textarea id="review-modifications-input" name="modifications" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top:16px;">
+                    <label for="review-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
+                    <select id="review-status-select" name="status" style="width:100%;padding:6px 8px;">
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+                <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
+                    <button type="submit" class="btn btn-turquoise" id="save-review-status-btn">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
     <script src="/js/approve-review.js"></script>

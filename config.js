@@ -7,6 +7,7 @@ var config = {
     dbUrl: "REMOVED_CONFIGURATION",
     dbUser: "REMOVED_CONFIGURATION",
     perplexityKey: "REMOVED_CREDENTIAL",
+    openaiKey: process.env.OPENAI_API_KEY || process.env.openaiKey || '',
     cookieSecret: "REMOVED_CREDENTIAL",
     awsRegion: "us-east-1",
     env: env
@@ -29,7 +30,8 @@ var envConfig = {
         dbUrl: process.env.dbUrl,
         dbUser: process.env.dbUser,
         awsRegion: "us-west-2",
-        cookieSecret: process.env.cookieSecret
+        cookieSecret: process.env.cookieSecret,
+        openAiApiKey: process.env.openAiApiKey
     }
 };
 

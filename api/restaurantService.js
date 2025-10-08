@@ -18,6 +18,8 @@ var allowedFields = [
     'statusUpdatedBy'
 ];
 
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
+
 function normalizeFieldSelection(rawFields) {
     if (rawFields === undefined || rawFields === null) {
         return [];
@@ -48,6 +50,75 @@ function normalizeFieldSelection(rawFields) {
         .filter(function(field, index, arr) {
             return field && allowedFields.includes(field) && arr.indexOf(field) === index;
         });
+}
+
+function hasProp(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
+function normalizeString(value) {
+    if (value === undefined || value === null) {
+        return '';
+    }
+    return String(value).trim();
+}
+
+function parseNullableFloat(value, fieldName) {
+    if (value === undefined) {
+        return undefined;
+    }
+    if (value === null || value === '') {
+        return null;
+    }
+    var num = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(num)) {
+        var err = new Error('Invalid ' + fieldName);
+        err.status = 400;
+        throw err;
+    }
+    return num;
+}
+
+async function getOrCreateCityId(connection, cityName) {
+    var name = normalizeString(cityName);
+    if (!name) {
+        return null;
+    }
+
+    var rows = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
+    if (rows && rows.length) {
+        return rows[0].cityId;
+    }
+
+    var insertResult = await connection.query('INSERT INTO cities (city) VALUES (?)', [name]);
+    if (Array.isArray(insertResult)) {
+        return insertResult[0] && insertResult[0].insertId;
+    }
+    return insertResult.insertId;
+}
+
+function normalizeStatus(rawStatus) {
+    if (rawStatus === undefined) {
+        return undefined;
+    }
+    var status = String(rawStatus || '').toLowerCase();
+    if (!VALID_STATUSES.has(status)) {
+        var err = new Error('Invalid status');
+        err.status = 400;
+        throw err;
+    }
+    return status;
+}
+
+function resolveAuditColumns(status, userId) {
+    if (status === undefined) {
+        return [];
+    }
+    if (status === 'pending') {
+        return [status, null, null];
+    }
+    var now = Date.now();
+    return [status, now, userId || null];
 }
 
 async function getRestaurants(params) {
@@ -99,20 +170,19 @@ async function getRestaurants(params) {
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
-    var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
 
-    if (shouldFilterPending) {
+    if (statusFilter === 'pending') {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
             throw err;
         }
         whereClauses.push("r.status = 'pending'");
-    } else if (!isAdmin) {
-        whereClauses.push("r.status = 'approved'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push('r.status = ?');
         whereValues.push(statusFilter);
+    } else if (!isAdmin) {
+        whereClauses.push("r.status = 'approved'");
     }
 
     if (params.restaurantId) {
@@ -217,9 +287,144 @@ async function updateRestaurantLatLngFromGeocode() {
     }
 }
 
+async function updateRestaurant(params) {
+    params = params || {};
+
+    var restaurantId = params.restaurantId;
+    if (!restaurantId) {
+        var missingErr = new Error('Missing restaurantId');
+        missingErr.status = 400;
+        throw missingErr;
+    }
+
+    var status = normalizeStatus(params.status);
+    var hasName = hasProp(params, 'name');
+    var hasAddress = hasProp(params, 'address');
+    var hasZip = hasProp(params, 'zip');
+    var hasCity = hasProp(params, 'city') || hasProp(params, 'cityName');
+    var hasLat = hasProp(params, 'lat');
+    var hasLng = hasProp(params, 'lng');
+
+    if (
+        !hasName &&
+        !hasAddress &&
+        !hasZip &&
+        !hasCity &&
+        status === undefined &&
+        !hasLat &&
+        !hasLng
+    ) {
+        return { updated: false };
+    }
+
+    var connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        var rowsResult = await connection.query('SELECT restaurantId FROM restaurants WHERE restaurantId = ? FOR UPDATE', [restaurantId]);
+        var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
+        if (!rows || !rows.length) {
+            var notFoundErr = new Error('Restaurant not found');
+            notFoundErr.status = 404;
+            throw notFoundErr;
+        }
+
+        var updates = [];
+        var values = [];
+
+        if (hasName) {
+            var name = normalizeString(params.name);
+            if (!name) {
+                var nameErr = new Error('Name is required');
+                nameErr.status = 400;
+                throw nameErr;
+            }
+            updates.push('name = ?');
+            values.push(name);
+        }
+
+        if (hasAddress) {
+            var address = normalizeString(params.address);
+            updates.push('address = ?');
+            values.push(address);
+        }
+
+        if (hasZip) {
+            var zip = normalizeString(params.zip);
+            updates.push('zip = ?');
+            values.push(zip);
+        }
+
+        if (hasLat) {
+            var lat = parseNullableFloat(params.lat, 'latitude');
+            if (lat === null) {
+                lat = 0;
+            }
+            updates.push('lat = ?');
+            values.push(lat);
+        }
+
+        if (hasLng) {
+            var lng = parseNullableFloat(params.lng, 'longitude');
+            if (lng === null) {
+                lng = 0;
+            }
+            updates.push('lng = ?');
+            values.push(lng);
+        }
+
+        if (hasCity) {
+            var cityInput = hasProp(params, 'city') ? params.city : params.cityName;
+            var cityName = normalizeString(cityInput);
+            if (!cityName) {
+                var cityErr = new Error('City is required');
+                cityErr.status = 400;
+                throw cityErr;
+            }
+            var cityId = await getOrCreateCityId(connection, cityName);
+            if (!cityId) {
+                var cityNotFoundErr = new Error('Unable to determine city');
+                cityNotFoundErr.status = 400;
+                throw cityNotFoundErr;
+            }
+            updates.push('cityId = ?');
+            values.push(cityId);
+        }
+
+        if (status !== undefined) {
+            var audit = resolveAuditColumns(status, params?.auth?.user?.userId);
+            updates.push('status = ?', 'statusUpdated = ?', 'statusUpdatedBy = ?');
+            values.push(audit[0], audit[1], audit[2]);
+        }
+
+        if (!updates.length) {
+            await connection.rollback();
+            return { updated: false };
+        }
+
+        values.push(restaurantId);
+        var sql = 'UPDATE restaurants SET ' + updates.join(', ') + ' WHERE restaurantId = ?';
+        await connection.query(sql, values);
+
+        await connection.commit();
+    } catch (err) {
+        try {
+            await connection.rollback();
+        } catch (rollbackErr) {
+            // ignore rollback errors
+        }
+        throw err;
+    } finally {
+        connection.release();
+    }
+
+    return { updated: true };
+}
+
 module.exports = {
     getRestaurants: getRestaurants,
     getRestaurant: getRestaurant,
-    updateRestaurantLatLngFromGeocode: updateRestaurantLatLngFromGeocode
+    updateRestaurantLatLngFromGeocode: updateRestaurantLatLngFromGeocode,
+    updateRestaurant: updateRestaurant
 };
 //updateRestaurantLatLngFromGeocode()

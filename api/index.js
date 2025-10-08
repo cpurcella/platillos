@@ -7,6 +7,6 @@ router.use('/dishes', require('./dishes'));
 router.use('/auth', require('./auth'));
 router.use('/files', require('./files'));
 router.use('/reviews', require('./reviews'));
-router.use('/approvals', require('./approvals'));
+router.use('/review-photos', require('./reviewPhotos'));
 
 module.exports = router;
