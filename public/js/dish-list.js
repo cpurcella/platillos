@@ -105,9 +105,13 @@ var dishListModule = {
                 coverPhotoSmall = buildVariantUrl(dish.coverPhoto, '_s');
             }
             var coverPhotoSmallEscaped = coverPhotoSmall ? $('<div>').text(coverPhotoSmall).html() : '';
+            var imageMarkup = coverPhotoSmallEscaped
+                ? `<img src="${coverPhotoSmallEscaped}" class="dish-cover-photo" loading="lazy" alt="${$('<div>').text(dish.name || 'Dish photo').html()}">`
+                : '';
             var html = `
                 <a href="${dishUrl}" class="card dish-card" data-dish-id="${dish.dishId}">
                     <div class="dish-card-content">
+                        ${imageMarkup}
                         <div class="dish-card-info">
                             <div class="dish-name">${dish.name}</div>
                             <div class="dish-meta">
@@ -122,7 +126,6 @@ var dishListModule = {
                                 </span>
                             </div>
                         </div>
-                        ${coverPhotoSmallEscaped ? `<img src="${coverPhotoSmallEscaped}" class="dish-cover-photo" loading="lazy">` : ''}
                     </div>
                 </a>
             `;

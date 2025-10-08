@@ -12,3 +12,14 @@
     max-width: 14rem;
     min-width: 10rem;
 }
+
+@media (max-width: 640px) {
+    .register-container {
+        padding: 1.5rem;
+        margin: 1.5rem auto;
+    }
+
+    .register-container .form-group.date-compact .form-input {
+        max-width: 12rem;
+    }
+}
