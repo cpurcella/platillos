@@ -6,6 +6,7 @@ var router = express.Router();
 var authService = require("./api/authService")
 var cookieParser = require('cookie-parser')
 var config = require("./config")
+var ai = require("./ai/restaurants")
 
 process.on('uncaughtException', function(err) {
     console.error('[uncaughtException]', err && err.stack ? err.stack : err);
@@ -163,7 +164,7 @@ app.use(function(err, req, res, next) {
     res.status(err.status || 500).json({ success: false, message: 'Internal Server Error' });
 });
 
-if(!process.env.env) {
+if(!process.env.env || process.env.local == "true") {
     var port = process.env.PORT || 3000;
     app.listen(port, function() {
         console.log('Platillos server running on http://localhost:' + port);

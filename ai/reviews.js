@@ -196,6 +196,8 @@ async function evaluateSingleReview(client, review) {
 
     var response;
     try {
+        var schemaDef = buildReviewJsonSchema();
+
         response = await client.responses.create({
             model: 'gpt-4o-mini',
             input: [
@@ -212,15 +214,19 @@ async function evaluateSingleReview(client, review) {
                     role: 'user',
                     content: [
                         {
-                            type: 'text',
+                            type: 'input_text',
                             text: userPrompt
                         }
                     ]
                 }
             ],
-            response_format: {
-                type: 'json_schema',
-                json_schema: buildReviewJsonSchema()
+            text: {
+                format: {
+                    type: 'json_schema',
+                    name: schemaDef.name,
+                    schema: schemaDef.schema,
+                    strict: true
+                }
             }
         });
     } catch (err) {
@@ -228,13 +234,31 @@ async function evaluateSingleReview(client, review) {
         throw err;
     }
 
-    var parsed = extractJsonResult(response) || {};
+    var outputBlocks = Array.isArray(response && response.output) ? response.output : [];
+    var contentParts = outputBlocks.flatMap(function(block) {
+        return Array.isArray(block && block.content) ? block.content : [];
+    });
+
+    var parsedContent = contentParts.find(function(part) { return part && Object.prototype.hasOwnProperty.call(part, 'parsed'); });
+
+    var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizeReviewDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+
+    var sources = contentParts.flatMap(function(part) {
+        if (!part) return [];
+        if (Array.isArray(part.citations)) return part.citations;
+        if (Array.isArray(part.sources)) return part.sources;
+        return [];
+    });
+    if (!sources.length && Array.isArray(response && response.sources)) {
+        sources = response.sources;
+    }
 
     return {
         decision: decision,
         summary: parsed.summary || '',
+        sources: sources,
         rawResponse: response
     };
 }

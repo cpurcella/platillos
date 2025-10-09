@@ -184,8 +184,10 @@ async function evaluateSingleDish(client, dish) {
 
     var response;
     try {
+        var schemaDef = buildDishJsonSchema();
+
         response = await client.responses.create({
-            model: 'gpt-4o-search-preview',
+            model: 'gpt-4o-mini',
             input: [
                 {
                     role: 'system',
@@ -200,7 +202,7 @@ async function evaluateSingleDish(client, dish) {
                     role: 'user',
                     content: [
                         {
-                            type: 'text',
+                            type: 'input_text',
                             text: userPrompt
                         }
                     ]
@@ -209,9 +211,13 @@ async function evaluateSingleDish(client, dish) {
             tools: [
                 { type: 'web_search' }
             ],
-            response_format: {
-                type: 'json_schema',
-                json_schema: buildDishJsonSchema()
+            text: {
+                format: {
+                    type: 'json_schema',
+                    name: schemaDef.name,
+                    schema: schemaDef.schema,
+                    strict: true
+                }
             }
         });
     } catch (err) {
@@ -219,13 +225,31 @@ async function evaluateSingleDish(client, dish) {
         throw err;
     }
 
-    var parsed = extractJsonResult(response) || {};
+    var outputBlocks = Array.isArray(response && response.output) ? response.output : [];
+    var contentParts = outputBlocks.flatMap(function(block) {
+        return Array.isArray(block && block.content) ? block.content : [];
+    });
+
+    var parsedContent = contentParts.find(function(part) { return part && Object.prototype.hasOwnProperty.call(part, 'parsed'); });
+
+    var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizeDishDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+
+    var sources = contentParts.flatMap(function(part) {
+        if (!part) return [];
+        if (Array.isArray(part.citations)) return part.citations;
+        if (Array.isArray(part.sources)) return part.sources;
+        return [];
+    });
+    if (!sources.length && Array.isArray(response && response.sources)) {
+        sources = response.sources;
+    }
 
     return {
         decision: decision,
         summary: parsed.summary || '',
+        sources: sources,
         rawResponse: response
     };
 }

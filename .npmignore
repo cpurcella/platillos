@@ -1,0 +1,12 @@
+# Exclude env secrets from published packages
+env/
+.env
+.env.*
+
+# Local only directories
+node_modules/
+coverage/
+dist/
+
+# Project configs not needed when publishing
+.vscode/
