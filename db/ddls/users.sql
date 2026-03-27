@@ -1,8 +1,11 @@
 CREATE TABLE `users` (
   `userId` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `isAdmin` tinyint NOT NULL DEFAULT '0',
+  `username` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `firstName` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `lastName` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `avatarFileId` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bio` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `dob` date NOT NULL,
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `phone` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -22,5 +25,6 @@ CREATE TABLE `users` (
   `lastLogin` bigint DEFAULT NULL,
   PRIMARY KEY (`userId`),
   UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `idx_users_username` (`username`),
   KEY `idx_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

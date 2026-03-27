@@ -4,6 +4,7 @@ var approveDishModule = {
     setHandlers: function() {
         $(document).ready(approveDishModule.init);
         $(document).on('click', '#save-dish-status-btn', approveDishModule.handleSave);
+        $(document).on('click', '#ai-evaluate-dish-btn', approveDishModule.handleAiEvaluate);
         $(document).on('click', '#approve-dish-content .metadata-chip', approveDishModule.handleChipToggle);
     },
     init: function() {
@@ -61,6 +62,7 @@ var approveDishModule = {
                 currentStatus = 'pending';
             }
             $('#dish-status-select').val(currentStatus);
+            $('#ai-evaluate-dish-btn').toggle(currentStatus === 'pending');
 
             if (metadataLoaded && metadataOptions) {
                 approveDishModule.applyMetadataSelections(dish);
@@ -147,6 +149,21 @@ var approveDishModule = {
         $chip.toggleClass('is-selected', !isSelected);
         $chip.attr('aria-selected', !isSelected ? 'true' : 'false');
     },
+    selectChipsByLabel: function(selector, labels) {
+        var $container = $(selector);
+        if (!$container.length || !labels || !labels.length) {
+            return;
+        }
+        var lowerLabels = labels.map(function(l) { return String(l).toLowerCase().trim(); });
+        $container.find('.metadata-chip').each(function() {
+            var $chip = $(this);
+            var chipLabel = $chip.text().toLowerCase().trim();
+            if (lowerLabels.indexOf(chipLabel) !== -1) {
+                $chip.addClass('is-selected');
+                $chip.attr('aria-selected', 'true');
+            }
+        });
+    },
     getSelectedIdsFromChips: function(selector) {
         var $container = $(selector);
         if (!$container.length) {
@@ -179,6 +196,12 @@ var approveDishModule = {
         if (!['approved', 'rejected', 'pending'].includes(normalizedStatus)) {
             common.showAlert('Please select a valid status.', 'error');
             return;
+        }
+
+        if (normalizedStatus === 'approved' || normalizedStatus === 'rejected') {
+            if (!confirm('Are you sure you want to mark this dish as ' + normalizedStatus + '?')) {
+                return;
+            }
         }
 
         var payload = {
@@ -217,9 +240,13 @@ var approveDishModule = {
                 common.showAlert(message, 'success');
                 $('#approve-dish-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
-                if (window.approvalsModule && approvalsModule.initDishesGrid) {
-                    $('#dishes-grid').empty();
-                    approvalsModule.initDishesGrid();
+                if (window.approvalsModule) {
+                    if (approvalsModule.dishGrid) {
+                        approvalsModule.dishGrid.forceRender();
+                    }
+                    if (approvalsModule.loadPendingCounts) {
+                        approvalsModule.loadPendingCounts();
+                    }
                 }
             } else {
                 common.showAlert((res && res.message) || 'Failed to update dish.', 'error');
@@ -230,6 +257,53 @@ var approveDishModule = {
             approveDishModule.isSaving = false;
             $btn.text(originalText);
             $btn.prop('disabled', false);
+        }
+    },
+    handleAiEvaluate: async function() {
+        var dishId = window.approveDishId;
+        if (!dishId) {
+            common.showAlert('Missing dishId.', 'error');
+            return;
+        }
+        var $btn = $('#ai-evaluate-dish-btn');
+        var originalText = $btn.text();
+        $btn.prop('disabled', true).text('Evaluating...');
+        $('#ai-dish-result').hide();
+        try {
+            var res = await $.ajax({
+                url: '/api/approvals/ai/dish/' + encodeURIComponent(dishId),
+                method: 'POST',
+                dataType: 'json'
+            });
+            if (res && res.success && res.data) {
+                var d = res.data;
+                var verdictLabel = (d.verdict || 'unknown').replace('_', ' ');
+                var confidence = d.confidence != null ? ' (' + Math.round(d.confidence * 100) + '% confidence)' : '';
+                $('#ai-dish-verdict').text(verdictLabel.charAt(0).toUpperCase() + verdictLabel.slice(1) + confidence);
+                $('#ai-dish-reasoning').text(d.reasoning || '');
+                $('#ai-dish-result').show();
+                if (d.verdict === 'approve') {
+                    $('#dish-status-select').val('approved');
+                } else if (d.verdict === 'reject') {
+                    $('#dish-status-select').val('rejected');
+                }
+                // Pre-select categories and dish types from AI result
+                if (d.categories && d.categories.length) {
+                    approveDishModule.selectChipsByLabel('#dish-categories-chips', d.categories);
+                }
+                if (d.dishTypes && d.dishTypes.length) {
+                    approveDishModule.selectChipsByLabel('#dish-types-chips', d.dishTypes);
+                }
+                if (d.tags && d.tags.length) {
+                    approveDishModule.selectChipsByLabel('#dish-tags-chips', d.tags);
+                }
+            } else {
+                common.showAlert((res && res.message) || 'AI evaluation failed.', 'error');
+            }
+        } catch (err) {
+            common.showAlert('AI evaluation failed.', 'error');
+        } finally {
+            $btn.prop('disabled', false).text(originalText);
         }
     }
 };

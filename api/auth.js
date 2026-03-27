@@ -29,6 +29,7 @@ router.post('/extendSession', async function (req, res) {
             return res.status(400).json({ success: false, message: "Unauthenticated" });
         }
 
+        var sessionData = await authService.getSession(sessionId);
         var result = await authService.extendSession(sessionId);
 
         var maxAge = result.expiration - Date.now();
@@ -38,7 +39,20 @@ router.post('/extendSession', async function (req, res) {
             sameSite: 'lax',
             signed: true
         });
-        res.json({ success: true });
+
+        var user = sessionData.user || {};
+        var avatarUrl = user.avatarFileId
+            ? 'https://' + require('../config').bucket + '.s3.amazonaws.com/' + user.avatarFileId
+            : null;
+        res.json({
+            success: true,
+            user: {
+                username: user.username || null,
+                firstName: user.firstName || null,
+                isAdmin: user.isAdmin || 0,
+                avatarUrl: avatarUrl
+            }
+        });
     } catch (err) {
         res.status(err.status || 400).json({ success: false, message: err.message });
     }

@@ -1,12 +1,26 @@
 var db = require('../connections');
+var config = require('../config');
 var { getOpenAiClient, clampLimit } = require('./client');
 var { formatDate, extractJsonResult } = require('./utils');
 
 var VALID_VERDICTS = ['approve', 'reject', 'manual_review'];
 
+async function fetchCategoriesAndDishTypes() {
+    var results = await Promise.all([
+        db.query('SELECT categoryId, category FROM categories ORDER BY category'),
+        db.query('SELECT dishTypeId, dishType FROM dishTypes ORDER BY dishType'),
+        db.query('SELECT tagId, tag FROM tags ORDER BY tag')
+    ]);
+    return {
+        categories: results[0] || [],
+        dishTypes: results[1] || [],
+        tags: results[2] || []
+    };
+}
+
 async function fetchPendingDishes(limit) {
-    var sql = "SELECT d.dishId, d.name AS dishName, d.description, d.restaurantId, d.submitted, d.submittedBy, " +
-        "d.status, r.name AS restaurantName, r.website, r.address, r.cityId, c.city AS cityName, c.state AS stateName " +
+    var sql = "SELECT d.dishId, d.name AS dishName, d.restaurantId, d.submitted, d.submittedBy, " +
+        "d.status, r.name AS restaurantName, r.address, r.cityId, c.city AS cityName, c.state AS stateName " +
         "FROM dishes d " +
         "JOIN restaurants r ON d.restaurantId = r.restaurantId " +
         "LEFT JOIN cities c ON r.cityId = c.cityId " +
@@ -18,10 +32,8 @@ async function fetchPendingDishes(limit) {
         return {
             dishId: row.dishId,
             dishName: row.dishName,
-            description: row.description || '',
             restaurantId: row.restaurantId,
             restaurantName: row.restaurantName || '',
-            restaurantWebsite: row.website || '',
             restaurantAddress: row.address || '',
             restaurantCity: row.cityName || '',
             restaurantState: row.stateName || '',
@@ -31,18 +43,14 @@ async function fetchPendingDishes(limit) {
     });
 }
 
-function buildDishPrompt(dish) {
+function buildDishPrompt(dish, lookups) {
     var lines = [
-        'You are validating a restaurant menu submission. Confirm whether this dish is real or reasonable for the restaurant to have.',
+        'You are validating a restaurant menu submission. Confirm whether this dish is real or reasonable for the restaurant to have, and tag it with the appropriate categories and dish types.',
         '',
+        'Dish ID: ' + (dish.dishId || ''),
         'Dish: ' + (dish.dishName || 'Unknown Dish'),
-        'Description: ' + (dish.description || 'No description provided'),
         'Restaurant: ' + (dish.restaurantName || 'Unknown Restaurant')
     ];
-
-    if (dish.restaurantWebsite) {
-        lines.push('Restaurant Website: ' + dish.restaurantWebsite);
-    }
 
     var locationParts = [dish.restaurantAddress, dish.restaurantCity, dish.restaurantState].filter(Boolean);
     if (locationParts.length) {
@@ -56,10 +64,26 @@ function buildDishPrompt(dish) {
 
     lines.push('');
     lines.push('Tasks:');
-    lines.push('1. Search the web (especially the restaurant’s website or reputable sources) to see if the dish appears on their menu.');
-    lines.push('2. If the dish is not mentioned, assess whether the dish reasonably fits the restaurant’s cuisine and style.');
+    lines.push("1. Search the web (especially the restaurant's website or reputable sources) to see if the dish appears on their menu.");
+    lines.push("2. If the dish is not mentioned, assess whether the dish reasonably fits the restaurant's cuisine and style.");
     lines.push('3. Flag any concerns such as mismatched cuisine, implausible dishes, or known hoaxes.');
     lines.push('4. Return a verdict (approve, reject, or manual_review) and explain your reasoning.');
+    lines.push('5. Tag the dish with ALL applicable categories, dish types, and tags from the lists below. Pick every relevant option -- a dish can have multiple categories, types, and tags.');
+    lines.push('');
+
+    var categoryNames = lookups.categories.map(function(c) { return c.category; });
+    lines.push('VALID CATEGORIES (pick all that apply): ' + categoryNames.join(', '));
+    lines.push('');
+
+    var dishTypeNames = lookups.dishTypes.map(function(t) { return t.dishType; });
+    lines.push('VALID DISH TYPES (pick all that apply): ' + dishTypeNames.join(', '));
+    lines.push('');
+
+    var tagNames = lookups.tags.map(function(t) { return t.tag; });
+    lines.push('VALID TAGS (pick all that apply): ' + tagNames.join(', '));
+    lines.push('');
+
+    lines.push('Return the category, dish type, and tag names exactly as listed above in the "categories", "dishTypes", and "tags" arrays of your response.');
     lines.push('');
     lines.push('Provide your decision as JSON according to the given schema, citing sources when possible.');
 
@@ -72,7 +96,7 @@ function buildDishJsonSchema() {
         schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['decisions'],
+            required: ['summary', 'decisions'],
             properties: {
                 summary: {
                     type: 'string'
@@ -82,7 +106,7 @@ function buildDishJsonSchema() {
                     minItems: 1,
                     items: {
                         type: 'object',
-                        required: ['dishId', 'verdict', 'confidence', 'reasoning'],
+                        required: ['dishId', 'verdict', 'confidence', 'reasoning', 'evidence', 'concerns', 'categories', 'dishTypes', 'tags'],
                         additionalProperties: false,
                         properties: {
                             dishId: {
@@ -107,6 +131,24 @@ function buildDishJsonSchema() {
                                 }
                             },
                             concerns: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                }
+                            },
+                            categories: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                }
+                            },
+                            dishTypes: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                }
+                            },
+                            tags: {
                                 type: 'array',
                                 items: {
                                     type: 'string'
@@ -136,7 +178,10 @@ function normalizeDishDecision(decision) {
         confidence: typeof decision.confidence === 'number' ? Math.max(0, Math.min(1, decision.confidence)) : null,
         reasoning: decision.reasoning || '',
         evidence: Array.isArray(decision.evidence) ? decision.evidence : [],
-        concerns: Array.isArray(decision.concerns) ? decision.concerns : []
+        concerns: Array.isArray(decision.concerns) ? decision.concerns : [],
+        categories: Array.isArray(decision.categories) ? decision.categories : [],
+        dishTypes: Array.isArray(decision.dishTypes) ? decision.dishTypes : [],
+        tags: Array.isArray(decision.tags) ? decision.tags : []
     };
 }
 
@@ -180,20 +225,21 @@ async function evaluatePendingDishes(options) {
 }
 
 async function evaluateSingleDish(client, dish) {
-    var userPrompt = buildDishPrompt(dish);
+    var lookups = await fetchCategoriesAndDishTypes();
+    var userPrompt = buildDishPrompt(dish, lookups);
 
     var response;
     try {
         var schemaDef = buildDishJsonSchema();
 
         response = await client.responses.create({
-            model: 'gpt-4o-mini',
+            model: config.aiModel,
             input: [
                 {
                     role: 'system',
                     content: [
                         {
-                            type: 'text',
+                            type: 'input_text',
                             text: 'You are a culinary fact-checker verifying restaurant menu submissions. Use current web sources to confirm dishes.'
                         }
                     ]
@@ -250,15 +296,53 @@ async function evaluateSingleDish(client, dish) {
         decision: decision,
         summary: parsed.summary || '',
         sources: sources,
-        rawResponse: response
+        rawResponse: response,
+        lookups: lookups
     };
 }
 
-async function applyDishDecisions(decisions) {
+function resolveCategoryIds(categoryNames, allCategories) {
+    if (!Array.isArray(categoryNames)) return [];
+    var ids = [];
+    for (var i = 0; i < categoryNames.length; i++) {
+        var name = String(categoryNames[i]).toLowerCase().trim();
+        var match = allCategories.find(function(c) { return c.category.toLowerCase() === name; });
+        if (match) ids.push(match.categoryId);
+    }
+    return ids;
+}
+
+function resolveDishTypeIds(dishTypeNames, allDishTypes) {
+    if (!Array.isArray(dishTypeNames)) return [];
+    var ids = [];
+    for (var i = 0; i < dishTypeNames.length; i++) {
+        var name = String(dishTypeNames[i]).toLowerCase().trim();
+        var match = allDishTypes.find(function(t) { return t.dishType.toLowerCase() === name; });
+        if (match) ids.push(match.dishTypeId);
+    }
+    return ids;
+}
+
+function resolveTagIds(tagNames, allTags) {
+    if (!Array.isArray(tagNames)) return [];
+    var ids = [];
+    for (var i = 0; i < tagNames.length; i++) {
+        var name = String(tagNames[i]).toLowerCase().trim();
+        var match = allTags.find(function(t) { return t.tag.toLowerCase() === name; });
+        if (match) ids.push(match.tagId);
+    }
+    return ids;
+}
+
+async function applyDishDecisions(decisions, lookups) {
     var reviewerUserId = 'openai';
 
     if (!Array.isArray(decisions) || !decisions.length) {
         return { updated: 0 };
+    }
+
+    if (!lookups) {
+        lookups = await fetchCategoriesAndDishTypes();
     }
 
     var connection = await db.getConnection();
@@ -308,6 +392,34 @@ async function applyDishDecisions(decisions) {
 
                 updates += affectedRows;
             }
+
+            // Insert category and dish type associations
+            var categoryIds = resolveCategoryIds(decision.categories, lookups.categories);
+            if (categoryIds.length) {
+                var catValues = categoryIds.map(function(cid) { return [decision.dishId, cid]; });
+                await connection.query(
+                    'INSERT IGNORE INTO dishes_categories (dishId, categoryId) VALUES ?',
+                    [catValues]
+                );
+            }
+
+            var dishTypeIds = resolveDishTypeIds(decision.dishTypes, lookups.dishTypes);
+            if (dishTypeIds.length) {
+                var dtValues = dishTypeIds.map(function(dtid) { return [decision.dishId, dtid]; });
+                await connection.query(
+                    'INSERT IGNORE INTO dishes_dishTypes (dishId, dishTypeId) VALUES ?',
+                    [dtValues]
+                );
+            }
+
+            var tagIds = resolveTagIds(decision.tags, lookups.tags);
+            if (tagIds.length) {
+                var tagValues = tagIds.map(function(tid) { return [decision.dishId, tid]; });
+                await connection.query(
+                    'INSERT IGNORE INTO dishes_tags (dishId, tagId) VALUES ?',
+                    [tagValues]
+                );
+            }
         }
 
         await connection.commit();
@@ -327,5 +439,8 @@ async function applyDishDecisions(decisions) {
 
 module.exports = {
     evaluatePendingDishes: evaluatePendingDishes,
-    applyDishDecisions: applyDishDecisions
+    applyDishDecisions: applyDishDecisions,
+    evaluateSingleDish: evaluateSingleDish,
+    fetchPendingDishes: fetchPendingDishes,
+    fetchCategoriesAndDishTypes: fetchCategoriesAndDishTypes
 };

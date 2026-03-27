@@ -5,11 +5,14 @@ var session = (function() {
         try {
 
             window.isLoggedIn = true;
-            await $.ajax({
+            var res = await $.ajax({
                 url: '/api/auth/extendSession',
                 method: 'POST',
                 dataType: 'json'
             });
+            if (res && res.user) {
+                window._platillosUser = res.user;
+            }
         } catch (err) {
             clearSession();
         }
@@ -17,6 +20,7 @@ var session = (function() {
 
     function clearSession() {
         window.isLoggedIn = false;
+        window._platillosUser = null;
     }
 
 

@@ -39,6 +39,7 @@ var approvalsModule = {
             approvalsModule.initDishesGrid();
             approvalsModule.initRestaurantsGrid();
             approvalsModule.initPhotosGrid();
+            approvalsModule.loadPendingCounts();
         });
         $('#reviews-grid').on('click', '.approve-btn', approvalsModule.openApproveModal);
         $('#dishes-grid').on('click', '.review-dish-btn', approvalsModule.openDishModal);
@@ -85,7 +86,7 @@ var approvalsModule = {
                         r.reviewContent || '',
                         new Date(r.submitted).toLocaleString(),
                         (r.photos || []).length,
-                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise approve-btn" data-review-id="' + r.reviewId + '">Approve</a>')
+                        gridjs.html('<a href="javascript:void(0)" class="btn btn-turquoise approve-btn" data-review-id="' + r.reviewId + '">Review</a>')
                     ];
                 });
             },
@@ -254,6 +255,24 @@ var approvalsModule = {
         }
         $('#photos-status-filter').val(status);
     },
+    loadPendingCounts: function() {
+        var endpoints = [
+            { url: '/api/reviews?status=pending&page=1&pageSize=1', badge: '#badge-reviews' },
+            { url: '/api/dishes?status=pending&page=1&pageSize=1', badge: '#badge-dishes' },
+            { url: '/api/restaurants?status=pending&page=1&pageSize=1', badge: '#badge-restaurants' },
+            { url: '/api/review-photos?status=pending&page=1&pageSize=1', badge: '#badge-photos' }
+        ];
+        endpoints.forEach(function(ep) {
+            $.get(ep.url).then(function(res) {
+                var count = (res && typeof res.total === 'number') ? res.total : 0;
+                if (count > 0) {
+                    $(ep.badge).text(count).show();
+                } else {
+                    $(ep.badge).hide();
+                }
+            });
+        });
+    },
     openDishModal: function(e) {
         e.preventDefault();
         var dishId = $(this).data('dish-id');
@@ -277,93 +296,6 @@ var approvalsModule = {
         var reviewId = $(this).data('review-id');
         window.approveReviewId = reviewId;
         common.showModal('/admin/approve-review');
-    },
-    loadPendingItems: async function() {
-        try {
-            var reviews = await $.get('/api/reviews/pending');
-            approvalsModule.renderReviews(reviews.data || []);
-            
-            var dishes = await $.get('/api/dishes/pending');
-            approvalsModule.renderDishes(dishes.data || []);
-            
-            var restaurants = await $.get('/api/restaurants/pending');
-            approvalsModule.renderRestaurants(restaurants.data || []);
-            
-            var images = await $.get('/api/files/pending');
-            approvalsModule.renderImages(images.data || []);
-        } catch (err) {
-            common.showAlert('Failed to load pending items', 'error');
-        }
-    },
-    renderReviews: function(reviews) {
-        var $list = $('#reviews-list');
-        $list.empty();
-        if (!reviews.length) {
-            $list.html('<div>No pending reviews.</div>');
-            return;
-        }
-        reviews.forEach(function(review) {
-            var html = `
-                <div class="card">
-                    <div>${review.reviewContent}</div>
-                    <div>Rating: ${review.rating}</div>
-                    <!-- Add approve/reject buttons here -->
-                </div>
-            `;
-            $list.append(html);
-        });
-    },
-    renderDishes: function(dishes) {
-        var $list = $('#dishes-list');
-        $list.empty();
-        if (!dishes.length) {
-            $list.html('<div>No pending dishes.</div>');
-            return;
-        }
-        dishes.forEach(function(dish) {
-            var html = `
-                <div class="card">
-                    <div>${dish.name}</div>
-                    <!-- Add approve/reject buttons here -->
-                </div>
-            `;
-            $list.append(html);
-        });
-    },
-    renderRestaurants: function(restaurants) {
-        var $list = $('#restaurants-list');
-        $list.empty();
-        if (!restaurants.length) {
-            $list.html('<div>No pending restaurants.</div>');
-            return;
-        }
-        restaurants.forEach(function(restaurant) {
-            var html = `
-                <div class="card">
-                    <div>${restaurant.name}</div>
-                    <div>${restaurant.address}</div>
-                    <!-- Add approve/reject buttons here -->
-                </div>
-            `;
-            $list.append(html);
-        });
-    },
-    renderImages: function(images) {
-        var $list = $('#images-list');
-        $list.empty();
-        if (!images.length) {
-            $list.html('<div>No pending images.</div>');
-            return;
-        }
-        images.forEach(function(image) {
-            var html = `
-                <div class="card">
-                    <img src="${image.url}" alt="Pending image" style="max-width: 200px;">
-                    <!-- Add approve/reject buttons here -->
-                </div>
-            `;
-            $list.append(html);
-        });
     }
 };
 

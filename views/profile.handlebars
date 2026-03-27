@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Platillos - Profile</title>
+    {{> head}}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css">
+    <link rel="stylesheet" href="/styles/profile.css">
+</head>
+<body class="bg-mint">
+    {{> header}}
+    <div class="main-container profile-page">
+        <section class="profile-header" id="profile-header">
+            <div class="profile-avatar-wrap" id="profile-avatar-wrap">
+                <div class="profile-avatar" id="profile-avatar"></div>
+            </div>
+            <div class="profile-info">
+                <h1 class="profile-display-name" id="profile-display-name"></h1>
+                <div class="profile-username" id="profile-username"></div>
+                <div class="profile-location" id="profile-location"></div>
+                <p class="profile-bio" id="profile-bio"></p>
+                <div class="profile-stats" id="profile-stats"></div>
+                <button class="btn btn-outline btn-sm hidden" id="edit-profile-btn">Edit Profile</button>
+            </div>
+        </section>
+
+        <section class="profile-tabs">
+            <button class="profile-tab active" data-tab="favorites">Favorites</button>
+            <button class="profile-tab" data-tab="reviews">Reviews</button>
+            <button class="profile-tab" data-tab="diary">Diary</button>
+        </section>
+
+        <section class="profile-tab-content" id="tab-favorites">
+            <div class="favorites-grid" id="favorites-grid"></div>
+        </section>
+
+        <section class="profile-tab-content hidden" id="tab-reviews">
+            <div class="reviews-list" id="profile-reviews-list"></div>
+        </section>
+
+        <section class="profile-tab-content hidden" id="tab-diary">
+            <div class="diary-controls" id="diary-controls"></div>
+            <div class="diary-calendar" id="diary-calendar"></div>
+            <div class="diary-entries-list" id="diary-entries-list"></div>
+        </section>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div class="modal-overlay hidden" id="edit-profile-overlay"></div>
+    <div class="edit-profile-modal hidden" id="edit-profile-modal">
+        <button class="close-modal" aria-label="Close">&times;</button>
+        <h2 class="section-title">Edit Profile</h2>
+        <form id="edit-profile-form">
+            <div class="form-group">
+                <label class="form-label" for="edit-username">Username</label>
+                <input class="form-input" type="text" id="edit-username" name="username" maxlength="30" pattern="[a-zA-Z0-9_]{3,30}" placeholder="letters, numbers, underscores">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="edit-bio">Bio</label>
+                <textarea class="form-input" id="edit-bio" name="bio" maxlength="500" rows="3" placeholder="Tell others about your food journey..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Avatar</label>
+                <div class="avatar-upload-row" id="avatar-row-default">
+                    <div class="avatar-preview" id="avatar-preview"></div>
+                    <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+                    <button type="button" class="btn btn-outline btn-sm" id="avatar-upload-btn">Change Photo</button>
+                </div>
+                <div class="avatar-crop-area hidden" id="avatar-crop-area">
+                    <div id="avatar-croppie"></div>
+                    <div class="avatar-crop-actions">
+                        <button type="button" class="btn btn-turquoise btn-sm" id="avatar-crop-confirm">Crop</button>
+                        <button type="button" class="btn btn-outline btn-sm" id="avatar-crop-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-turquoise">Save</button>
+                <button type="button" class="btn btn-outline" id="cancel-edit-btn">Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    {{> footer}}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
+    <script src="/js/profile.js"></script>
+</body>
+</html>

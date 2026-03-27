@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var dishService = require('./dishService');
+var { requireAdmin } = require('./middleware');
 
 router.get('/', async function(req, res) {
     try {
@@ -54,7 +55,7 @@ router.get('/:dishId', async function(req, res) {
     }
 });
 
-router.patch('/:dishId', async function(req, res) {
+router.patch('/:dishId', requireAdmin, async function(req, res) {
     try {
         var params = Object.assign({}, req.allParams || {}, { dishId: req.params.dishId });
         var result = await dishService.updateDish(params);

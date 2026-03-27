@@ -20,6 +20,9 @@
             <div class="dish-header-photo" id="dish-cover-container"></div>
         </section>
         <section class="dish-reviews" id="dish-reviews">
+            <div class="dish-actions" id="dish-actions">
+                <button class="btn btn-turquoise btn-sm hidden" id="quick-log-btn">📝 Log It</button>
+            </div>
             <h2 class="section-title">Reviews</h2>
             <div id="reviews-list" class="reviews-list"></div>
             <div class="reviews-pagination">
@@ -29,6 +32,29 @@
             </div>
         </section>
     </div>
+
+    <!-- Quick Log Modal -->
+    <div class="modal-overlay hidden" id="quick-log-overlay"></div>
+    <div class="quick-log-modal hidden" id="quick-log-modal">
+        <button class="close-modal" aria-label="Close">&times;</button>
+        <h3 class="section-title">Quick Log</h3>
+        <p class="quick-log-desc">Record that you tried this dish — no review needed.</p>
+        <form id="quick-log-form">
+            <div class="form-group">
+                <label class="form-label" for="log-date">Date Tried</label>
+                <input class="form-input" type="date" id="log-date" name="dateTried" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="log-rating">Rating (optional, 1–10)</label>
+                <input class="form-input" type="number" id="log-rating" name="rating" min="1" max="10" step="1">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-turquoise">Save</button>
+                <button type="button" class="btn btn-outline" id="cancel-log-btn">Cancel</button>
+            </div>
+        </form>
+    </div>
+
     {{> footer}}
     <script src="/js/dish.js"></script>
 </body>

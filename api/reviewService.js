@@ -3,6 +3,7 @@ var crypto = require('crypto');
 var axios = require('axios');
 var config = require('../config');
 var dishService = require('./dishService');
+var aiJobQueue = require('../aiJobQueue');
 
 var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
 
@@ -263,6 +264,29 @@ async function saveReview(allParams) {
         }
 
         await connection.commit();
+
+        // Enqueue AI evaluation jobs (non-blocking, after commit)
+        try {
+            if (isNewRestaurant && restaurantId) {
+                await aiJobQueue.enqueueJob('evaluate_restaurant', restaurantId);
+            }
+            if (isNewDish && finalDishId) {
+                await aiJobQueue.enqueueJob('evaluate_dish', finalDishId);
+            }
+            await aiJobQueue.enqueueJob('evaluate_review', reviewId);
+            if (allParams.photos && allParams.photos.length) {
+                var photoRows = await db.query(
+                    'SELECT reviewPhotoId FROM reviews_photos WHERE reviewId = ?',
+                    [reviewId]
+                );
+                for (var p = 0; p < photoRows.length; p++) {
+                    await aiJobQueue.enqueueJob('evaluate_photo', photoRows[p].reviewPhotoId);
+                }
+            }
+        } catch (enqueueErr) {
+            console.error('[ai-jobs] Failed to enqueue:', enqueueErr.message || enqueueErr);
+        }
+
         return reviewId;
     } catch (err) {
         await connection.rollback();
@@ -283,7 +307,7 @@ async function getReviews(params) {
             r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
             r.status, r.statusUpdated, r.statusUpdatedBy,
             d.name AS dishName, s.name AS restaurantName,
-            u.firstName, u.lastName, u.email
+            u.firstName, u.lastName, u.email, u.username, u.avatarFileId
     `;
     var fromClause = `
         FROM reviews r
@@ -344,12 +368,20 @@ async function getReviews(params) {
             for (var i = 0; i < photoRows.length; i++) {
                 var pr = photoRows[i];
                 photosByReview[pr.reviewId] = photosByReview[pr.reviewId] || [];
-                photosByReview[pr.reviewId].push(pr.fileId);
+                var photoUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + pr.fileId;
+                photosByReview[pr.reviewId].push({ fileId: pr.fileId, url: photoUrl });
             }
             for (var j = 0; j < reviews.length; j++) {
                 var rv = reviews[j];
                 rv.photos = photosByReview[rv.reviewId] || [];
             }
+        }
+    }
+
+    // Resolve avatar URLs
+    for (var k = 0; k < reviews.length; k++) {
+        if (reviews[k].avatarFileId) {
+            reviews[k].avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + reviews[k].avatarFileId;
         }
     }
 

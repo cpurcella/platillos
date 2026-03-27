@@ -1,9 +1,15 @@
 var db = require('../connections');
+var config = require('../config');
 var dishService = require('../api/dishService');
 var { getOpenAiClient, clampLimit } = require('./client');
 var { formatDate, extractJsonResult } = require('./utils');
 
 var VALID_VERDICTS = ['approve', 'reject', 'manual_review'];
+
+function buildPublicFileUrl(fileId) {
+    if (!fileId) return null;
+    return 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId;
+}
 
 async function fetchPendingReviews(limit) {
     var sql = "SELECT r.reviewId, r.review AS reviewContent, r.modifications, r.rating, r.dishId, r.submitted, " +
@@ -17,6 +23,21 @@ async function fetchPendingReviews(limit) {
         "ORDER BY r.submitted DESC, r.reviewId DESC LIMIT ?";
 
     var rows = await db.query(sql, [limit]) || [];
+
+    var reviewIds = rows.map(function(row) { return row.reviewId; });
+    var photoMap = {};
+    if (reviewIds.length) {
+        var photoSql = "SELECT rp.reviewId, rp.fileId FROM reviews_photos rp " +
+            "JOIN files f ON rp.fileId = f.fileId " +
+            "WHERE rp.reviewId IN (?) " +
+            "ORDER BY rp.reviewPhotoId ASC";
+        var photoRows = await db.query(photoSql, [reviewIds]) || [];
+        photoRows.forEach(function(pr) {
+            if (!photoMap[pr.reviewId]) photoMap[pr.reviewId] = [];
+            photoMap[pr.reviewId].push(buildPublicFileUrl(pr.fileId));
+        });
+    }
+
     return rows.map(function(row) {
         var reviewerName = ((row.firstName || '') + ' ' + (row.lastName || '')).trim();
         return {
@@ -30,7 +51,8 @@ async function fetchPendingReviews(limit) {
             restaurantName: row.restaurantName,
             submitted: row.submitted,
             reviewerId: row.submittedBy,
-            reviewerName: reviewerName || row.email || 'Anonymous'
+            reviewerName: reviewerName || row.email || 'Anonymous',
+            photoUrls: photoMap[row.reviewId] || []
         };
     });
 }
@@ -64,7 +86,8 @@ function buildReviewPrompt(review) {
     lines.push('1. The review should primarily discuss the food or dining experience.');
     lines.push('2. Reject content with hate speech, harassment, personal attacks, profanity, explicit or unsafe material.');
     lines.push('3. Reject content that includes personal information, order numbers, or unrelated topics.');
-    lines.push('4. If unsure, request manual review.');
+    lines.push('4. If photos are attached, verify they appear to show food relevant to the dish and restaurant described.');
+    lines.push('5. If unsure, request manual review.');
     lines.push('');
     lines.push('Return your verdict as JSON using the provided schema.');
 
@@ -77,7 +100,7 @@ function buildReviewJsonSchema() {
         schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['decisions'],
+            required: ['summary', 'decisions'],
             properties: {
                 summary: {
                     type: 'string'
@@ -87,7 +110,7 @@ function buildReviewJsonSchema() {
                     minItems: 1,
                     items: {
                         type: 'object',
-                        required: ['reviewId', 'verdict', 'confidence', 'reasoning'],
+                        required: ['reviewId', 'verdict', 'confidence', 'reasoning', 'issues', 'evidence', 'suggestedEdits'],
                         additionalProperties: false,
                         properties: {
                             reviewId: {
@@ -194,30 +217,41 @@ async function evaluatePendingReviews(options) {
 async function evaluateSingleReview(client, review) {
     var userPrompt = buildReviewPrompt(review);
 
+    var userContent = [
+        {
+            type: 'input_text',
+            text: userPrompt
+        }
+    ];
+
+    if (review.photoUrls && review.photoUrls.length) {
+        review.photoUrls.forEach(function(url) {
+            userContent.push({
+                type: 'input_image',
+                image_url: url
+            });
+        });
+    }
+
     var response;
     try {
         var schemaDef = buildReviewJsonSchema();
 
         response = await client.responses.create({
-            model: 'gpt-4o-mini',
+            model: config.aiModel,
             input: [
                 {
                     role: 'system',
                     content: [
                         {
-                            type: 'text',
+                            type: 'input_text',
                             text: 'You are a helpful but strict content moderator for restaurant reviews. Ensure all published reviews are polite, food-focused, and safe.'
                         }
                     ]
                 },
                 {
                     role: 'user',
-                    content: [
-                        {
-                            type: 'input_text',
-                            text: userPrompt
-                        }
-                    ]
+                    content: userContent
                 }
             ],
             text: {
@@ -352,5 +386,7 @@ async function applyReviewDecisions(decisions) {
 
 module.exports = {
     evaluatePendingReviews: evaluatePendingReviews,
-    applyReviewDecisions: applyReviewDecisions
+    applyReviewDecisions: applyReviewDecisions,
+    evaluateSingleReview: evaluateSingleReview,
+    fetchPendingReviews: fetchPendingReviews
 };

@@ -30,20 +30,30 @@
                         <input type="text" id="restaurant-lng-input" name="lng">
                     </div>
                 </div>
-                <div class="form-row" style="margin-top:16px;">
-                    <label for="restaurant-status-select" style="display:block;margin-bottom:4px;font-weight:600;">Status</label>
-                    <select id="restaurant-status-select" name="status" style="width:100%;padding:6px 8px;">
+                <div class="approval-status-row">
+                    <label for="restaurant-status-select">Status</label>
+                    <select id="restaurant-status-select" name="status">
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
                 </div>
-                <div class="form-row" style="margin-top:16px;">
-                    <label style="display:block;margin-bottom:4px;font-weight:600;">Submitted</label>
+                <div class="approval-info-row">
+                    <label>Submitted</label>
                     <div id="restaurant-submitted" class="form-static"></div>
                 </div>
-                <div class="form-actions" style="margin-top:16px;gap:8px;display:flex;">
+                <div class="approval-info-row">
+                    <label>Submitted By</label>
+                    <div id="restaurant-submitter" class="form-static"></div>
+                </div>
+                <div class="approval-actions">
                     <button type="submit" class="btn btn-turquoise" id="save-restaurant-status-btn">Save Changes</button>
+                    <button type="button" class="btn btn-outline" id="ai-evaluate-restaurant-btn">AI Evaluate</button>
+                </div>
+                <div id="ai-restaurant-result" class="ai-result-box">
+                    <div class="ai-result-title">AI Recommendation</div>
+                    <div id="ai-restaurant-verdict"></div>
+                    <div id="ai-restaurant-reasoning" class="ai-result-reasoning"></div>
                 </div>
             </form>
         </div>

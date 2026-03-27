@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var restaurantService = require('./restaurantService');
+var { requireAdmin } = require('./middleware');
 
 router.get('/', async function(req, res) {
     try {
@@ -41,7 +42,7 @@ router.get('/:restaurantId', async function(req, res) {
     }
 });
 
-router.patch('/:restaurantId', async function(req, res) {
+router.patch('/:restaurantId', requireAdmin, async function(req, res) {
     try {
         var params = Object.assign({}, req.allParams || {}, { restaurantId: req.params.restaurantId });
         var result = await restaurantService.updateRestaurant(params);

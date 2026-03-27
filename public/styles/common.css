@@ -13,6 +13,7 @@ body {
     background: var(--color-mint-bg);
     margin: 0;
     padding: 0;
+    padding-bottom: 5rem;
 }
 
 .text-turquoise {
@@ -63,6 +64,17 @@ header .btn-turquoise {
 }
 .btn:hover {
     cursor: pointer;
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--color-turquoise-dark, #008080);
+    border: 1.5px solid var(--color-turquoise-dark, #008080);
+}
+
+.btn-outline:hover, .btn-outline:focus {
+    background: var(--color-turquoise-dark, #008080);
+    color: #fff;
 }
 
 .form-row {

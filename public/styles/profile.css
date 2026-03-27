@@ -1,0 +1,443 @@
+/* profile.css */
+
+.profile-page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+/* ── Header ── */
+.profile-header {
+    display: flex;
+    gap: 20px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    align-items: flex-start;
+}
+
+.profile-avatar-wrap {
+    flex-shrink: 0;
+}
+
+.profile-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--color-turquoise);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.25rem;
+    font-weight: 700;
+    overflow: hidden;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.profile-display-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-turquoise-dark);
+    margin: 0 0 2px;
+}
+
+.profile-username {
+    font-size: 0.95rem;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.profile-location {
+    font-size: 0.9rem;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.profile-bio {
+    font-size: 0.95rem;
+    color: #333;
+    margin: 0 0 12px;
+    white-space: pre-line;
+}
+
+.profile-stats {
+    display: flex;
+    gap: 24px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.profile-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.profile-stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-turquoise-dark);
+}
+
+.profile-stat-label {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+#edit-profile-btn {
+    margin-top: 12px;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.9rem;
+    font-size: 0.85rem;
+}
+
+/* ── Favorites ── */
+.profile-favorites {
+    margin-top: 24px;
+}
+
+.favorites-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.favorite-card {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.2s;
+}
+
+.favorite-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.favorite-card-photo {
+    position: relative;
+    width: 100%;
+    padding-bottom: 100%;
+    background: #f0f0f0;
+    overflow: hidden;
+}
+
+.favorite-card-photo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.favorite-card-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #ccc;
+}
+
+.favorite-card-name {
+    padding: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.favorites-empty {
+    font-size: 0.9rem;
+    color: #888;
+    padding: 12px 0;
+}
+
+/* ── Reviews ── */
+.profile-reviews {
+    margin-top: 24px;
+}
+
+.profile-review-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    margin-bottom: 12px;
+}
+
+.profile-review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.profile-review-dish {
+    font-weight: 600;
+    color: var(--color-turquoise-dark);
+}
+
+.profile-review-dish a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.profile-review-dish a:hover {
+    text-decoration: underline;
+}
+
+.profile-review-rating {
+    font-weight: 600;
+    color: #e36414;
+}
+
+.profile-review-restaurant {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.profile-review-text {
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.profile-review-date {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.reviews-empty {
+    font-size: 0.9rem;
+    color: #888;
+    padding: 12px 0;
+}
+
+/* ── Edit Profile Modal ── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.32);
+    z-index: 1000;
+}
+
+.edit-profile-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 95vw;
+    max-width: 480px;
+    z-index: 1001;
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.18);
+}
+
+.avatar-upload-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-preview {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-turquoise);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Avatar crop area */
+.avatar-crop-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.avatar-crop-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+#avatar-croppie .cr-boundary {
+    border-radius: 8px;
+}
+
+/* ── Tabs ── */
+.profile-tabs {
+    display: flex;
+    gap: 0;
+    margin-top: 24px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.profile-tab {
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    color: #888;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.profile-tab:hover {
+    color: var(--color-turquoise-dark);
+}
+
+.profile-tab.active {
+    color: var(--color-turquoise-dark);
+    border-bottom-color: var(--color-turquoise);
+}
+
+.profile-tab-content {
+    margin-top: 16px;
+}
+
+/* ── Diary ── */
+.diary-controls {
+    margin-bottom: 16px;
+}
+
+.diary-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.diary-month-label {
+    font-weight: 600;
+    font-size: 1rem;
+    min-width: 160px;
+    text-align: center;
+}
+
+.diary-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 20px;
+}
+
+.diary-cal-header {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #888;
+    padding: 4px 0;
+}
+
+.diary-cal-cell {
+    position: relative;
+    text-align: center;
+    padding: 6px 0;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #555;
+    min-height: 32px;
+}
+
+.diary-cal-cell.empty {
+    background: transparent;
+}
+
+.diary-cal-cell.has-entries {
+    background: var(--color-turquoise-light, #d4f5ef);
+    font-weight: 600;
+    color: var(--color-turquoise-dark);
+}
+
+.diary-cal-dot {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-turquoise);
+    margin: 2px auto 0;
+}
+
+.diary-entry-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.diary-entry-date {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.diary-badge-log {
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: var(--color-turquoise-light, #d4f5ef);
+    color: var(--color-turquoise-dark);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+    .profile-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 20px 16px;
+    }
+
+    .profile-stats {
+        justify-content: center;
+    }
+
+    .favorites-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 1.75rem;
+    }
+}

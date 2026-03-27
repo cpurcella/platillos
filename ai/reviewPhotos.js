@@ -76,9 +76,10 @@ function buildPhotoPrompt(photo) {
     lines.push('');
     lines.push('Tasks:');
     lines.push('1. Confirm whether the image is an appropriate, high-quality depiction of the dish being reviewed.');
-    lines.push('2. Flag any issues such as unrelated food, people, explicit content, text overlays, or low quality.');
-    lines.push('3. Decide if the photo should be approved, rejected, or requires manual review.');
-    lines.push('4. If the dish lacks a cover photo (or this image is significantly better), indicate whether it should become the new cover photo.');
+    lines.push('2. Use web search to look up the dish at the restaurant and verify the photo matches what the dish should look like.');
+    lines.push('3. Flag any issues such as unrelated food, people, explicit content, text overlays, or low quality.');
+    lines.push('4. Decide if the photo should be approved, rejected, or requires manual review.');
+    lines.push('5. If the dish lacks a cover photo (or this image is significantly better), indicate whether it should become the new cover photo.');
     lines.push('');
     lines.push('Return a JSON object with your verdict, confidence, reasoning, and whether to set it as the cover photo.');
 
@@ -91,7 +92,7 @@ function buildPhotoJsonSchema() {
         schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['decisions'],
+            required: ['summary', 'decisions'],
             properties: {
                 summary: {
                     type: 'string'
@@ -101,7 +102,7 @@ function buildPhotoJsonSchema() {
                     minItems: 1,
                     items: {
                         type: 'object',
-                        required: ['reviewPhotoId', 'verdict', 'confidence', 'reasoning', 'setAsCoverPhoto'],
+                        required: ['reviewPhotoId', 'verdict', 'confidence', 'reasoning', 'setAsCoverPhoto', 'coverPhotoReasoning', 'issues', 'evidence'],
                         additionalProperties: false,
                         properties: {
                             reviewPhotoId: {
@@ -220,13 +221,13 @@ async function evaluateSingleReviewPhoto(client, photo) {
         var schemaDef = buildPhotoJsonSchema();
 
         response = await client.responses.create({
-            model: 'gpt-4o-mini',
+            model: config.aiModel,
             input: [
                 {
                     role: 'system',
                     content: [
                         {
-                            type: 'text',
+                            type: 'input_text',
                             text: 'You are an expert food photography moderator. Evaluate images for appropriateness, quality, and relevance to the described dish.'
                         }
                     ]
@@ -244,6 +245,9 @@ async function evaluateSingleReviewPhoto(client, photo) {
                         }
                     ]
                 }
+            ],
+            tools: [
+                { type: 'web_search' }
             ],
             text: {
                 format: {
@@ -388,5 +392,7 @@ async function applyPhotoDecisions(decisions) {
 
 module.exports = {
     evaluatePendingReviewPhotos: evaluatePendingReviewPhotos,
-    applyPhotoDecisions: applyPhotoDecisions
+    applyPhotoDecisions: applyPhotoDecisions,
+    evaluateSingleReviewPhoto: evaluateSingleReviewPhoto,
+    fetchPendingReviewPhotos: fetchPendingReviewPhotos
 };

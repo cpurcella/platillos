@@ -15,6 +15,11 @@ var dishPage = {
         dishPage.bindEvents();
         dishPage.loadDish();
         dishPage.loadReviews();
+
+        // Show quick-log button for logged-in users
+        if (window._platillosUser) {
+            $('#quick-log-btn').removeClass('hidden');
+        }
     },
 
     getDishIdFromPath: function() {
@@ -39,6 +44,44 @@ var dishPage = {
             if (dishPage.hasNextPage) {
                 dishPage.currentPage += 1;
                 dishPage.loadReviews();
+            }
+        });
+
+        // Quick-log
+        $('#quick-log-btn').on('click', function() {
+            $('#log-date').val(new Date().toISOString().slice(0, 10));
+            $('#log-rating').val('');
+            $('#quick-log-overlay, #quick-log-modal').removeClass('hidden');
+        });
+        $('#cancel-log-btn, #quick-log-overlay, #quick-log-modal .close-modal').on('click', function() {
+            $('#quick-log-overlay, #quick-log-modal').addClass('hidden');
+        });
+        $('#quick-log-form').on('submit', async function(e) {
+            e.preventDefault();
+            var data = {
+                dishId: dishPage.dishId,
+                dateTried: $('#log-date').val()
+            };
+            var rating = $('#log-rating').val();
+            if (rating) data.rating = parseInt(rating);
+
+            try {
+                var res = await $.ajax({
+                    url: '/api/users/diary',
+                    method: 'POST',
+                    data: JSON.stringify(data),
+                    contentType: 'application/json',
+                    dataType: 'json'
+                });
+                if (res.success) {
+                    common.showAlert('Logged!', 'success');
+                    $('#quick-log-overlay, #quick-log-modal').addClass('hidden');
+                } else {
+                    common.showAlert(res.message || 'Failed to log.', 'error');
+                }
+            } catch (err) {
+                var msg = (err.responseJSON && err.responseJSON.message) || 'Failed to log.';
+                common.showAlert(msg, 'error');
             }
         });
     },
@@ -152,11 +195,29 @@ var dishPage = {
                     submittedHtml = '<div class="review-meta">' + submittedSafe + '</div>';
                 }
 
+                // Build reviewer avatar
+                var avatarHtml = '';
+                if (review.avatarUrl) {
+                    avatarHtml = '<img class="review-author-avatar" src="' + $('<div>').text(review.avatarUrl + '_s').html() + '" alt="">';
+                } else {
+                    var initial = (reviewer || '?').charAt(0).toUpperCase();
+                    avatarHtml = '<span class="review-author-avatar review-author-initial">' + initial + '</span>';
+                }
+
+                // Link to profile if username available
+                var authorHtml = avatarHtml;
+                if (review.username) {
+                    var usernameSafe = encodeURIComponent(review.username);
+                    authorHtml = '<a href="/users/' + usernameSafe + '" class="review-author-link">' + avatarHtml + '<span class="review-author-name">' + reviewerSafe + '</span></a>';
+                } else {
+                    authorHtml = '<span class="review-author-link">' + avatarHtml + '<span class="review-author-name">' + reviewerSafe + '</span></span>';
+                }
+
                 var reviewHtml = `
                     <div class="review-card">
                         <div class="review-card-header">
                             <span class="review-rating">Rating: ${ratingText}</span>
-                            <span class="review-author">${reviewerSafe}</span>
+                            <span class="review-author">${authorHtml}</span>
                         </div>
                         <div class="review-content">${safeContent}</div>
                         ${modifications}

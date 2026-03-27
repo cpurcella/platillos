@@ -5,6 +5,7 @@ var approveRestaurantModule = {
             approveRestaurantModule.loadRestaurant();
         });
         $(document).on('submit', '#approve-restaurant-form', approveRestaurantModule.handleSave);
+        $(document).on('click', '#ai-evaluate-restaurant-btn', approveRestaurantModule.handleAiEvaluate);
     },
     loadRestaurant: async function() {
         var restaurantId = window.approveRestaurantId;
@@ -33,9 +34,15 @@ var approveRestaurantModule = {
                 currentStatus = 'pending';
             }
             $('#restaurant-status-select').val(currentStatus);
+            $('#ai-evaluate-restaurant-btn').toggle(currentStatus === 'pending');
 
             var submittedDate = restaurant.submitted ? new Date(restaurant.submitted).toLocaleString() : '';
             $('#restaurant-submitted').text(submittedDate || '');
+
+            var submitter = (restaurant.submitterFirstName || restaurant.submitterLastName)
+                ? ((restaurant.submitterFirstName || '') + ' ' + (restaurant.submitterLastName || '')).trim()
+                : (restaurant.submitterEmail || restaurant.submittedBy || '');
+            $('#restaurant-submitter').text(submitter);
         } catch (err) {
             $('#approve-restaurant-content').text('Failed to load restaurant.');
         }
@@ -63,12 +70,19 @@ var approveRestaurantModule = {
             return;
         }
 
+        var selectedStatus = $('#restaurant-status-select').val();
+        if (selectedStatus === 'approved' || selectedStatus === 'rejected') {
+            if (!confirm('Are you sure you want to mark this restaurant as ' + selectedStatus + '?')) {
+                return;
+            }
+        }
+
         var payload = {
             name: name,
             address: $('#restaurant-address-input').val() || '',
             city: city,
             zip: $('#restaurant-zip-input').val() || '',
-            status: $('#restaurant-status-select').val()
+            status: selectedStatus
         };
 
         var latVal = $('#restaurant-lat-input').val();
@@ -99,10 +113,13 @@ var approveRestaurantModule = {
                 common.showAlert(message, 'success');
                 $('#approve-restaurant-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
-                if (window.approvalsModule && approvalsModule.initRestaurantsGrid) {
-                    $('#restaurants-grid').empty();
-                    approvalsModule.restaurantGrid = null;
-                    approvalsModule.initRestaurantsGrid();
+                if (window.approvalsModule) {
+                    if (approvalsModule.restaurantGrid) {
+                        approvalsModule.restaurantGrid.forceRender();
+                    }
+                    if (approvalsModule.loadPendingCounts) {
+                        approvalsModule.loadPendingCounts();
+                    }
                 }
             } else {
                 common.showAlert((res && res.message) || 'Failed to update restaurant.', 'error');
@@ -111,6 +128,50 @@ var approveRestaurantModule = {
             common.showAlert('Failed to update restaurant.', 'error');
         } finally {
             approveRestaurantModule.isSaving = false;
+            $btn.prop('disabled', false).text(originalText);
+        }
+    },
+    handleAiEvaluate: async function() {
+        var restaurantId = window.approveRestaurantId;
+        if (!restaurantId) {
+            common.showAlert('Missing restaurantId.', 'error');
+            return;
+        }
+        var $btn = $('#ai-evaluate-restaurant-btn');
+        var originalText = $btn.text();
+        $btn.prop('disabled', true).text('Evaluating...');
+        $('#ai-restaurant-result').hide();
+        try {
+            var res = await $.ajax({
+                url: '/api/approvals/ai/restaurant/' + encodeURIComponent(restaurantId),
+                method: 'POST',
+                dataType: 'json'
+            });
+            if (res && res.success && res.data) {
+                var d = res.data;
+                var verdictLabel = (d.verdict || 'unknown').replace('_', ' ');
+                var confidence = d.confidence != null ? ' (' + Math.round(d.confidence * 100) + '% confidence)' : '';
+                $('#ai-restaurant-verdict').text(verdictLabel.charAt(0).toUpperCase() + verdictLabel.slice(1) + confidence);
+                $('#ai-restaurant-reasoning').text(d.reasoning || '');
+                $('#ai-restaurant-result').show();
+                if (d.verdict === 'approve') {
+                    $('#restaurant-status-select').val('approved');
+                } else if (d.verdict === 'reject') {
+                    $('#restaurant-status-select').val('rejected');
+                }
+                if (d.verifiedAddress) {
+                    if (d.verifiedAddress.street) $('#restaurant-address-input').val(d.verifiedAddress.street);
+                    if (d.verifiedAddress.city) $('#restaurant-city-input').val(d.verifiedAddress.city);
+                    if (d.verifiedAddress.postalCode) $('#restaurant-zip-input').val(d.verifiedAddress.postalCode);
+                    if (d.verifiedAddress.lat != null) $('#restaurant-lat-input').val(d.verifiedAddress.lat);
+                    if (d.verifiedAddress.lng != null) $('#restaurant-lng-input').val(d.verifiedAddress.lng);
+                }
+            } else {
+                common.showAlert((res && res.message) || 'AI evaluation failed.', 'error');
+            }
+        } catch (err) {
+            common.showAlert('AI evaluation failed.', 'error');
+        } finally {
             $btn.prop('disabled', false).text(originalText);
         }
     }

@@ -1,13 +1,10 @@
 var express = require('express');
 var router = express.Router();
 var reviewService = require('./reviewService');
+var { requireAuth, requireAdmin } = require('./middleware');
 
-router.post('/', async function(req, res) {
+router.post('/', requireAuth, async function(req, res) {
     try {
-        if (!req.allParams.auth || !req.allParams.auth.user) {
-            return res.status(401).json({ success: false, message: 'Unauthorized. Please log in.' });
-        }
-
         await reviewService.saveReview(req.allParams);
 
         res.json({ success: true, message: 'Review submitted successfully.' });
@@ -66,7 +63,7 @@ router.get('/:reviewId', async function(req, res) {
     }
 });
 
-router.patch('/:reviewId', async function(req, res) {
+router.patch('/:reviewId', requireAdmin, async function(req, res) {
     try {
         var params = Object.assign({}, req.allParams || {}, { reviewId: req.params.reviewId });
         var result = await reviewService.updateReview(params);

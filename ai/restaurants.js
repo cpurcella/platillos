@@ -1,4 +1,5 @@
 var db = require('../connections');
+var config = require('../config');
 var { getOpenAiClient, clampLimit } = require('./client');
 var { formatDate, extractJsonResult } = require('./utils');
 
@@ -32,7 +33,7 @@ async function getOrCreateCityId(connection, cityName) {
 }
 
 function fetchPendingRestaurants(limit) {
-    var sql = "SELECT r.restaurantId, r.name, r.address, r.zip, r.submitted, r.submittedBy, r.status, r.statusUpdated, r.statusUpdatedBy, c.city as cityName " +
+    var sql = "SELECT r.restaurantId, r.name, r.address, r.zip, r.lat, r.lng, r.submitted, r.submittedBy, r.status, r.statusUpdated, r.statusUpdatedBy, c.city as cityName " +
         "FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId " +
         "WHERE r.status = 'pending' ORDER BY r.submitted DESC, r.restaurantId DESC LIMIT ?";
     return db.query(sql, [limit]).then(function (rows) {
@@ -44,6 +45,8 @@ function fetchPendingRestaurants(limit) {
                 address: row.address,
                 city: row.cityName,
                 zip: row.zip,
+                lat: row.lat,
+                lng: row.lng,
                 submitted: row.submitted,
                 submittedBy: row.submittedBy
             };
@@ -57,9 +60,19 @@ function buildUserPrompt(restaurants) {
         lines.push((index + 1) + '. ' + restaurant.name);
         if (restaurant.address) {
             lines.push('   Address: ' + restaurant.address);
+        } else {
+            lines.push('   Address: MISSING — please look up');
         }
         if (restaurant.city || restaurant.zip) {
             lines.push('   Location: ' + [restaurant.city, restaurant.zip].filter(Boolean).join(', '));
+        } else {
+            lines.push('   Location: MISSING — please look up');
+        }
+        var hasCoords = restaurant.lat && restaurant.lng && (restaurant.lat !== 0 || restaurant.lng !== 0);
+        if (hasCoords) {
+            lines.push('   Coordinates: ' + restaurant.lat + ', ' + restaurant.lng);
+        } else {
+            lines.push('   Coordinates: MISSING — please look up');
         }
         if (restaurant.submittedBy) {
             lines.push('   Submitted By: ' + restaurant.submittedBy);
@@ -71,6 +84,7 @@ function buildUserPrompt(restaurants) {
         lines.push('');
     });
     lines.push('Use trusted sources to confirm the restaurant exists and is legitimate.');
+    lines.push('Fill in any MISSING fields with the correct information in the verifiedAddress.');
     lines.push('Return a JSON object with a "decisions" array describing the verdict for each restaurant.');
     return lines.join('\n');
 }
@@ -80,9 +94,11 @@ function toPromptPayload(restaurants) {
         return {
             restaurantId: restaurant.restaurantId,
             name: restaurant.name,
-            address: restaurant.address,
-            city: restaurant.city,
-            zip: restaurant.zip,
+            address: restaurant.address || null,
+            city: restaurant.city || null,
+            zip: restaurant.zip || null,
+            lat: restaurant.lat || null,
+            lng: restaurant.lng || null,
             submitted: formatDate(restaurant.submitted) || restaurant.submitted,
             submittedBy: restaurant.submittedBy
         };
@@ -117,12 +133,14 @@ function buildJsonSchema() {
                             verifiedAddress: {
                                 type: 'object',
                                 additionalProperties: false,
-                                required: ['street','city','state','postalCode'],
+                                required: ['street','city','state','postalCode','lat','lng'],
                                 properties: {
                                     street: { type: 'string' },
                                     city: { type: 'string' },
                                     state: { type: 'string' },
-                                    postalCode: { type: 'string' }
+                                    postalCode: { type: 'string' },
+                                    lat: { type: 'number' },
+                                    lng: { type: 'number' }
                                 }
                             }
                         }
@@ -154,7 +172,9 @@ function normalizeDecision(decision) {
             street: normalizeString(decision.verifiedAddress.street) || null,
             city: normalizeString(decision.verifiedAddress.city) || null,
             state: normalizeString(decision.verifiedAddress.state) || null,
-            postalCode: normalizeString(decision.verifiedAddress.postalCode) || null
+            postalCode: normalizeString(decision.verifiedAddress.postalCode) || null,
+            lat: typeof decision.verifiedAddress.lat === 'number' ? decision.verifiedAddress.lat : null,
+            lng: typeof decision.verifiedAddress.lng === 'number' ? decision.verifiedAddress.lng : null
         } : null
     };
 }
@@ -207,9 +227,15 @@ async function evaluateSingleRestaurant(client, restaurant) {
         var schemaDef = buildJsonSchema();
 
         response = await client.responses.create({
-            model: "gpt-4o",
+            model: config.aiModel,
             instructions:
-                "You are a compliance reviewer that decides whether newly submitted restaurants are real and safe to list. Always base conclusions on up-to-date sources, cite the sources you used, return JSON that matches the provided schema, and when approving a restaurant include a verifiedAddress object describing the confirmed street, city, state, and postal code.",
+                "You are a compliance reviewer that decides whether newly submitted restaurants are real and safe to list. " +
+                "Always base conclusions on up-to-date sources and cite the sources you used. " +
+                "Return JSON that matches the provided schema. " +
+                "When a restaurant is missing information (address, city, zip, or coordinates), use web search to find the correct details and include them in the verifiedAddress. " +
+                "The verifiedAddress must always include lat and lng coordinates for the restaurant location. " +
+                "If coordinates are 0 or missing in the input, look them up. " +
+                "If you cannot verify the restaurant exists, set verdict to reject.",
             input: [
                 {
                     role: "user",
@@ -309,8 +335,10 @@ async function applyAiDecisions(decisions) {
                 var city = normalizeString(verified.city);
                 var state = normalizeString(verified.state);
                 var postalCode = normalizeString(verified.postalCode);
+                var verifiedLat = typeof verified.lat === 'number' ? verified.lat : null;
+                var verifiedLng = typeof verified.lng === 'number' ? verified.lng : null;
 
-                var shouldUpdateAddress = street || city || state || postalCode;
+                var shouldUpdateAddress = street || city || state || postalCode || verifiedLat !== null || verifiedLng !== null;
                 if (shouldUpdateAddress) {
                     var cityDisplay = [city, state].filter(Boolean).join(', ');
                     var cityId = null;
@@ -337,6 +365,14 @@ async function applyAiDecisions(decisions) {
                     if (cityId !== null && cityId !== undefined) {
                         addressUpdates.push('cityId = ?');
                         addressValues.push(cityId);
+                    }
+                    if (verifiedLat !== null) {
+                        addressUpdates.push('lat = ?');
+                        addressValues.push(verifiedLat);
+                    }
+                    if (verifiedLng !== null) {
+                        addressUpdates.push('lng = ?');
+                        addressValues.push(verifiedLng);
                     }
 
                     if (addressUpdates.length) {
@@ -367,6 +403,7 @@ async function applyAiDecisions(decisions) {
 
 module.exports = {
     evaluatePendingRestaurants: evaluatePendingRestaurants,
-    applyAiDecisions: applyAiDecisions
+    applyAiDecisions: applyAiDecisions,
+    evaluateSingleRestaurant: evaluateSingleRestaurant,
+    fetchPendingRestaurants: fetchPendingRestaurants
 };
-//evaluatePendingRestaurants();

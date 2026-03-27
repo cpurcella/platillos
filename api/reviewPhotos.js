@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var reviewPhotoService = require('./reviewPhotoService');
+var { requireAdmin } = require('./middleware');
 
 router.get('/', async function(req, res) {
     try {
@@ -44,7 +45,7 @@ router.get('/:reviewPhotoId', async function(req, res) {
     }
 });
 
-router.patch('/:reviewPhotoId', async function(req, res) {
+router.patch('/:reviewPhotoId', requireAdmin, async function(req, res) {
     try {
         var params = Object.assign({}, req.allParams || {}, { reviewPhotoId: req.params.reviewPhotoId });
         var result = await reviewPhotoService.updateReviewPhoto(params);

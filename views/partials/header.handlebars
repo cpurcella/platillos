@@ -7,7 +7,9 @@
                 {{#if user.isAdmin}}
                     <a href="/admin/approvals" class="btn btn-turquoise">Approvals</a>
                 {{/if}}
-                <span style="display:none" class="header-welcome">Welcome, {{user.firstName}}!</span>
+                {{#if user.username}}
+                    <a href="/users/{{user.username}}" class="btn btn-turquoise">Profile</a>
+                {{/if}}
                 <a href="/logout" class="btn btn-turquoise">Logout</a>
             {{else}}
                 <a href="/login" class="btn btn-turquoise">Login</a>

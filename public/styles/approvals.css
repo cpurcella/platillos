@@ -178,3 +178,183 @@
     outline: 2px solid var(--color-turquoise, #2ac1a6);
     outline-offset: 2px;
 }
+
+.tab-badge {
+    display: inline-block;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 999px;
+    padding: 0 6px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* ── Shared approval modal styles ── */
+
+.modal-content {
+    position: relative;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: var(--color-turquoise-dark);
+    font-size: 1.35rem;
+}
+
+/* Form grid — 2 columns on wider screens, 1 on narrow */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 16px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.form-field label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.95rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+    outline: none;
+    border-color: var(--color-turquoise, #2ac1a6);
+    box-shadow: 0 0 0 2px rgba(42, 193, 166, 0.15);
+}
+
+.form-field-full {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Static display values (submitted date, submitter name, etc.) */
+.form-static {
+    font-size: 0.95rem;
+    color: #333;
+    padding: 4px 0;
+}
+
+/* Review summary (approve-review modal) */
+.review-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.review-summary-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-size: 0.95rem;
+}
+
+.review-summary-item .label {
+    font-weight: 600;
+    color: #374151;
+    min-width: 80px;
+}
+
+.review-summary-item .value {
+    color: #333;
+}
+
+/* Photo thumbnail row inside review summary */
+.photo-thumbs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+/* Shared status row */
+.approval-status-row {
+    margin-top: 16px;
+}
+
+.approval-status-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.approval-status-row select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    font-size: 0.95rem;
+}
+
+/* Shared info row (submitted, submitted by) */
+.approval-info-row {
+    margin-top: 12px;
+}
+
+.approval-info-row label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+/* Shared actions row */
+.approval-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+}
+
+/* Shared AI result box */
+.ai-result-box {
+    margin-top: 12px;
+    display: none;
+    padding: 12px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+}
+
+.ai-result-box .ai-result-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.ai-result-box .ai-result-reasoning {
+    margin-top: 6px;
+    font-size: 0.9rem;
+    color: #555;
+}

@@ -126,6 +126,17 @@ router.get('/logout', async function(req, res) {
     res.redirect('/');
 });
 
+// Gate all /admin/* pages behind authentication + admin check
+router.get('/admin/*', function(req, res, next) {
+    if (!req.allParams.auth || !req.allParams.auth.user) {
+        return res.redirect('/login');
+    }
+    if (req.allParams.auth.user.isAdmin !== 1) {
+        return res.status(403).send('Forbidden');
+    }
+    next();
+});
+
 router.get('*', async function(req, res, next) {
     var _urlPath = req.path;
     if (path.extname(_urlPath)) {
@@ -139,6 +150,15 @@ router.get('*', async function(req, res, next) {
             return;
         } catch (err) {
             // fall through to generic handling if template missing
+        }
+    }
+    // User profile routes: /users/:username
+    if (/^\/users\/[A-Za-z0-9_]+$/.test(_urlPath)) {
+        try {
+            await templates.renderTemplate('profile', req, res);
+            return;
+        } catch (err) {
+            // fall through
         }
     }
     var templateName = _urlPath.replace(/^[\/]/, '') || 'index';

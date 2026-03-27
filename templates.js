@@ -1,6 +1,7 @@
 var path = require('path');
 var fs = require('fs');
 var handlebars = require('handlebars');
+var config = require('./config');
 var dataProviders = require('./dataProviders');
 
 var templates = {
@@ -20,6 +21,9 @@ var templates = {
                 }
             }
             var context = req.allParams.auth || {};
+            if (context.user && context.user.avatarFileId) {
+                context.user.avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + context.user.avatarFileId + '_s';
+            }
             if (typeof dataProviders[templateName] === 'function') {
                 var extraData = await dataProviders[templateName](req);
                 context = Object.assign({}, context, extraData);

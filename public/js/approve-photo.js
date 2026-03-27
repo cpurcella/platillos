@@ -5,6 +5,7 @@ var approvePhotoModule = {
             approvePhotoModule.loadPhoto();
         });
         $(document).on('submit', '#approve-photo-form', approvePhotoModule.handleSave);
+        $(document).on('click', '#ai-evaluate-photo-btn', approvePhotoModule.handleAiEvaluate);
     },
     loadPhoto: async function() {
         var photoId = window.approvePhotoId;
@@ -26,6 +27,7 @@ var approvePhotoModule = {
                 currentStatus = 'pending';
             }
             $('#photo-status-select').val(currentStatus);
+            $('#ai-evaluate-photo-btn').toggle(currentStatus === 'pending');
 
             var reviewer = photo.reviewerName || photo.reviewerEmail || '';
             var submitted = photo.reviewSubmitted ? new Date(photo.reviewSubmitted).toLocaleString() : '';
@@ -106,6 +108,12 @@ var approvePhotoModule = {
             return;
         }
 
+        if (normalized === 'approved' || normalized === 'rejected') {
+            if (!confirm('Are you sure you want to mark this photo as ' + normalized + '?')) {
+                return;
+            }
+        }
+
         var payload = { status: normalized };
         var $btn = $('#save-photo-status-btn');
         var originalText = $btn.text();
@@ -126,10 +134,13 @@ var approvePhotoModule = {
                 common.showAlert(message, 'success');
                 $('#approve-photo-modal').addClass('hidden');
                 $('.overlay').addClass('hidden');
-                if (window.approvalsModule && approvalsModule.initPhotosGrid) {
-                    $('#photos-grid').empty();
-                    approvalsModule.photoGrid = null;
-                    approvalsModule.initPhotosGrid();
+                if (window.approvalsModule) {
+                    if (approvalsModule.photoGrid) {
+                        approvalsModule.photoGrid.forceRender();
+                    }
+                    if (approvalsModule.loadPendingCounts) {
+                        approvalsModule.loadPendingCounts();
+                    }
                 }
             } else {
                 common.showAlert((res && res.message) || 'Failed to update photo.', 'error');
@@ -138,6 +149,43 @@ var approvePhotoModule = {
             common.showAlert('Failed to update photo.', 'error');
         } finally {
             approvePhotoModule.isSaving = false;
+            $btn.prop('disabled', false).text(originalText);
+        }
+    },
+    handleAiEvaluate: async function() {
+        var photoId = window.approvePhotoId;
+        if (!photoId) {
+            common.showAlert('Missing reviewPhotoId.', 'error');
+            return;
+        }
+        var $btn = $('#ai-evaluate-photo-btn');
+        var originalText = $btn.text();
+        $btn.prop('disabled', true).text('Evaluating...');
+        $('#ai-photo-result').hide();
+        try {
+            var res = await $.ajax({
+                url: '/api/approvals/ai/photo/' + encodeURIComponent(photoId),
+                method: 'POST',
+                dataType: 'json'
+            });
+            if (res && res.success && res.data) {
+                var d = res.data;
+                var verdictLabel = (d.verdict || 'unknown').replace('_', ' ');
+                var confidence = d.confidence != null ? ' (' + Math.round(d.confidence * 100) + '% confidence)' : '';
+                $('#ai-photo-verdict').text(verdictLabel.charAt(0).toUpperCase() + verdictLabel.slice(1) + confidence);
+                $('#ai-photo-reasoning').text(d.reasoning || '');
+                $('#ai-photo-result').show();
+                if (d.verdict === 'approve') {
+                    $('#photo-status-select').val('approved');
+                } else if (d.verdict === 'reject') {
+                    $('#photo-status-select').val('rejected');
+                }
+            } else {
+                common.showAlert((res && res.message) || 'AI evaluation failed.', 'error');
+            }
+        } catch (err) {
+            common.showAlert('AI evaluation failed.', 'error');
+        } finally {
             $btn.prop('disabled', false).text(originalText);
         }
     }
