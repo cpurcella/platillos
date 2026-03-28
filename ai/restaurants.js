@@ -86,6 +86,7 @@ function buildUserPrompt(restaurants) {
     });
     lines.push('Use trusted sources to confirm the restaurant exists and is legitimate.');
     lines.push('Fill in any MISSING fields with the correct information in the verifiedAddress.');
+    lines.push('If the submitted name has typos or is not the official name, provide the correct name in verifiedName.');
     lines.push('Return a JSON object with a "decisions" array describing the verdict for each restaurant.');
     return lines.join('\n');
 }
@@ -121,7 +122,7 @@ function buildJsonSchema() {
                     items: {
                         type: 'object',
                         additionalProperties: false,
-                        required: ['restaurantId', 'verdict', 'confidence', 'reasoning', 'evidence', 'verifiedAddress'],
+                        required: ['restaurantId', 'verdict', 'confidence', 'reasoning', 'evidence', 'verifiedName', 'verifiedAddress'],
                         properties: {
                             restaurantId: { type: 'string' },
                             verdict: { type: 'string', enum: ['approve', 'reject', 'manual_review'] },
@@ -131,6 +132,7 @@ function buildJsonSchema() {
                                 type: 'array',
                                 items: { type: 'string' }
                             },
+                            verifiedName: { type: 'string' },
                             verifiedAddress: {
                                 type: 'object',
                                 additionalProperties: false,
@@ -169,6 +171,7 @@ function normalizeDecision(decision) {
         confidence: typeof decision.confidence === 'number' ? Math.max(0, Math.min(1, decision.confidence)) : null,
         reasoning: decision.reasoning || '',
         evidence: Array.isArray(decision.evidence) ? decision.evidence : [],
+        verifiedName: normalizeString(decision.verifiedName) || null,
         verifiedAddress: decision.verifiedAddress && typeof decision.verifiedAddress === 'object' ? {
             street: normalizeString(decision.verifiedAddress.street) || null,
             city: normalizeString(decision.verifiedAddress.city) || null,
@@ -234,6 +237,7 @@ async function evaluateSingleRestaurant(client, restaurant) {
                 "Always base conclusions on up-to-date sources and cite the sources you used. " +
                 "Return JSON that matches the provided schema. " +
                 "When a restaurant is missing information (address, city, zip, or coordinates), use web search to find the correct details and include them in the verifiedAddress. " +
+                "If the submitted name has typos, abbreviations, or is not the official business name, provide the correct name in verifiedName. If the name is already correct, set verifiedName to an empty string. " +
                 "The verifiedAddress must always include lat and lng coordinates for the restaurant location. " +
                 "If coordinates are 0 or missing in the input, look them up. " +
                 "If you cannot verify the restaurant exists, set verdict to reject.",
@@ -325,58 +329,67 @@ async function applyAiDecisions(decisions) {
 
             updates += affectedRows;
 
-            if (status === 'approved' && affectedRows > 0 && decision.verifiedAddress) {
-                var verified = decision.verifiedAddress;
-                var street = normalizeString(verified.street);
-                var city = normalizeString(verified.city);
-                var state = normalizeString(verified.state);
-                var postalCode = normalizeString(verified.postalCode);
-                var verifiedLat = typeof verified.lat === 'number' ? verified.lat : null;
-                var verifiedLng = typeof verified.lng === 'number' ? verified.lng : null;
+            if (status === 'approved' && affectedRows > 0) {
+                if (decision.verifiedName) {
+                    await connection.query(
+                        'UPDATE restaurants SET name = ? WHERE restaurantId = ?',
+                        [decision.verifiedName, decision.restaurantId]
+                    );
+                }
 
-                var shouldUpdateAddress = street || city || state || postalCode || verifiedLat !== null || verifiedLng !== null;
-                if (shouldUpdateAddress) {
-                    var cityDisplay = [city, state].filter(Boolean).join(', ');
-                    var cityId = null;
-                    if (cityDisplay) {
-                        try {
-                            cityId = await getOrCreateCityId(connection, cityDisplay);
-                        } catch (cityErr) {
-                            // do not abort address update if city lookup fails
-                            cityId = null;
+                if (decision.verifiedAddress) {
+                    var verified = decision.verifiedAddress;
+                    var street = normalizeString(verified.street);
+                    var city = normalizeString(verified.city);
+                    var state = normalizeString(verified.state);
+                    var postalCode = normalizeString(verified.postalCode);
+                    var verifiedLat = typeof verified.lat === 'number' ? verified.lat : null;
+                    var verifiedLng = typeof verified.lng === 'number' ? verified.lng : null;
+
+                    var shouldUpdateAddress = street || city || state || postalCode || verifiedLat !== null || verifiedLng !== null;
+                    if (shouldUpdateAddress) {
+                        var cityDisplay = [city, state].filter(Boolean).join(', ');
+                        var cityId = null;
+                        if (cityDisplay) {
+                            try {
+                                cityId = await getOrCreateCityId(connection, cityDisplay);
+                            } catch (cityErr) {
+                                // do not abort address update if city lookup fails
+                                cityId = null;
+                            }
                         }
-                    }
 
-                    var addressUpdates = [];
-                    var addressValues = [];
+                        var addressUpdates = [];
+                        var addressValues = [];
 
-                    if (street) {
-                        addressUpdates.push('address = ?');
-                        addressValues.push(street);
-                    }
-                    if (postalCode) {
-                        addressUpdates.push('zip = ?');
-                        addressValues.push(postalCode);
-                    }
-                    if (cityId !== null && cityId !== undefined) {
-                        addressUpdates.push('cityId = ?');
-                        addressValues.push(cityId);
-                    }
-                    if (verifiedLat !== null) {
-                        addressUpdates.push('lat = ?');
-                        addressValues.push(verifiedLat);
-                    }
-                    if (verifiedLng !== null) {
-                        addressUpdates.push('lng = ?');
-                        addressValues.push(verifiedLng);
-                    }
+                        if (street) {
+                            addressUpdates.push('address = ?');
+                            addressValues.push(street);
+                        }
+                        if (postalCode) {
+                            addressUpdates.push('zip = ?');
+                            addressValues.push(postalCode);
+                        }
+                        if (cityId !== null && cityId !== undefined) {
+                            addressUpdates.push('cityId = ?');
+                            addressValues.push(cityId);
+                        }
+                        if (verifiedLat !== null) {
+                            addressUpdates.push('lat = ?');
+                            addressValues.push(verifiedLat);
+                        }
+                        if (verifiedLng !== null) {
+                            addressUpdates.push('lng = ?');
+                            addressValues.push(verifiedLng);
+                        }
 
-                    if (addressUpdates.length) {
-                        addressValues.push(decision.restaurantId);
-                        await connection.query(
-                            'UPDATE restaurants SET ' + addressUpdates.join(', ') + ' WHERE restaurantId = ?',
-                            addressValues
-                        );
+                        if (addressUpdates.length) {
+                            addressValues.push(decision.restaurantId);
+                            await connection.query(
+                                'UPDATE restaurants SET ' + addressUpdates.join(', ') + ' WHERE restaurantId = ?',
+                                addressValues
+                            );
+                        }
                     }
                 }
             }

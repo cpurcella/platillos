@@ -1,6 +1,7 @@
 var dishPage = {
     dishId: null,
     dishData: null,
+    isOnWatchlist: false,
     currentPage: 1,
     pageSize: 10,
     hasNextPage: false,
@@ -17,9 +18,11 @@ var dishPage = {
         dishPage.loadDish();
         dishPage.loadReviews();
 
-        // Show quick-log button for logged-in users
+        // Show buttons for logged-in users
         if (window._platillosUser) {
             $('#quick-log-btn').removeClass('hidden');
+            $('#watchlist-btn').removeClass('hidden');
+            dishPage.loadWatchlistState();
         }
     },
 
@@ -64,6 +67,54 @@ var dishPage = {
             };
             common.showModal('/add-review');
         });
+
+        // Watchlist toggle
+        $('#watchlist-btn').on('click', function() {
+            dishPage.toggleWatchlist();
+        });
+    },
+
+    loadWatchlistState: async function() {
+        try {
+            var res = await $.get('/api/watchlist/ids');
+            if (res.success && Array.isArray(res.data)) {
+                var onList = res.data.indexOf(dishPage.dishId) !== -1;
+                dishPage.isOnWatchlist = onList;
+                dishPage.updateWatchlistButton();
+            }
+        } catch (err) {
+            // Silently fail
+        }
+    },
+
+    toggleWatchlist: async function() {
+        var $btn = $('#watchlist-btn');
+        $btn.prop('disabled', true);
+        try {
+            if (dishPage.isOnWatchlist) {
+                await $.ajax({ url: '/api/watchlist/' + dishPage.dishId, method: 'DELETE' });
+                dishPage.isOnWatchlist = false;
+            } else {
+                await $.ajax({ url: '/api/watchlist/' + dishPage.dishId, method: 'POST' });
+                dishPage.isOnWatchlist = true;
+            }
+            dishPage.updateWatchlistButton();
+        } catch (err) {
+            common.showAlert('Failed to update watchlist.', 'error');
+        } finally {
+            $btn.prop('disabled', false);
+        }
+    },
+
+    updateWatchlistButton: function() {
+        var $btn = $('#watchlist-btn');
+        if (dishPage.isOnWatchlist) {
+            $btn.addClass('active');
+            $btn.find('.want-to-try-label').text('On Your List');
+        } else {
+            $btn.removeClass('active');
+            $btn.find('.want-to-try-label').text('Want to Try');
+        }
     },
 
     loadDish: async function() {
@@ -194,6 +245,15 @@ var dishPage = {
                     authorHtml = '<span class="review-author-link">' + avatarHtml + '<span class="review-author-name">' + reviewerSafe + '</span></span>';
                 }
 
+                var photosHtml = '';
+                if (review.photos && review.photos.length) {
+                    var photoItems = review.photos.map(function(p) {
+                        var safeUrl = $('<div>').text(p.url).html();
+                        return '<img class="review-photo" src="' + safeUrl + '" alt="Review photo" loading="lazy">';
+                    }).join('');
+                    photosHtml = '<div class="review-photos">' + photoItems + '</div>';
+                }
+
                 var reviewHtml = `
                     <div class="review-card">
                         <div class="review-card-header">
@@ -201,6 +261,7 @@ var dishPage = {
                             <span class="review-author">${authorHtml}</span>
                         </div>
                         <div class="review-content">${safeContent}</div>
+                        ${photosHtml}
                         ${modifications}
                         ${submittedHtml}
                     </div>

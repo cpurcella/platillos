@@ -180,7 +180,14 @@ async function updateReviewPhoto(params) {
     try {
         await connection.beginTransaction();
 
-        var rowsResult = await connection.query('SELECT reviewPhotoId FROM reviews_photos WHERE reviewPhotoId = ? FOR UPDATE', [reviewPhotoId]);
+        var rowsResult = await connection.query(
+            'SELECT rp.reviewPhotoId, rp.fileId, r.dishId, d.coverPhoto ' +
+            'FROM reviews_photos rp ' +
+            'JOIN reviews r ON rp.reviewId = r.reviewId ' +
+            'JOIN dishes d ON r.dishId = d.dishId ' +
+            'WHERE rp.reviewPhotoId = ? FOR UPDATE',
+            [reviewPhotoId]
+        );
         var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
         if (!rows || !rows.length) {
             var notFoundErr = new Error('Photo not found');
@@ -188,10 +195,19 @@ async function updateReviewPhoto(params) {
             throw notFoundErr;
         }
 
+        var row = rows[0];
         var audit = resolveAuditColumns(statusValue, params?.auth?.user?.userId);
         var sql = 'UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ?';
         var values = [audit[0], audit[1], audit[2], reviewPhotoId];
         await connection.query(sql, values);
+
+        // Set as dish cover photo if approving and dish has no cover yet
+        if (statusValue === 'approved' && !row.coverPhoto && row.fileId && row.dishId) {
+            await connection.query(
+                "UPDATE dishes SET coverPhoto = ? WHERE dishId = ? AND (coverPhoto IS NULL OR coverPhoto = '')",
+                [row.fileId, row.dishId]
+            );
+        }
 
         await connection.commit();
     } catch (err) {

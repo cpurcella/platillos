@@ -80,6 +80,20 @@ router.get('/profile/:username/diary', async function(req, res) {
     }
 });
 
+// Get user's watchlist
+router.get('/profile/:username/watchlist', async function(req, res) {
+    try {
+        var profile = await userService.getProfile(req.allParams.username);
+        var watchlistService = require('./watchlistService');
+        var page = parseInt(req.query.page) || 1;
+        var pageSize = parseInt(req.query.pageSize) || 20;
+        var result = await watchlistService.getWatchlist(profile.userId, page, pageSize);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        res.status(err.status || 500).json({ success: false, message: err.message });
+    }
+});
+
 // Add quick diary log
 router.post('/diary', authorization.requireAuth, async function(req, res) {
     try {

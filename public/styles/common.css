@@ -129,6 +129,11 @@ header .btn-turquoise {
     max-width: min(24rem, 98vw);
     margin: 2rem auto;
 }
+.login-about-link {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
 .tooltip {
     position: relative;
     display: inline-block;

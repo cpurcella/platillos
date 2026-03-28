@@ -159,12 +159,15 @@ var approveRestaurantModule = {
                 } else if (d.verdict === 'reject') {
                     $('#restaurant-status-select').val('rejected');
                 }
+                if (d.verifiedName) {
+                    $('#restaurant-name-input').val(d.verifiedName);
+                }
                 if (d.verifiedAddress) {
                     if (d.verifiedAddress.street) $('#restaurant-address-input').val(d.verifiedAddress.street);
                     if (d.verifiedAddress.city) $('#restaurant-city-input').val(d.verifiedAddress.city);
                     if (d.verifiedAddress.postalCode) $('#restaurant-zip-input').val(d.verifiedAddress.postalCode);
-                    if (d.verifiedAddress.lat != null) $('#restaurant-lat-input').val(d.verifiedAddress.lat);
-                    if (d.verifiedAddress.lng != null) $('#restaurant-lng-input').val(d.verifiedAddress.lng);
+                    if (typeof d.verifiedAddress.lat === 'number') $('#restaurant-lat-input').val(d.verifiedAddress.lat);
+                    if (typeof d.verifiedAddress.lng === 'number') $('#restaurant-lng-input').val(d.verifiedAddress.lng);
                 }
             } else {
                 common.showAlert((res && res.message) || 'AI evaluation failed.', 'error');

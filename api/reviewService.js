@@ -370,7 +370,7 @@ async function getReviews(params) {
     if (reviews.length) {
         var reviewIds = reviews.map(function(r) { return r.reviewId; });
         if (reviewIds.length) {
-            var photoRows = await db.query('SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?)', [reviewIds]) || [];
+            var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND LOWER(COALESCE(status, 'pending')) = 'approved'", [reviewIds]) || [];
             var photosByReview = {};
             for (var i = 0; i < photoRows.length; i++) {
                 var pr = photoRows[i];

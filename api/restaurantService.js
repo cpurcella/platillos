@@ -85,16 +85,15 @@ async function getOrCreateCityId(connection, cityName) {
         return null;
     }
 
-    var rows = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
+    var result = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
+    var rows = Array.isArray(result) ? result[0] : result;
     if (rows && rows.length) {
         return rows[0].cityId;
     }
 
     var insertResult = await connection.query('INSERT INTO cities (city) VALUES (?)', [name]);
-    if (Array.isArray(insertResult)) {
-        return insertResult[0] && insertResult[0].insertId;
-    }
-    return insertResult.insertId;
+    var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
+    return header && header.insertId;
 }
 
 function normalizeStatus(rawStatus) {

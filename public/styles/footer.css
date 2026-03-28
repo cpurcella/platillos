@@ -61,6 +61,19 @@
     flex: 1 1 0;
 }
 
+.footer-about-link {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+}
+
+.footer-about-link:hover {
+    color: #fff;
+}
+
 @media (max-width: 700px) {
     .footer-content {
         padding: 1rem 0.7rem;

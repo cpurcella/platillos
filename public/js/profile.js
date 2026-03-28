@@ -4,6 +4,7 @@ var profilePage = (function() {
     var diaryYear = new Date().getFullYear();
     var diaryMonth = new Date().getMonth() + 1;
     var diaryYears = [];
+    var watchlistPage = 1;
     var MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -159,6 +160,9 @@ var profilePage = (function() {
         $('.profile-tab[data-tab="' + tabName + '"]').addClass('active');
         $('.profile-tab-content').addClass('hidden');
         $('#tab-' + tabName).removeClass('hidden');
+        if (tabName === 'watchlist') {
+            loadWatchlist();
+        }
     }
 
     // ── Diary ──
@@ -256,6 +260,63 @@ var profilePage = (function() {
         if (diaryMonth > 12) { diaryMonth = 1; diaryYear++; }
         if (diaryMonth < 1) { diaryMonth = 12; diaryYear--; }
         loadDiary();
+    }
+
+    // ── Watchlist ──
+    async function loadWatchlist() {
+        if (!profileData) return;
+        var $list = $('#watchlist-list');
+        $list.html('<div class="reviews-empty">Loading...</div>');
+        try {
+            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+                '/watchlist?page=' + watchlistPage + '&pageSize=20';
+            var res = await $.get(url);
+            if (res.success && res.data) {
+                renderWatchlist(res.data.items || []);
+                renderWatchlistPagination(res.data);
+            }
+        } catch (err) {
+            $list.html('<div class="reviews-empty">Failed to load watchlist.</div>');
+        }
+    }
+
+    function renderWatchlist(items) {
+        var $list = $('#watchlist-list');
+        $list.empty();
+        if (!items.length) {
+            $list.html('<div class="reviews-empty">No dishes on the watchlist yet.</div>');
+            return;
+        }
+        items.forEach(function(item) {
+            var photoHtml = item.coverPhoto
+                ? '<img src="' + escapeHtml(item.coverPhoto) + '_s" alt="' + escapeHtml(item.dishName) + '">'
+                : '<div class="favorite-card-placeholder">🍽</div>';
+            var scoreText = item.score != null ? parseFloat(item.score).toFixed(1) : '';
+            var dateAdded = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            var html = '<a href="/dishes/' + encodeURIComponent(item.dishId) + '" class="watchlist-card">' +
+                '<div class="watchlist-card-photo">' + photoHtml + '</div>' +
+                '<div class="watchlist-card-info">' +
+                    '<div class="watchlist-card-name">' + escapeHtml(item.dishName) + '</div>' +
+                    '<div class="watchlist-card-restaurant">' + escapeHtml(item.restaurantName || '') + '</div>' +
+                    (scoreText ? '<div class="watchlist-card-score">' + escapeHtml(scoreText) + '/10</div>' : '') +
+                '</div>' +
+                (dateAdded ? '<div class="watchlist-card-date">' + escapeHtml(dateAdded) + '</div>' : '') +
+                '</a>';
+            $list.append(html);
+        });
+    }
+
+    function renderWatchlistPagination(data) {
+        var $pag = $('#watchlist-pagination');
+        var totalPages = Math.ceil(data.total / data.pageSize);
+        if (totalPages <= 1) {
+            $pag.empty();
+            return;
+        }
+        var html = '<button class="btn btn-outline btn-sm watchlist-prev"' + (watchlistPage <= 1 ? ' disabled' : '') + '>Previous</button>' +
+            '<span class="watchlist-page-label">Page ' + watchlistPage + ' of ' + totalPages + '</span>' +
+            '<button class="btn btn-outline btn-sm watchlist-next"' + (watchlistPage >= totalPages ? ' disabled' : '') + '>Next</button>';
+        $pag.html(html);
     }
 
     // ── Edit profile ──
@@ -405,6 +466,8 @@ var profilePage = (function() {
         // Diary navigation
         $(document).on('click', '.diary-prev', function() { changeMonth(-1); });
         $(document).on('click', '.diary-next', function() { changeMonth(1); });
+        $(document).on('click', '.watchlist-prev', function() { watchlistPage--; loadWatchlist(); });
+        $(document).on('click', '.watchlist-next', function() { watchlistPage++; loadWatchlist(); });
 
         // Edit profile
         $('#edit-profile-btn').on('click', openEditModal);

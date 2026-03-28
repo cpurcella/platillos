@@ -147,3 +147,35 @@ a.dish-card:active {color: inherit;}
     }
 }
 
+/* ── Want to Try Card Button ── */
+.want-to-try-card-btn {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1.5px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    align-self: center;
+    white-space: nowrap;
+}
+
+.want-to-try-card-btn:hover {
+    border-color: var(--color-turquoise);
+    color: var(--color-turquoise-dark);
+}
+
+.want-to-try-card-btn.active {
+    border-color: var(--color-turquoise);
+    background: var(--color-turquoise-light, #d4f5ef);
+    color: var(--color-turquoise-dark);
+}
+
+.want-to-try-card-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+

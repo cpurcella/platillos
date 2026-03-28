@@ -386,7 +386,11 @@ var addReviewModule = {
     showAddRestaurantForm: function() {
         $('#add-restaurant-section').removeClass('hidden');
         $('#restaurant-list').addClass('hidden');
+        var searchVal = $('#restaurant-search').val() || '';
         $('#restaurant-search').closest('.form-row').addClass('hidden');
+        if (searchVal.trim() && !$('#new-restaurant-name').val().trim()) {
+            $('#new-restaurant-name').val(searchVal.trim());
+        }
     },
 
     cancelAddRestaurant: function() {

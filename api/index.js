@@ -9,5 +9,6 @@ router.use('/files', require('./files'));
 router.use('/reviews', require('./reviews'));
 router.use('/review-photos', require('./reviewPhotos'));
 router.use('/approvals', require('./approvals'));
+router.use('/watchlist', require('./watchlist'));
 
 module.exports = router;

@@ -2,9 +2,12 @@
 // Handles search and pagination for dish-list partial
 
 var dishListModule = {
+    watchlistIds: [],
     init: function() {
         dishListModule.bindEvents();
-        dishListModule.loadDishes();
+        dishListModule.loadWatchlistIds().then(function() {
+            dishListModule.loadDishes();
+        });
     },
     bindEvents: function() {
         $('#searchBtn').on('click', dishListModule.handleSearch);
@@ -14,6 +17,17 @@ var dishListModule = {
                 dishListModule.handleSearch();
             }
         });
+    },
+    loadWatchlistIds: async function() {
+        if (!window._platillosUser) return;
+        try {
+            var res = await $.get('/api/watchlist/ids');
+            if (res.success && Array.isArray(res.data)) {
+                dishListModule.watchlistIds = res.data;
+            }
+        } catch (err) {
+            // Silently fail
+        }
     },
     handleSearch: function() {
         var term = $('#searchInput').val();
@@ -108,6 +122,11 @@ var dishListModule = {
             var imageMarkup = coverPhotoSmallEscaped
                 ? `<img src="${coverPhotoSmallEscaped}" class="dish-cover-photo" loading="lazy" alt="${$('<div>').text(dish.name || 'Dish photo').html()}">`
                 : '';
+            var isOnWatchlist = dishListModule.watchlistIds.indexOf(dish.dishId) !== -1;
+            var escapedDishId = $('<div>').text(dish.dishId).html();
+            var watchlistBtnHtml = window._platillosUser
+                ? `<button class="want-to-try-card-btn${isOnWatchlist ? ' active' : ''}" data-dish-id="${escapedDishId}" title="Want to Try" onclick="event.preventDefault(); event.stopPropagation(); dishListModule.toggleWatchlistCard(this, '${escapedDishId}')">Want to Try</button>`
+                : '';
             var html = `
                 <a href="${dishUrl}" class="card dish-card" data-dish-id="${dish.dishId}">
                     <div class="dish-card-content">
@@ -126,6 +145,7 @@ var dishListModule = {
                                 </span>
                             </div>
                         </div>
+                        ${watchlistBtnHtml}
                     </div>
                 </a>
             `;
@@ -138,3 +158,25 @@ $(document).ready(dishListModule.init);
 
 // Export for other scripts if needed
 window.dishListModule = dishListModule;
+
+dishListModule.toggleWatchlistCard = async function(btn, dishId) {
+    var $btn = $(btn);
+    $btn.prop('disabled', true);
+    var isActive = $btn.hasClass('active');
+    try {
+        if (isActive) {
+            await $.ajax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'DELETE' });
+            $btn.removeClass('active').text('Want to Try');
+            var idx = dishListModule.watchlistIds.indexOf(dishId);
+            if (idx !== -1) dishListModule.watchlistIds.splice(idx, 1);
+        } else {
+            await $.ajax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'POST' });
+            $btn.addClass('active').text('On Your List');
+            dishListModule.watchlistIds.push(dishId);
+        }
+    } catch (err) {
+        // Silently fail
+    } finally {
+        $btn.prop('disabled', false);
+    }
+};
