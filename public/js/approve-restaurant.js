@@ -30,7 +30,7 @@ var approveRestaurantModule = {
             $('#restaurant-lng-input').val(restaurant.lng != null ? restaurant.lng : '');
 
             var currentStatus = (restaurant.status || 'pending').toLowerCase();
-            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#restaurant-status-select').val(currentStatus);

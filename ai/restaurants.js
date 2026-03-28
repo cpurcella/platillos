@@ -1,7 +1,7 @@
 var db = require('../connections');
 var config = require('../config');
 var { getOpenAiClient, clampLimit } = require('./client');
-var { formatDate, extractJsonResult } = require('./utils');
+var { formatDate, extractJsonResult, resolveAiStatus } = require('./utils');
 
 function normalizeString(value) {
     if (value === undefined || value === null) {
@@ -58,6 +58,7 @@ function buildUserPrompt(restaurants) {
     var lines = ['Here are newly submitted restaurants that need verification:', ''];
     restaurants.forEach(function (restaurant, index) {
         lines.push((index + 1) + '. ' + restaurant.name);
+        lines.push('   Restaurant ID: ' + restaurant.restaurantId);
         if (restaurant.address) {
             lines.push('   Address: ' + restaurant.address);
         } else {
@@ -122,7 +123,7 @@ function buildJsonSchema() {
                         additionalProperties: false,
                         required: ['restaurantId', 'verdict', 'confidence', 'reasoning', 'evidence', 'verifiedAddress'],
                         properties: {
-                            restaurantId: { type: 'integer' },
+                            restaurantId: { type: 'string' },
                             verdict: { type: 'string', enum: ['approve', 'reject', 'manual_review'] },
                             confidence: { type: 'number', minimum: 0, maximum: 1 },
                             reasoning: { type: 'string' },
@@ -305,13 +306,8 @@ async function applyAiDecisions(decisions) {
                 continue;
             }
 
-            var verdict = String(decision.verdict || '').toLowerCase();
-            var status;
-            if (verdict === 'approve') {
-                status = 'approved';
-            } else if (verdict === 'reject') {
-                status = 'rejected';
-            } else {
+            var status = resolveAiStatus(decision.verdict, decision.confidence);
+            if (!status) {
                 continue;
             }
 

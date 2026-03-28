@@ -5,7 +5,7 @@ var config = require('../config');
 var dishService = require('./dishService');
 var aiJobQueue = require('../aiJobQueue');
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
 
 function hasProp(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj || {}, key);
@@ -344,6 +344,13 @@ async function getReviews(params) {
             throw err;
         }
         whereClauses.push(normalizedStatusExpr + " = 'pending'");
+    } else if (statusFilter === 'needs_review') {
+        if (!isAdmin) {
+            var err = new Error('Forbidden');
+            err.status = 403;
+            throw err;
+        }
+        whereClauses.push(normalizedStatusExpr + " = 'needs_review'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push(normalizedStatusExpr + ' = ?');
         whereValues.push(statusFilter);

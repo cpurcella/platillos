@@ -58,7 +58,7 @@ var approveDishModule = {
             approveDishModule.renderDishInfo(dish);
 
             var currentStatus = (dish.status || 'pending').toLowerCase();
-            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#dish-status-select').val(currentStatus);
@@ -193,7 +193,7 @@ var approveDishModule = {
 
         var status = $('#dish-status-select').val();
         var normalizedStatus = (status || '').toLowerCase();
-        if (!['approved', 'rejected', 'pending'].includes(normalizedStatus)) {
+        if (!['approved', 'rejected', 'pending', 'needs_review'].includes(normalizedStatus)) {
             common.showAlert('Please select a valid status.', 'error');
             return;
         }

@@ -1,5 +1,6 @@
 var dishPage = {
     dishId: null,
+    dishData: null,
     currentPage: 1,
     pageSize: 10,
     hasNextPage: false,
@@ -47,42 +48,21 @@ var dishPage = {
             }
         });
 
-        // Quick-log
+        // Review button
         $('#quick-log-btn').on('click', function() {
-            $('#log-date').val(new Date().toISOString().slice(0, 10));
-            $('#log-rating').val('');
-            $('#quick-log-overlay, #quick-log-modal').removeClass('hidden');
-        });
-        $('#cancel-log-btn, #quick-log-overlay, #quick-log-modal .close-modal').on('click', function() {
-            $('#quick-log-overlay, #quick-log-modal').addClass('hidden');
-        });
-        $('#quick-log-form').on('submit', async function(e) {
-            e.preventDefault();
-            var data = {
-                dishId: dishPage.dishId,
-                dateTried: $('#log-date').val()
-            };
-            var rating = $('#log-rating').val();
-            if (rating) data.rating = parseInt(rating);
-
-            try {
-                var res = await $.ajax({
-                    url: '/api/users/diary',
-                    method: 'POST',
-                    data: JSON.stringify(data),
-                    contentType: 'application/json',
-                    dataType: 'json'
-                });
-                if (res.success) {
-                    common.showAlert('Logged!', 'success');
-                    $('#quick-log-overlay, #quick-log-modal').addClass('hidden');
-                } else {
-                    common.showAlert(res.message || 'Failed to log.', 'error');
+            if (!dishPage.dishData) return;
+            var d = dishPage.dishData;
+            window._addReviewPreselect = {
+                restaurant: {
+                    restaurantId: d.restaurantId,
+                    name: d.restaurantName || ''
+                },
+                dish: {
+                    dishId: d.dishId,
+                    name: d.name || ''
                 }
-            } catch (err) {
-                var msg = (err.responseJSON && err.responseJSON.message) || 'Failed to log.';
-                common.showAlert(msg, 'error');
-            }
+            };
+            common.showModal('/add-review');
         });
     },
 
@@ -95,6 +75,7 @@ var dishPage = {
                 return;
             }
             dishPage.renderDish(res.data);
+            dishPage.dishData = res.data;
         } catch (err) {
             dishPage.renderDishError('Failed to load dish.');
         }
@@ -236,7 +217,8 @@ var dishPage = {
     }
 };
 
-$(document).ready(function() {
+$(document).ready(async function() {
+    await session.ready();
     dishPage.init();
 });
 

@@ -21,6 +21,7 @@ var config = {
     websiteUrl: process.env.websiteUrl || 'http://localhost:3000',
     bucket: process.env.bucket || (env === 'prod' ? 'platillos-prod' : 'platillos-qa'),
     aiModel: process.env.aiModel || 'gpt-5.4-mini',
+    aiConfidenceThreshold: parseFloat(process.env.aiConfidenceThreshold) || 0.8,
     env: env
 };
 

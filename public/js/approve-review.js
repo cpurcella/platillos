@@ -51,7 +51,7 @@ var approveReviewModule = {
             $('#review-modifications-input').val(review.modifications || '');
 
             var currentStatus = (review.status || 'pending').toLowerCase();
-            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#review-status-select').val(currentStatus);

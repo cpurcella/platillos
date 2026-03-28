@@ -1,3 +1,5 @@
+var config = require('../config');
+
 function formatDate(value) {
     if (!value) {
         return null;
@@ -46,7 +48,22 @@ function extractJsonResult(response) {
     return null;
 }
 
+function resolveAiStatus(verdict, confidence) {
+    var v = String(verdict || '').toLowerCase();
+    var threshold = config.aiConfidenceThreshold;
+    var conf = typeof confidence === 'number' ? confidence : 0;
+
+    if (v === 'approve' && conf >= threshold) {
+        return 'approved';
+    } else if (v === 'reject' && conf >= threshold) {
+        return 'rejected';
+    } else {
+        return 'needs_review';
+    }
+}
+
 module.exports = {
     formatDate: formatDate,
-    extractJsonResult: extractJsonResult
+    extractJsonResult: extractJsonResult,
+    resolveAiStatus: resolveAiStatus
 };

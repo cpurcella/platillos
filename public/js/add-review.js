@@ -546,6 +546,25 @@ var addReviewModule = {
 function initializeAddReview() {
     addReviewModule.setHandlers();
     $("#add-review-modal").show();
+
+    // Check for preselection (set by dish page before opening modal)
+    var preselect = window._addReviewPreselect;
+    if (preselect) {
+        delete window._addReviewPreselect;
+        addReviewModule.setSelectedRestaurant(preselect.restaurant);
+        // Wait for dishes to load, then select the dish
+        var checkInterval = setInterval(function() {
+            var dishLoaded = addReviewModule.dishes.some(function(d) {
+                return d.dishId === preselect.dish.dishId;
+            });
+            if (dishLoaded || addReviewModule.dishes.length > 0 || $('#dish-list .empty-state').length) {
+                clearInterval(checkInterval);
+                addReviewModule.setSelectedDish(preselect.dish);
+            }
+        }, 100);
+        return;
+    }
+
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             addReviewModule.lat = position.coords.latitude;

@@ -2,7 +2,7 @@ var db = require('../connections');
 var config = require('../config');
 var dishService = require('../api/dishService');
 var { getOpenAiClient, clampLimit } = require('./client');
-var { formatDate, extractJsonResult } = require('./utils');
+var { formatDate, extractJsonResult, resolveAiStatus } = require('./utils');
 
 var VALID_VERDICTS = ['approve', 'reject', 'manual_review'];
 
@@ -329,13 +329,7 @@ async function applyReviewDecisions(decisions) {
 
             var row = selectRows[0];
             var currentStatus = String(row.status || 'pending').toLowerCase();
-            var newStatus = null;
-
-            if (decision.verdict === 'approve') {
-                newStatus = 'approved';
-            } else if (decision.verdict === 'reject') {
-                newStatus = 'rejected';
-            }
+            var newStatus = resolveAiStatus(decision.verdict, decision.confidence);
 
             if (newStatus && currentStatus === 'pending') {
                 var updateResult = await connection.query(

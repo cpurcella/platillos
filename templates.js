@@ -4,6 +4,10 @@ var handlebars = require('handlebars');
 var config = require('./config');
 var dataProviders = require('./dataProviders');
 
+handlebars.registerHelper('initial', function(str) {
+    return (str || '?').charAt(0).toUpperCase();
+});
+
 var templates = {
     renderTemplate: async function(templateName, req, res) {
         var filePath = path.join(__dirname, 'views', templateName + '.handlebars');

@@ -25,9 +25,12 @@ var session = (function() {
 
 
 
-    $(document).ready(async function() {
-        await extendSession();
+    var _ready = null;
+    $(document).ready(function() {
+        _ready = extendSession();
     });
 
-
+    return {
+        ready: function() { return _ready || Promise.resolve(); }
+    };
 })();

@@ -1,7 +1,7 @@
 var db = require('../connections');
 var config = require('../config');
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
 
 function buildPhotoUrl(fileId) {
     return fileId ? 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId : null;

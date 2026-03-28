@@ -18,7 +18,7 @@ var allowedFields = [
     'statusUpdatedBy'
 ];
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
 
 function normalizeFieldSelection(rawFields) {
     if (rawFields === undefined || rawFields === null) {
@@ -178,6 +178,13 @@ async function getRestaurants(params) {
             throw err;
         }
         whereClauses.push("r.status = 'pending'");
+    } else if (statusFilter === 'needs_review') {
+        if (!isAdmin) {
+            var err = new Error('Forbidden');
+            err.status = 403;
+            throw err;
+        }
+        whereClauses.push("r.status = 'needs_review'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push('r.status = ?');
         whereValues.push(statusFilter);

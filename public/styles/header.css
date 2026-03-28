@@ -40,6 +40,39 @@
     font-weight: 500;
 }
 
+.header-profile-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.header-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    transition: border-color 0.2s;
+}
+
+.header-profile-link:hover .header-avatar {
+    border-color: #fff;
+}
+
+.header-avatar-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-turquoise);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
 @media (max-width: 700px) {
     .header-content {
         flex-direction: row;

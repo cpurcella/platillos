@@ -203,6 +203,13 @@ async function getDishes(params) {
             throw err;
         }
         whereClauses.push("d.status = 'pending'");
+    } else if (statusFilter === 'needs_review') {
+        if (!isAdmin) {
+            var err = new Error('Forbidden');
+            err.status = 403;
+            throw err;
+        }
+        whereClauses.push("d.status = 'needs_review'");
     } else if (!isAdmin) {
         whereClauses.push("d.status = 'approved'");
         whereClauses.push("r.status = 'approved'");
@@ -414,7 +421,7 @@ async function updateDish(params) {
 
     var shouldUpdateStatus = Object.prototype.hasOwnProperty.call(params, 'status');
     var statusValue = shouldUpdateStatus ? String(params.status || '').toLowerCase() : undefined;
-    if (shouldUpdateStatus && ['approved', 'rejected', 'pending'].indexOf(statusValue) === -1) {
+    if (shouldUpdateStatus && ['approved', 'rejected', 'pending', 'needs_review'].indexOf(statusValue) === -1) {
         err = new Error('Invalid status');
         err.status = 400;
         throw err;

@@ -63,6 +63,7 @@ var profilePage = (function() {
             if (window._platillosUser && window._platillosUser.username === profileData.username) {
                 isOwnProfile = true;
                 $('#edit-profile-btn').removeClass('hidden');
+                $('#logout-btn').removeClass('hidden');
             }
 
             // Pre-load diary data for current month
@@ -428,8 +429,9 @@ var profilePage = (function() {
         $('#avatar-crop-cancel').on('click', cancelCrop);
     }
 
-    $(document).ready(function() {
+    $(document).ready(async function() {
         bindEvents();
+        await session.ready();
         load();
     });
 

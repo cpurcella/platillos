@@ -23,7 +23,7 @@ var approvePhotoModule = {
             }
 
             var currentStatus = (photo.status || 'pending').toLowerCase();
-            if (!['pending', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#photo-status-select').val(currentStatus);
@@ -103,7 +103,7 @@ var approvePhotoModule = {
 
         var status = $('#photo-status-select').val();
         var normalized = (status || '').toLowerCase();
-        if (!['pending', 'approved', 'rejected'].includes(normalized)) {
+        if (!['pending', 'needs_review', 'approved', 'rejected'].includes(normalized)) {
             common.showAlert('Please select a valid status.', 'error');
             return;
         }
