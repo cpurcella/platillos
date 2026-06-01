@@ -10,6 +10,9 @@ router.get('/', async function(req, res) {
         res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
         console.log(err)
+        if (err.status) {
+            return res.status(err.status).json({ success: false, message: err.message });
+        }
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -35,6 +38,15 @@ router.get('/metadata/options', async function(req, res) {
     try {
         var options = await dishService.getDishMetadataOptions();
         res.json({ success: true, data: options });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.get('/shelves', async function(req, res) {
+    try {
+        var shelves = await dishService.getHomeShelves(req.allParams);
+        res.json({ success: true, data: shelves });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

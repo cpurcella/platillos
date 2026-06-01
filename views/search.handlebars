@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Search - Platillos</title>
+    {{> head}}
+    <link rel="stylesheet" href="/styles/search.css">
+</head>
+<body class="bg-mint">
+    {{> header}}
+    <div class="main-container search-page">
+        <div class="search-bar-row">
+            <div class="search-input-wrap">
+                <svg class="search-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="#999" stroke-width="2.2" fill="none"/><line x1="15.5" y1="15.5" x2="20.5" y2="20.5" stroke="#999" stroke-width="2.2" stroke-linecap="round"/></svg>
+                <input type="text" id="searchInput" name="search" placeholder="Search for a dish (e.g. hamburger, ramen...)" class="form-input search-input" autocomplete="off">
+            </div>
+            <button id="searchBtn" class="btn btn-turquoise search-btn">Search</button>
+        </div>
+        <div id="search-tabs" class="search-tabs" style="display:none">
+            <button class="search-tab active" data-type="dishes">Dishes</button>
+            <button class="search-tab" data-type="people">People</button>
+        </div>
+        <div id="dishes-section" style="display:none">
+            <div class="search-controls">
+                <span id="results-count" class="results-count"></span>
+                <select id="sort-select" class="sort-select">
+                    <option value="score">Top Rated</option>
+                    <option value="reviews">Most Reviewed</option>
+                    <option value="nearest">Nearest</option>
+                    <option value="newest">Newest</option>
+                </select>
+            </div>
+            <div id="dishes-container"></div>
+            <div id="dishes-loading" class="search-loading" style="display:none">Loading...</div>
+        </div>
+        <div id="people-section" style="display:none">
+            <div id="people-container"></div>
+        </div>
+        <div id="search-empty" class="search-empty" style="display:none">No results found.</div>
+    </div>
+    {{> footer}}
+    <script src="/js/search.js"></script>
+</body>
+</html>

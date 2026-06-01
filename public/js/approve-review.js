@@ -51,11 +51,18 @@ var approveReviewModule = {
             $('#review-modifications-input').val(review.modifications || '');
 
             var currentStatus = (review.status || 'pending').toLowerCase();
-            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected', 'out_of_area'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#review-status-select').val(currentStatus);
             $('#ai-evaluate-review-btn').toggle(currentStatus === 'pending');
+
+            if (review.aiReasoning) {
+                $('#ai-review-stored-reasoning-text').text(review.aiReasoning);
+                $('#ai-review-stored-reasoning').show();
+            } else {
+                $('#ai-review-stored-reasoning').hide();
+            }
         } catch (err) {
             $('#approve-review-content').text('Failed to load review.');
         }

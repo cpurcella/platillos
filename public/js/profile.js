@@ -4,7 +4,16 @@ var profilePage = (function() {
     var diaryYear = new Date().getFullYear();
     var diaryMonth = new Date().getMonth() + 1;
     var diaryYears = [];
+    var favoritesPage = 1;
+    var favoritesTotal = 0;
+    var favoritesLoading = false;
+    var reviewsPage = 1;
+    var reviewsTotal = 0;
+    var reviewsLoading = false;
     var watchlistPage = 1;
+    var watchlistTotal = 0;
+    var watchlistLoading = false;
+    var PAGE_SIZE = 20;
     var MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -54,21 +63,31 @@ var profilePage = (function() {
                 return;
             }
             profileData = res.data.profile;
-            var reviews = res.data.reviews || [];
 
             renderProfile(profileData);
-            renderFavorites(profileData.favorites || []);
-            renderReviews(reviews);
+            loadFavorites();
+            loadReviews();
 
             // Check if this is the logged-in user's own profile
             if (window._platillosUser && window._platillosUser.username === profileData.username) {
                 isOwnProfile = true;
                 $('#edit-profile-btn').removeClass('hidden');
                 $('#logout-btn').removeClass('hidden');
+            } else if (window._platillosUser) {
+                // Show follow button for other users' profiles
+                var $followBtn = $('#follow-btn');
+                $followBtn.removeClass('hidden');
+                if (res.data.isFollowing) {
+                    $followBtn.addClass('following').text('Following');
+                }
+                $followBtn.on('click', function() {
+                    toggleFollow();
+                });
             }
 
             // Pre-load diary data for current month
             loadDiary();
+            loadWatchlist();
         } catch (err) {
             if (err.status === 404) {
                 $('#profile-header').html('<p class="reviews-empty">User not found.</p>');
@@ -105,6 +124,8 @@ var profilePage = (function() {
         // Stats
         var joined = profile.created ? new Date(profile.created).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
         var statsHtml = '';
+        statsHtml += '<a href="javascript:void(0)" class="profile-stat profile-stat-link" data-follow-type="followers"><span class="profile-stat-value" id="stat-follower-count">' + (profile.followerCount || 0) + '</span><span class="profile-stat-label">Followers</span></a>';
+        statsHtml += '<a href="javascript:void(0)" class="profile-stat profile-stat-link" data-follow-type="following"><span class="profile-stat-value" id="stat-following-count">' + (profile.followingCount || 0) + '</span><span class="profile-stat-label">Following</span></a>';
         statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + (profile.reviewCount || 0) + '</span><span class="profile-stat-label">Reviews</span></div>';
         statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + (profile.avgRating || '—') + '</span><span class="profile-stat-label">Avg Rating</span></div>';
         if (joined) {
@@ -113,10 +134,35 @@ var profilePage = (function() {
         $('#profile-stats').html(statsHtml);
     }
 
+    async function toggleFollow() {
+        if (!profileData) return;
+        var $btn = $('#follow-btn');
+        var isFollowing = $btn.hasClass('following');
+        try {
+            var res;
+            if (isFollowing) {
+                res = await $.ajax({ url: '/api/users/follow/' + profileData.userId, method: 'DELETE' });
+            } else {
+                res = await $.ajax({ url: '/api/users/follow/' + profileData.userId, method: 'POST' });
+            }
+            if (res.success) {
+                if (res.following) {
+                    $btn.addClass('following').text('Following');
+                } else {
+                    $btn.removeClass('following').text('Follow');
+                }
+                // Update follower count in stats
+                profileData.followerCount = res.followerCount;
+                $('#stat-follower-count').text(res.followerCount);
+            }
+        } catch (err) {
+            console.error('Follow toggle failed:', err);
+        }
+    }
+
     function renderFavorites(favorites) {
         var $grid = $('#favorites-grid');
-        $grid.empty();
-        if (!favorites.length) {
+        if (!favorites.length && favoritesPage === 1) {
             $grid.html('<div class="favorites-empty">No favorite dishes yet.</div>');
             return;
         }
@@ -127,15 +173,37 @@ var profilePage = (function() {
             var html = '<a href="/dishes/' + encodeURIComponent(fav.dishId) + '" class="favorite-card">' +
                 '<div class="favorite-card-photo">' + photoHtml + '</div>' +
                 '<div class="favorite-card-name">' + escapeHtml(fav.dishName) + '</div>' +
+                '<div class="favorite-card-restaurant">' + escapeHtml(fav.restaurantName || '') + '</div>' +
                 '</a>';
             $grid.append(html);
         });
     }
 
+    async function loadFavorites() {
+        if (!profileData || favoritesLoading) return;
+        if (favoritesPage > 1 && (favoritesPage - 1) * PAGE_SIZE >= favoritesTotal) return;
+        favoritesLoading = true;
+        try {
+            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+                '/favorites?page=' + favoritesPage + '&pageSize=' + PAGE_SIZE;
+            var res = await $.get(url);
+            if (res.success && res.data) {
+                favoritesTotal = res.data.total;
+                renderFavorites(res.data.items || []);
+                favoritesPage++;
+            }
+        } catch (err) {
+            if (favoritesPage === 1) {
+                $('#favorites-grid').html('<div class="favorites-empty">Failed to load favorites.</div>');
+            }
+        } finally {
+            favoritesLoading = false;
+        }
+    }
+
     function renderReviews(reviews) {
         var $list = $('#profile-reviews-list');
-        $list.empty();
-        if (!reviews.length) {
+        if (!reviews.length && reviewsPage === 1) {
             $list.html('<div class="reviews-empty">No reviews yet.</div>');
             return;
         }
@@ -143,7 +211,7 @@ var profilePage = (function() {
             var ratingText = r.rating != null ? r.rating + '/10' : '';
             var html = '<div class="profile-review-card">' +
                 '<div class="profile-review-header">' +
-                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(r.dishId) + '">' + escapeHtml(r.dishName) + '</a></span>' +
+                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(r.dishId) + '?reviewId=' + r.reviewId + '">' + escapeHtml(r.dishName) + '</a></span>' +
                     '<span class="profile-review-rating">' + escapeHtml(ratingText) + '</span>' +
                 '</div>' +
                 '<div class="profile-review-restaurant">' + escapeHtml(r.restaurantName || '') + '</div>' +
@@ -154,15 +222,36 @@ var profilePage = (function() {
         });
     }
 
+    async function loadReviews() {
+        if (!profileData || reviewsLoading) return;
+        if (reviewsPage > 1 && (reviewsPage - 1) * PAGE_SIZE >= reviewsTotal) return;
+        reviewsLoading = true;
+        try {
+            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+                '/reviews?page=' + reviewsPage + '&pageSize=' + PAGE_SIZE;
+            var res = await $.get(url);
+            if (res.success && res.data) {
+                reviewsTotal = res.data.total;
+                renderReviews(res.data.items || []);
+                reviewsPage++;
+            }
+        } catch (err) {
+            if (reviewsPage === 1) {
+                $('#profile-reviews-list').html('<div class="reviews-empty">Failed to load reviews.</div>');
+            }
+        } finally {
+            reviewsLoading = false;
+        }
+    }
+
     // ── Tabs ──
     function switchTab(tabName) {
         $('.profile-tab').removeClass('active');
         $('.profile-tab[data-tab="' + tabName + '"]').addClass('active');
         $('.profile-tab-content').addClass('hidden');
         $('#tab-' + tabName).removeClass('hidden');
-        if (tabName === 'watchlist') {
-            loadWatchlist();
-        }
+        if (tabName === 'favorites') loadFavorites();
+        if (tabName === 'watchlist') loadWatchlist();
     }
 
     // ── Diary ──
@@ -264,58 +353,116 @@ var profilePage = (function() {
 
     // ── Watchlist ──
     async function loadWatchlist() {
-        if (!profileData) return;
-        var $list = $('#watchlist-list');
-        $list.html('<div class="reviews-empty">Loading...</div>');
+        if (!profileData || watchlistLoading) return;
+        if (watchlistPage > 1 && (watchlistPage - 1) * PAGE_SIZE >= watchlistTotal) return;
+        watchlistLoading = true;
         try {
             var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
-                '/watchlist?page=' + watchlistPage + '&pageSize=20';
+                '/watchlist?page=' + watchlistPage + '&pageSize=' + PAGE_SIZE;
             var res = await $.get(url);
             if (res.success && res.data) {
+                watchlistTotal = res.data.total;
                 renderWatchlist(res.data.items || []);
-                renderWatchlistPagination(res.data);
+                watchlistPage++;
             }
         } catch (err) {
-            $list.html('<div class="reviews-empty">Failed to load watchlist.</div>');
+            if (watchlistPage === 1) {
+                $('#watchlist-list').html('<div class="reviews-empty">Failed to load watchlist.</div>');
+            }
+        } finally {
+            watchlistLoading = false;
         }
     }
 
     function renderWatchlist(items) {
         var $list = $('#watchlist-list');
-        $list.empty();
-        if (!items.length) {
-            $list.html('<div class="reviews-empty">No dishes on the watchlist yet.</div>');
+        if (!items.length && watchlistPage === 1) {
+            $list.html('<div class="favorites-empty">No dishes on the watchlist yet.</div>');
             return;
         }
         items.forEach(function(item) {
             var photoHtml = item.coverPhoto
                 ? '<img src="' + escapeHtml(item.coverPhoto) + '_s" alt="' + escapeHtml(item.dishName) + '">'
                 : '<div class="favorite-card-placeholder">🍽</div>';
-            var scoreText = item.score != null ? parseFloat(item.score).toFixed(1) : '';
-            var dateAdded = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-            var html = '<a href="/dishes/' + encodeURIComponent(item.dishId) + '" class="watchlist-card">' +
-                '<div class="watchlist-card-photo">' + photoHtml + '</div>' +
-                '<div class="watchlist-card-info">' +
-                    '<div class="watchlist-card-name">' + escapeHtml(item.dishName) + '</div>' +
-                    '<div class="watchlist-card-restaurant">' + escapeHtml(item.restaurantName || '') + '</div>' +
-                    (scoreText ? '<div class="watchlist-card-score">' + escapeHtml(scoreText) + '/10</div>' : '') +
-                '</div>' +
-                (dateAdded ? '<div class="watchlist-card-date">' + escapeHtml(dateAdded) + '</div>' : '') +
+            var html = '<a href="/dishes/' + encodeURIComponent(item.dishId) + '" class="favorite-card">' +
+                '<div class="favorite-card-photo">' + photoHtml + '</div>' +
+                '<div class="favorite-card-name">' + escapeHtml(item.dishName) + '</div>' +
+                '<div class="favorite-card-restaurant">' + escapeHtml(item.restaurantName || '') + '</div>' +
                 '</a>';
             $list.append(html);
         });
     }
 
-    function renderWatchlistPagination(data) {
-        var $pag = $('#watchlist-pagination');
+    // ── Followers / Following Modal ──
+    var followModalType = null;
+    var followModalPage = 1;
+
+    function openFollowModal(type) {
+        followModalType = type;
+        followModalPage = 1;
+        $('#follow-modal-title').text(type === 'followers' ? 'Followers' : 'Following');
+        $('#follow-modal-overlay').removeClass('hidden');
+        $('#follow-modal').removeClass('hidden');
+        loadFollowModal();
+    }
+
+    function closeFollowModal() {
+        $('#follow-modal-overlay').addClass('hidden');
+        $('#follow-modal').addClass('hidden');
+        followModalType = null;
+    }
+
+    async function loadFollowModal() {
+        if (!profileData || !followModalType) return;
+        var $list = $('#follow-modal-list');
+        $list.html('<div class="reviews-empty">Loading...</div>');
+        try {
+            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+                '/' + followModalType + '?page=' + followModalPage + '&pageSize=20';
+            var res = await $.get(url);
+            if (res.success && res.data) {
+                renderFollowModalList(res.data.items || []);
+                renderFollowModalPagination(res.data);
+            }
+        } catch (err) {
+            $list.html('<div class="reviews-empty">Failed to load.</div>');
+        }
+    }
+
+    function renderFollowModalList(items) {
+        var $list = $('#follow-modal-list');
+        $list.empty();
+        if (!items.length) {
+            var label = followModalType === 'followers' ? 'No followers yet.' : 'Not following anyone yet.';
+            $list.html('<div class="reviews-empty">' + label + '</div>');
+            return;
+        }
+        items.forEach(function(user) {
+            var avatarHtml = user.avatarUrl
+                ? '<img src="' + escapeHtml(user.avatarUrl) + '_s" alt="Avatar">'
+                : '<span class="follow-card-initial">' + avatarInitial(user.firstName) + '</span>';
+            var displayName = escapeHtml((user.firstName || '') + ' ' + (user.lastName || '')).trim();
+            var html = '<a href="/users/' + encodeURIComponent(user.username) + '" class="follow-card">' +
+                '<div class="follow-card-avatar">' + avatarHtml + '</div>' +
+                '<div class="follow-card-info">' +
+                    '<div class="follow-card-name">' + (displayName || escapeHtml(user.username)) + '</div>' +
+                    '<div class="follow-card-username">@' + escapeHtml(user.username) + '</div>' +
+                '</div>' +
+                '</a>';
+            $list.append(html);
+        });
+    }
+
+    function renderFollowModalPagination(data) {
+        var $pag = $('#follow-modal-pagination');
         var totalPages = Math.ceil(data.total / data.pageSize);
         if (totalPages <= 1) {
             $pag.empty();
             return;
         }
-        var html = '<button class="btn btn-outline btn-sm watchlist-prev"' + (watchlistPage <= 1 ? ' disabled' : '') + '>Previous</button>' +
-            '<span class="watchlist-page-label">Page ' + watchlistPage + ' of ' + totalPages + '</span>' +
-            '<button class="btn btn-outline btn-sm watchlist-next"' + (watchlistPage >= totalPages ? ' disabled' : '') + '>Next</button>';
+        var html = '<button class="btn btn-outline btn-sm follow-modal-prev"' + (followModalPage <= 1 ? ' disabled' : '') + '>Previous</button>' +
+            '<span class="follow-page-label">Page ' + followModalPage + ' of ' + totalPages + '</span>' +
+            '<button class="btn btn-outline btn-sm follow-modal-next"' + (followModalPage >= totalPages ? ' disabled' : '') + '>Next</button>';
         $pag.html(html);
     }
 
@@ -466,8 +613,27 @@ var profilePage = (function() {
         // Diary navigation
         $(document).on('click', '.diary-prev', function() { changeMonth(-1); });
         $(document).on('click', '.diary-next', function() { changeMonth(1); });
-        $(document).on('click', '.watchlist-prev', function() { watchlistPage--; loadWatchlist(); });
-        $(document).on('click', '.watchlist-next', function() { watchlistPage++; loadWatchlist(); });
+
+        // Infinite scroll for reviews and watchlist
+        $(window).on('scroll', function() {
+            var scrollBottom = $(window).scrollTop() + $(window).height();
+            var threshold = $(document).height() - 200;
+            if (scrollBottom >= threshold) {
+                var activeTab = $('.profile-tab.active').data('tab');
+                if (activeTab === 'reviews') loadReviews();
+                if (activeTab === 'favorites') loadFavorites();
+                if (activeTab === 'watchlist') loadWatchlist();
+            }
+        });
+
+        // Follow modal
+        $(document).on('click', '.profile-stat-link', function() {
+            openFollowModal($(this).data('follow-type'));
+        });
+        $('#follow-modal-overlay').on('click', closeFollowModal);
+        $('#follow-modal .close-modal').on('click', closeFollowModal);
+        $(document).on('click', '.follow-modal-prev', function() { followModalPage--; loadFollowModal(); });
+        $(document).on('click', '.follow-modal-next', function() { followModalPage++; loadFollowModal(); });
 
         // Edit profile
         $('#edit-profile-btn').on('click', openEditModal);

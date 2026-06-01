@@ -8,6 +8,24 @@ $(document).ready(function() {
     $('#dob').attr('max', maxDob);
 });
 
+var softLaunchModule = {
+    abqLat: 35.0844,
+    abqLng: -106.6504,
+    radiusMiles: 50
+};
+
+function calculateDistanceMiles(lat1, lng1, lat2, lng2) {
+    var toRadians = function(value) { return value * Math.PI / 180; };
+    var earthRadiusMiles = 3958.8;
+    var dLat = toRadians(lat2 - lat1);
+    var dLng = toRadians(lng2 - lng1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusMiles * c;
+}
+
 function setHandlers() {
     $('#register-form').on('submit', onRegisterSubmit);
     $('#goToHomeBtn').on('click', onGoToHome);
@@ -38,29 +56,43 @@ async function onRegisterSubmit(e) {
     var data = $(form).serializeObject();
     var email = data.email;
     var password = data.password;
-    // Get address components from Google Places Autocomplete directly
-    var place = window._platillosAutocomplete.getPlace();
-    if (place && place.address_components) {
-        var streetNumber = '', route = '', city = '', state = '', zip = '', county = '', country = '';
-        for (var i = 0; i < place.address_components.length; i++) {
-            var comp = place.address_components[i];
-            var type = comp.types[0];
-            if (type === 'street_number') streetNumber = comp.long_name;
-            if (type === 'route') route = comp.long_name;
-            if (type === 'locality') city = comp.long_name;
-            if (type === 'administrative_area_level_1') state = comp.short_name;
-            if (type === 'postal_code') zip = comp.long_name;
-            if (type === 'administrative_area_level_2') county = comp.long_name;
-            if (type === 'country') country = comp.short_name;
+    // Get address from new Places Autocomplete element
+    var place = window._platillosPlace;
+    if (place && place.addressComponents) {
+        var streetNumber = '', route = '', city = '', state = '', zip = '', county = '';
+        for (var i = 0; i < place.addressComponents.length; i++) {
+            var comp = place.addressComponents[i];
+            var types = comp.types || [];
+            if (types.indexOf('street_number') !== -1) streetNumber = comp.longText;
+            if (types.indexOf('route') !== -1) route = comp.longText;
+            if (types.indexOf('locality') !== -1) city = comp.longText;
+            if (types.indexOf('administrative_area_level_1') !== -1) state = comp.shortText;
+            if (types.indexOf('postal_code') !== -1) zip = comp.longText;
+            if (types.indexOf('administrative_area_level_2') !== -1) county = comp.longText;
         }
         data.addressStreet = (streetNumber ? streetNumber + ' ' : '') + route;
         data.addressCity = city;
         data.addressZip = zip;
         data.addressState = state;
         data.addressCounty = county;
-        if (place.geometry && place.geometry.location) {
-            data.addressLat = place.geometry.location.lat();
-            data.addressLng = place.geometry.location.lng();
+        if (place.location) {
+            data.addressLat = place.location.lat();
+            data.addressLng = place.location.lng();
+        }
+    }
+
+    if (data.addressLat && data.addressLng) {
+        var distanceMiles = calculateDistanceMiles(
+            parseFloat(data.addressLat),
+            parseFloat(data.addressLng),
+            softLaunchModule.abqLat,
+            softLaunchModule.abqLng
+        );
+        if (distanceMiles > softLaunchModule.radiusMiles) {
+            var proceed = window.confirm('Platillos is currently allowing restaurants from Albuquerque, New Mexico only. You can still create your account and use the app, but restaurant submissions outside Albuquerque will stay queued for later review. Continue?');
+            if (!proceed) {
+                return;
+            }
         }
     }
     var recaptcha = $(form).find('.g-recaptcha-response').val();
@@ -98,7 +130,8 @@ async function onRegisterSubmit(e) {
             window.grecaptcha.reset();
         }
     } catch (err) {
-        common.showAlert('Registration failed. Please try again.', 'error');
+        var msg = (err.responseJSON && err.responseJSON.message) || 'Registration failed. Please try again.';
+        common.showAlert(msg, 'error');
         window.grecaptcha.reset();
     }
 }

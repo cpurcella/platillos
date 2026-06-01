@@ -2,14 +2,20 @@
     <link rel="stylesheet" href="/styles/add-review.css">
     <div class="modal-content">
         <button class="close-modal" aria-label="Close">&times;</button>
-        <h2>Review a Dish!</h2>
+        <h2>Add a Review</h2>
         <div id="selected-restaurant-container"></div>
+        <div id="review-type-section" class="hidden section-block">
+            <div class="review-type-options" role="group" aria-label="Review type">
+                <button type="button" class="review-type-option" data-item-type="food">Food</button>
+                <button type="button" class="review-type-option" data-item-type="drink">Drink</button>
+            </div>
+        </div>
         <div id="selected-dish-container"></div>
         <div id="restaurant-search-section">
             <form id="add-review-form">
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="restaurant-search">Where did you eat this dish?</label>
+                        <label class="form-label" for="restaurant-search" id="restaurant-search-label">Where was it?</label>
                         <input type="text" id="restaurant-search" class="form-input" placeholder="Type to search...">
                         <div id="restaurant-list"></div>
                     </div>
@@ -50,26 +56,40 @@
             </div>
         </div>
         <div id="dish-search-section" class="hidden section-block">
-            <label class="form-label" for="dish-list">What did you eat?</label>
+            <label class="form-label" for="dish-list" id="dish-search-label">What did you have?</label>
             <input type="text" id="dish-search" class="form-input" placeholder="Type to search...">
             <div id="dish-list"></div>
         </div>
         <div id="add-dish-section" class="hidden section-block">
-            <h3>Add a Dish</h3>
+            <h3 id="add-dish-title">Add an Item</h3>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label" for="new-dish-name">Dish Name</label>
-                    <input type="text" id="new-dish-name" class="form-input" placeholder="Dish name">
+                    <label class="form-label" for="new-dish-name" id="new-dish-name-label">Name</label>
+                    <input type="text" id="new-dish-name" class="form-input" placeholder="Name">
+                </div>
+            </div>
+            <div id="drink-style-section" class="hidden">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Drink category</label>
+                        <div id="drink-category-options" class="metadata-chip-list"></div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Drink style</label>
+                        <div id="drink-type-options" class="metadata-chip-list"></div>
+                    </div>
                 </div>
             </div>
             <div class="button-row">
-                <a href="javascript:void(0)" class="btn btn-turquoise" id="save-dish-btn">Save Dish</a>
+                <a href="javascript:void(0)" class="btn btn-turquoise" id="save-dish-btn">Save</a>
                 <a href="javascript:void(0)" class="btn" id="cancel-add-dish-btn">Cancel</a>
             </div>
         </div>
         <div id="review-section" class="hidden section-block">
-            <div class="form-row">
-                <div class="form-group">
+            <div class="rating-favorite-row">
+                <div class="rating-group">
                     <label class="form-label" for="rating">Rating (1-10)</label>
                     <select id="rating" class="form-input" required>
                         <option value="" disabled selected>Select a rating</option>
@@ -85,6 +105,13 @@
                         <option value="10">10</option>
                     </select>
                 </div>
+                <div class="favorite-group">
+                    <label class="form-label">Favorite</label>
+                    <label class="favorite-checkbox-row" title="Add to Favorites">
+                        <input type="checkbox" id="add-to-favorites" class="hidden">
+                        <span class="favorite-checkbox-icon">♡</span>
+                    </label>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -94,8 +121,8 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label" for="modifications">Any modifications to your dish?</label>
-                    <input type="text" id="modifications" class="form-input" placeholder="No onions, extra cheese, etc.">
+                    <label class="form-label" for="modifications" id="modifications-label">Any modifications?</label>
+                    <input type="text" id="modifications" class="form-input" placeholder="Optional notes">
                 </div>
             </div>
             <div class="form-row">

@@ -272,6 +272,9 @@ async function evaluateSingleRestaurant(client, restaurant) {
     var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizeDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+    if (decision) {
+        decision.restaurantId = restaurant.restaurantId;
+    }
 
     var sources = contentParts.flatMap(function (part) {
         if (!part) return [];
@@ -315,9 +318,10 @@ async function applyAiDecisions(decisions) {
                 continue;
             }
 
+            var aiReasoning = status === 'needs_review' ? (decision.reasoning || null) : null;
             var result = await connection.query(
-                "UPDATE restaurants SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE restaurantId = ? AND status = 'pending'",
-                [status, Date.now(), reviewerUserId, decision.restaurantId]
+                "UPDATE restaurants SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE restaurantId = ? AND status = 'pending'",
+                [status, Date.now(), reviewerUserId, aiReasoning, decision.restaurantId]
             );
 
             var affectedRows = 0;

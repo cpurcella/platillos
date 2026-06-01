@@ -4,8 +4,25 @@ var axios = require('axios');
 var config = require('../config');
 var dishService = require('./dishService');
 var aiJobQueue = require('../aiJobQueue');
+var softLaunch = require('../softLaunch');
+var paginationHelper = require('./paginationHelper');
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review', 'out_of_area']);
+
+var PUBLIC_REVIEW_SELECT = `
+        SELECT
+            r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submitted,
+        d.name AS dishName, d.itemType, s.name AS restaurantName,
+            u.firstName, u.lastName, u.username, u.avatarFileId
+    `;
+
+var ADMIN_REVIEW_SELECT = `
+        SELECT
+            r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
+            r.status, r.statusUpdated, r.statusUpdatedBy, r.aiReasoning,
+        d.name AS dishName, d.itemType, s.name AS restaurantName,
+            u.firstName, u.lastName, u.email, u.username, u.avatarFileId
+    `;
 
 function hasProp(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj || {}, key);
@@ -28,7 +45,7 @@ function resolveAuditColumns(status, userId) {
     if (status === undefined) {
         return [];
     }
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'out_of_area') {
         return [status, null, null];
     }
     var now = Date.now();
@@ -39,18 +56,28 @@ function normalizeRating(value) {
     if (value === undefined) {
         return undefined;
     }
-    if (value === null || value === '') {
-        return null;
+    if (value === null || (typeof value === 'string' && value.trim() === '')) {
+        var requiredErr = new Error('Rating is required');
+        requiredErr.status = 400;
+        throw requiredErr;
     }
-    var num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) {
-        var err = new Error('Invalid rating');
+    var num = typeof value === 'number' ? value : Number(value);
+    if (!isFinite(num) || num < 1 || num > 10) {
+        var err = new Error('Rating must be between 1 and 10');
         err.status = 400;
         throw err;
     }
-    if (num < 0) num = 0;
-    if (num > 10) num = 10;
     return Math.round(num * 10) / 10;
+}
+
+function requireRating(value) {
+    var rating = normalizeRating(value);
+    if (rating === undefined) {
+        var err = new Error('Rating is required');
+        err.status = 400;
+        throw err;
+    }
+    return rating;
 }
 
 function normalizeString(value) {
@@ -58,6 +85,16 @@ function normalizeString(value) {
         return undefined;
     }
     return String(value);
+}
+
+function stripPublicReviewFields(review) {
+    delete review.submittedBy;
+    delete review.status;
+    delete review.statusUpdated;
+    delete review.statusUpdatedBy;
+    delete review.aiReasoning;
+    delete review.email;
+    return review;
 }
 
 async function hasRecentReview(dishId, userId) {
@@ -76,14 +113,16 @@ async function hasRecentReview(dishId, userId) {
 
 async function getOrCreateCityId(connection, cityName) {
     if(!connection) {
-        connection = db.getConnection();
+        connection = await db.getConnection();
     }
     var name = (cityName || '').trim();
     if (!name) name = 'Unknown';
-    var rows = await db.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
+    var result = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
+    var rows = Array.isArray(result) ? result[0] : result;
     if (rows && rows.length) return rows[0].cityId;
-    var insert = await db.query('INSERT INTO cities (city) VALUES (?)', [name]);
-    return insert[0].insertId;
+    var insertResult = await connection.query('INSERT INTO cities (city) VALUES (?)', [name]);
+    var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
+    return header && header.insertId;
 }
 
 async function geocodeRestaurantLocation(restaurantData) {
@@ -130,6 +169,7 @@ async function geocodeRestaurantLocation(restaurantData) {
 }
 
 async function saveReview(allParams) {
+    var ratingValue = requireRating(allParams.rating);
     var connection = await db.getConnection();
     try {
         await connection.beginTransaction();
@@ -157,6 +197,7 @@ async function saveReview(allParams) {
         allParams.photos = photoPayload;
 
         var restaurantId = allParams.restaurantId || null;
+        var holdForSoftLaunch = false;
         if (isNewRestaurant && allParams.newRestaurantData) {
             var cityId = await getOrCreateCityId(connection, allParams.newRestaurantData.city);
             restaurantId = crypto.randomUUID();
@@ -164,14 +205,25 @@ async function saveReview(allParams) {
             var geocodeResult = await geocodeRestaurantLocation(allParams.newRestaurantData);
             var lat = 0;
             var lng = 0;
+            var hasGeocodedCoordinates = false;
             if (geocodeResult) {
                 var parsedLat = parseFloat(geocodeResult.lat);
                 var parsedLng = parseFloat(geocodeResult.lng);
                 if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
                     lat = parsedLat;
                     lng = parsedLng;
+                    hasGeocodedCoordinates = true;
                 }
             }
+
+            var launchCheck = softLaunch.evaluateLocation({
+                lat: hasGeocodedCoordinates ? lat : null,
+                lng: hasGeocodedCoordinates ? lng : null,
+                city: allParams.newRestaurantData.city,
+                state: allParams.newRestaurantData.state
+            });
+            holdForSoftLaunch = launchCheck.isOutsideLaunchArea;
+            var restaurantStatus = holdForSoftLaunch ? 'out_of_area' : 'pending';
 
             await connection.query(
                 `
@@ -190,28 +242,31 @@ async function saveReview(allParams) {
                     lng,
                     nowMs,
                     userId,
-                    'pending',
+                    restaurantStatus,
                     null,
                     null
                 ]
             );
         }
 
+        var submissionStatus = holdForSoftLaunch ? 'out_of_area' : 'pending';
         var finalDishId = allParams.dishId || null;
         if (isNewDish && allParams.newDishData) {
             if (!restaurantId) {
                 throw new Error('Restaurant is required to add a new dish.');
             }
             var dishId = crypto.randomUUID();
+            var itemType = dishService.normalizeItemType(allParams.newDishData.itemType || allParams.itemType) || 'food';
             await connection.query(
                 `
                 INSERT INTO dishes
-                    (dishId, restaurantId, name, submitted, submittedBy, status, statusUpdated, statusUpdatedBy)
+                    (dishId, restaurantId, name, itemType, submitted, submittedBy, status, statusUpdated, statusUpdatedBy)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
-                [dishId, restaurantId, allParams.newDishData.name || '', nowMs, userId, 'pending', null, null]
+                [dishId, restaurantId, allParams.newDishData.name || '', itemType, nowMs, userId, submissionStatus, null, null]
             );
+            await dishService.addDishMetadata(connection, dishId, allParams.newDishData);
             finalDishId = dishId;
         }
 
@@ -229,7 +284,7 @@ async function saveReview(allParams) {
         }
 
         var reviewData = {
-            rating: allParams.rating,
+            rating: ratingValue,
             reviewContent: allParams.review,
             modifications: allParams.modifications,
             dishId: finalDishId,
@@ -237,9 +292,10 @@ async function saveReview(allParams) {
             submitted: nowMs
         };
 
+        var reviewStatus = holdForSoftLaunch ? 'out_of_area' : 'approved';
         var sql = `
-            INSERT INTO reviews (rating, review, modifications, dishId, submittedBy, submitted)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO reviews (rating, review, modifications, dishId, submittedBy, submitted, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         var params = [
             reviewData.rating,
@@ -247,18 +303,19 @@ async function saveReview(allParams) {
             reviewData.modifications,
             reviewData.dishId,
             reviewData.submittedBy,
-            reviewData.submitted
+            reviewData.submitted,
+            reviewStatus
         ];
         var result = await connection.query(sql, params);
         var reviewId = result[0].insertId;
 
         if (allParams.photos && allParams.photos.length) {
             var photoSql = `
-                INSERT INTO reviews_photos (reviewId, fileId)
+                INSERT INTO reviews_photos (reviewId, fileId, status)
                 VALUES ?
             `;
             var photoParams = allParams.photos.map(function(fileId) {
-                return [reviewId, fileId];
+                return [reviewId, fileId, holdForSoftLaunch ? 'out_of_area' : 'pending'];
             });
             await connection.query(photoSql, [photoParams]);
         }
@@ -267,27 +324,44 @@ async function saveReview(allParams) {
 
         // Enqueue AI evaluation jobs (non-blocking, after commit)
         try {
-            if (isNewRestaurant && restaurantId) {
-                await aiJobQueue.enqueueJob('evaluate_restaurant', restaurantId);
-            }
-            if (isNewDish && finalDishId) {
-                await aiJobQueue.enqueueJob('evaluate_dish', finalDishId);
-            }
-            await aiJobQueue.enqueueJob('evaluate_review', reviewId);
-            if (allParams.photos && allParams.photos.length) {
-                var photoRows = await db.query(
-                    'SELECT reviewPhotoId FROM reviews_photos WHERE reviewId = ?',
-                    [reviewId]
-                );
-                for (var p = 0; p < photoRows.length; p++) {
-                    await aiJobQueue.enqueueJob('evaluate_photo', photoRows[p].reviewPhotoId);
+            if (!holdForSoftLaunch) {
+                if (isNewRestaurant && restaurantId) {
+                    await aiJobQueue.enqueueJob('evaluate_restaurant', restaurantId);
+                }
+                if (isNewDish && finalDishId) {
+                    await aiJobQueue.enqueueJob('evaluate_dish', finalDishId);
+                }
+                if (allParams.photos && allParams.photos.length) {
+                    var photoRows = await db.query(
+                        'SELECT reviewPhotoId FROM reviews_photos WHERE reviewId = ?',
+                        [reviewId]
+                    );
+                    for (var p = 0; p < photoRows.length; p++) {
+                        await aiJobQueue.enqueueJob('evaluate_photo', photoRows[p].reviewPhotoId);
+                    }
                 }
             }
         } catch (enqueueErr) {
             console.error('[ai-jobs] Failed to enqueue:', enqueueErr.message || enqueueErr);
         }
 
-        return reviewId;
+        // Recalculate dish scores now that the review is immediately approved
+        if (!holdForSoftLaunch && reviewStatus === 'approved') {
+            try {
+                await dishService.setDishScores(finalDishId);
+            } catch (scoreErr) {
+                console.error('[scores] Failed to recalculate:', scoreErr.message || scoreErr);
+            }
+        }
+
+        return {
+            reviewId: reviewId,
+            dishId: finalDishId,
+            heldForSoftLaunch: holdForSoftLaunch,
+            message: holdForSoftLaunch
+                ? 'Review submitted. Because Platillos is currently limited to Albuquerque restaurants, this restaurant and related content were saved for later review and were not sent to AI yet.'
+                : 'Review submitted successfully.'
+        };
     } catch (err) {
         await connection.rollback();
         throw err;
@@ -297,18 +371,12 @@ async function saveReview(allParams) {
 }
 async function getReviews(params) {
     params = params || {};
-    var pageSize = parseInt(params.pageSize, 10) || 10;
-    var page = parseInt(params.page, 10) || 1;
-    if (page < 1) page = 1;
-    var offset = (page - 1) * pageSize;
+    var pagination = paginationHelper.normalizePagination(params, 10);
+    var pageSize = pagination.pageSize;
+    var offset = pagination.offset;
+    var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
 
-    var selectClause = `
-        SELECT
-            r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
-            r.status, r.statusUpdated, r.statusUpdatedBy,
-            d.name AS dishName, s.name AS restaurantName,
-            u.firstName, u.lastName, u.email, u.username, u.avatarFileId
-    `;
+    var selectClause = isAdmin ? ADMIN_REVIEW_SELECT : PUBLIC_REVIEW_SELECT;
     var fromClause = `
         FROM reviews r
         JOIN dishes d ON r.dishId = d.dishId
@@ -332,25 +400,23 @@ async function getReviews(params) {
         whereValues.push(params.dishId);
     }
 
-    var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
     var normalizedStatusExpr = "LOWER(COALESCE(r.status, 'pending'))";
 
-    if (shouldFilterPending) {
-        if (!isAdmin) {
-            var err = new Error('Forbidden');
-            err.status = 403;
-            throw err;
+    if (!isAdmin) {
+        if (shouldFilterPending || statusFilter === 'needs_review' || statusFilter === 'out_of_area' || statusFilter === 'rejected') {
+            var publicStatusErr = new Error('Forbidden');
+            publicStatusErr.status = 403;
+            throw publicStatusErr;
         }
+        whereClauses.push(normalizedStatusExpr + " = 'approved'");
+    } else if (shouldFilterPending) {
         whereClauses.push(normalizedStatusExpr + " = 'pending'");
     } else if (statusFilter === 'needs_review') {
-        if (!isAdmin) {
-            var err = new Error('Forbidden');
-            err.status = 403;
-            throw err;
-        }
         whereClauses.push(normalizedStatusExpr + " = 'needs_review'");
+    } else if (statusFilter === 'out_of_area') {
+        whereClauses.push(normalizedStatusExpr + " = 'out_of_area'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push(normalizedStatusExpr + ' = ?');
         whereValues.push(statusFilter);
@@ -385,10 +451,35 @@ async function getReviews(params) {
         }
     }
 
+    // Resolve vote counts (and whether current user voted on each review)
+    if (reviews.length) {
+        var rvIds = reviews.map(function(r) { return r.reviewId; });
+        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]) || [];
+        var likeMap = {};
+        for (var lc = 0; lc < voteCounts.length; lc++) {
+            likeMap[voteCounts[lc].reviewId] = parseInt(voteCounts[lc].likeCount, 10) || 0;
+        }
+        var currentUserId = params.auth && params.auth.user ? params.auth.user.userId : null;
+        var userVoteMap = {};
+        if (currentUserId) {
+            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]) || [];
+            for (var ul = 0; ul < userVotes.length; ul++) {
+                userVoteMap[userVotes[ul].reviewId] = userVotes[ul].value;
+            }
+        }
+        for (var li = 0; li < reviews.length; li++) {
+            reviews[li].likeCount = likeMap[reviews[li].reviewId] || 0;
+            reviews[li].userVote = userVoteMap[reviews[li].reviewId] || 0;
+        }
+    }
+
     // Resolve avatar URLs
     for (var k = 0; k < reviews.length; k++) {
         if (reviews[k].avatarFileId) {
             reviews[k].avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + reviews[k].avatarFileId;
+        }
+        if (!isAdmin) {
+            stripPublicReviewFields(reviews[k]);
         }
     }
 
@@ -442,12 +533,6 @@ async function updateReview(params) {
         modificationsValue === undefined
     ) {
         return { updated: false };
-    }
-
-    if (ratingValue === null) {
-        var ratingErr = new Error('Rating is required');
-        ratingErr.status = 400;
-        throw ratingErr;
     }
 
     var connection = await db.getConnection();
@@ -531,10 +616,143 @@ async function updateReview(params) {
     return { updated: true };
 }
 
+async function voteReview(userId, reviewId, value) {
+    // value must be 1 or -1
+    var v = value === -1 ? -1 : 1;
+    await db.query(
+        'INSERT INTO reviewLikes (userId, reviewId, value, createdAt) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, createdAt = ?',
+        [userId, reviewId, v, Date.now(), v, Date.now()]
+    );
+    var rows = await db.query('SELECT COALESCE(SUM(value), 0) AS likeCount FROM reviewLikes WHERE reviewId = ?', [reviewId]);
+    var userRow = await db.query('SELECT value FROM reviewLikes WHERE userId = ? AND reviewId = ?', [userId, reviewId]);
+    return { likeCount: parseInt(rows[0].likeCount, 10) || 0, userVote: userRow[0].value };
+}
+
+async function removeVote(userId, reviewId) {
+    await db.query('DELETE FROM reviewLikes WHERE userId = ? AND reviewId = ?', [userId, reviewId]);
+    var rows = await db.query('SELECT COALESCE(SUM(value), 0) AS likeCount FROM reviewLikes WHERE reviewId = ?', [reviewId]);
+    return { likeCount: parseInt(rows[0].likeCount, 10) || 0, userVote: 0 };
+}
+
+async function getFeed(params) {
+    params = params || {};
+    var tab = params.tab || 'recent';
+    var pagination = paginationHelper.normalizePagination(params, 20);
+    var pageSize = pagination.pageSize;
+    var offset = pagination.offset;
+    var currentUserId = params.auth && params.auth.user ? params.auth.user.userId : null;
+
+    var selectClause = `
+        SELECT
+            r.reviewId, r.rating, r.review AS reviewContent, r.modifications, r.dishId, r.submittedBy, r.submitted,
+            d.name AS dishName, d.coverPhoto AS dishCoverPhoto, d.score AS dishScore,
+            s.name AS restaurantName, s.restaurantId,
+            u.firstName, u.lastName, u.username, u.avatarFileId
+    `;
+    var fromClause = `
+        FROM reviews r
+        JOIN dishes d ON r.dishId = d.dishId
+        JOIN restaurants s ON d.restaurantId = s.restaurantId
+        JOIN users u ON r.submittedBy = u.userId
+    `;
+
+    var whereClauses = ["r.status = 'approved'", "d.status = 'approved'", "s.status = 'approved'"];
+    var whereValues = [];
+    var orderClause;
+
+    if (tab === 'following') {
+        if (!currentUserId) {
+            return { rows: [], total: 0 };
+        }
+        fromClause += ' JOIN userFollows uf ON uf.followingId = r.submittedBy AND uf.followerId = ? ';
+        whereValues.push(currentUserId);
+        orderClause = ' ORDER BY r.submitted DESC';
+    } else if (tab === 'popular') {
+        fromClause += ` LEFT JOIN (
+            SELECT reviewId, COALESCE(SUM(value), 0) AS likeCount
+            FROM reviewLikes GROUP BY reviewId
+        ) rl ON rl.reviewId = r.reviewId `;
+        orderClause = ' ORDER BY rl.likeCount DESC, r.submitted DESC';
+    } else {
+        orderClause = ' ORDER BY r.submitted DESC';
+    }
+
+    var whereSql = ' WHERE ' + whereClauses.join(' AND ');
+
+    var countSql = 'SELECT COUNT(*) AS total ' + fromClause + whereSql;
+    var countRows = await db.query(countSql, whereValues) || [];
+    var total = countRows.length ? countRows[0].total : 0;
+
+    var dataSql = selectClause + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
+    var dataValues = whereValues.slice();
+    dataValues.push(pageSize, offset);
+    var reviews = await db.query(dataSql, dataValues) || [];
+
+    // Attach photos
+    if (reviews.length) {
+        var reviewIds = reviews.map(function(r) { return r.reviewId; });
+        var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND LOWER(COALESCE(status, 'pending')) = 'approved'", [reviewIds]) || [];
+        var photosByReview = {};
+        for (var i = 0; i < photoRows.length; i++) {
+            var pr = photoRows[i];
+            photosByReview[pr.reviewId] = photosByReview[pr.reviewId] || [];
+            photosByReview[pr.reviewId].push({ fileId: pr.fileId, url: 'https://' + config.bucket + '.s3.amazonaws.com/' + pr.fileId });
+        }
+        for (var j = 0; j < reviews.length; j++) {
+            reviews[j].photos = photosByReview[reviews[j].reviewId] || [];
+        }
+    }
+
+    // Attach vote counts + current user vote
+    if (reviews.length) {
+        var rvIds = reviews.map(function(r) { return r.reviewId; });
+        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]) || [];
+        var likeMap = {};
+        for (var lc = 0; lc < voteCounts.length; lc++) {
+            likeMap[voteCounts[lc].reviewId] = parseInt(voteCounts[lc].likeCount, 10) || 0;
+        }
+        var userVoteMap = {};
+        if (currentUserId) {
+            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]) || [];
+            for (var ul = 0; ul < userVotes.length; ul++) {
+                userVoteMap[userVotes[ul].reviewId] = userVotes[ul].value;
+            }
+        }
+        for (var li = 0; li < reviews.length; li++) {
+            reviews[li].likeCount = likeMap[reviews[li].reviewId] || 0;
+            reviews[li].userVote = userVoteMap[reviews[li].reviewId] || 0;
+        }
+    }
+
+    // Resolve URLs
+    for (var k = 0; k < reviews.length; k++) {
+        if (reviews[k].avatarFileId) {
+            reviews[k].avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + reviews[k].avatarFileId;
+        }
+        if (reviews[k].dishCoverPhoto) {
+            reviews[k].dishCoverPhoto = 'https://' + config.bucket + '.s3.amazonaws.com/' + reviews[k].dishCoverPhoto;
+        }
+    }
+
+    return { rows: reviews, total: total };
+}
+
+async function getRatingsForDish(dishId) {
+    var rows = await db.query(
+        "SELECT reviewId, rating, submitted FROM reviews WHERE dishId = ? AND status = 'approved' ORDER BY submitted ASC, reviewId ASC",
+        [dishId]
+    );
+    return dishService.buildDishScoreTrend(rows || []);
+}
+
 module.exports = {
     saveReview: saveReview,
     hasRecentReview: hasRecentReview,
     getReviews: getReviews,
     getReviewsForDish: getReviewsForDish,
-    updateReview: updateReview
+    getRatingsForDish: getRatingsForDish,
+    getFeed: getFeed,
+    updateReview: updateReview,
+    voteReview: voteReview,
+    removeVote: removeVote
 };

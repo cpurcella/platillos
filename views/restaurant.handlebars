@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Platillos - Restaurant</title>
+    {{> head}}
+    <link rel="stylesheet" href="/styles/index.css">
+    <link rel="stylesheet" href="/styles/restaurant.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body class="bg-mint">
+    {{> header}}
+    <div class="main-container restaurant-page">
+        <section class="restaurant-header" id="restaurant-header">
+            <h1 id="restaurant-name" class="platillos-title"></h1>
+            <div class="restaurant-meta" id="restaurant-meta"></div>
+            <a id="directions-link" class="directions-link hidden" target="_blank" rel="noopener noreferrer">Get Directions</a>
+            <div class="restaurant-map" id="restaurant-map"></div>
+        </section>
+        <section class="restaurant-stats" id="restaurant-stats"></section>
+        <section class="restaurant-dishes">
+            <div class="restaurant-dishes-header">
+                <h2 class="section-title">Dishes</h2>
+                <input type="text" id="dish-search" class="form-input dish-search-input" placeholder="Search dishes…">
+            </div>
+            <div id="dishes-list" class="dishes-list"></div>
+            <div id="dishes-empty" class="dishes-empty hidden">No dishes found.</div>
+        </section>
+    </div>
+
+    {{> footer}}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/js/restaurant.js"></script>
+</body>
+</html>

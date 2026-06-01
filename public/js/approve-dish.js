@@ -12,9 +12,10 @@ var approveDishModule = {
         approveDishModule.loadDish();
     },
     renderDishLoading: function() {
-        $('#approve-dish-name').text('Loading...');
+        $('#approve-dish-name').val('Loading...');
         $('#approve-dish-restaurant').text('');
         $('#approve-dish-submitted').text('');
+        $('#ai-dish-metadata-suggestions').empty();
         approveDishModule.showMetadataError('');
     },
     ensureMetadataOptions: async function() {
@@ -58,11 +59,18 @@ var approveDishModule = {
             approveDishModule.renderDishInfo(dish);
 
             var currentStatus = (dish.status || 'pending').toLowerCase();
-            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected', 'out_of_area'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#dish-status-select').val(currentStatus);
             $('#ai-evaluate-dish-btn').toggle(currentStatus === 'pending');
+
+            if (dish.aiReasoning) {
+                $('#ai-dish-stored-reasoning-text').text(dish.aiReasoning);
+                $('#ai-dish-stored-reasoning').show();
+            } else {
+                $('#ai-dish-stored-reasoning').hide();
+            }
 
             if (metadataLoaded && metadataOptions) {
                 approveDishModule.applyMetadataSelections(dish);
@@ -74,7 +82,8 @@ var approveDishModule = {
         }
     },
     renderDishInfo: function(dish) {
-        $('#approve-dish-name').text(dish.name || '');
+        $('#approve-dish-name').val(dish.name || '');
+        approveDishModule.originalDishName = dish.name || '';
         $('#approve-dish-restaurant').text(dish.restaurantName || '');
         var submittedText = '';
         if (dish.submitted) {
@@ -179,6 +188,22 @@ var approveDishModule = {
         });
         return ids;
     },
+    renderMetadataSuggestions: function(suggestions) {
+        var $container = $('#ai-dish-metadata-suggestions');
+        $container.empty();
+        if (!suggestions || !suggestions.length) {
+            return;
+        }
+
+        $container.append('<div class="ai-result-subtitle">Suggested Metadata Additions</div>');
+        suggestions.forEach(function(suggestion) {
+            var label = suggestion.type === 'dishType' ? 'Dish Type' : suggestion.type.charAt(0).toUpperCase() + suggestion.type.slice(1);
+            var $item = $('<div class="ai-metadata-suggestion"></div>');
+            $('<div class="ai-metadata-suggestion-name"></div>').text(label + ': ' + suggestion.name).appendTo($item);
+            $('<div class="ai-metadata-suggestion-reason"></div>').text(suggestion.justification || '').appendTo($item);
+            $container.append($item);
+        });
+    },
     handleSave: async function(e) {
         e.preventDefault();
         if (approveDishModule.isSaving) {
@@ -193,7 +218,7 @@ var approveDishModule = {
 
         var status = $('#dish-status-select').val();
         var normalizedStatus = (status || '').toLowerCase();
-        if (!['approved', 'rejected', 'pending', 'needs_review'].includes(normalizedStatus)) {
+        if (!['approved', 'rejected', 'pending', 'needs_review', 'out_of_area'].includes(normalizedStatus)) {
             common.showAlert('Please select a valid status.', 'error');
             return;
         }
@@ -207,6 +232,10 @@ var approveDishModule = {
         var payload = {
             status: normalizedStatus
         };
+        var editedName = $('#approve-dish-name').val().trim();
+        if (editedName && editedName !== approveDishModule.originalDishName) {
+            payload.name = editedName;
+        }
         var categories = approveDishModule.getSelectedIdsFromChips('#dish-categories-chips');
         if (categories !== undefined) {
             payload.categories = categories;
@@ -269,6 +298,7 @@ var approveDishModule = {
         var originalText = $btn.text();
         $btn.prop('disabled', true).text('Evaluating...');
         $('#ai-dish-result').hide();
+        $('#ai-dish-metadata-suggestions').empty();
         try {
             var res = await $.ajax({
                 url: '/api/approvals/ai/dish/' + encodeURIComponent(dishId),
@@ -281,11 +311,15 @@ var approveDishModule = {
                 var confidence = d.confidence != null ? ' (' + Math.round(d.confidence * 100) + '% confidence)' : '';
                 $('#ai-dish-verdict').text(verdictLabel.charAt(0).toUpperCase() + verdictLabel.slice(1) + confidence);
                 $('#ai-dish-reasoning').text(d.reasoning || '');
+                approveDishModule.renderMetadataSuggestions(d.suggestedMetadata || []);
                 $('#ai-dish-result').show();
                 if (d.verdict === 'approve') {
                     $('#dish-status-select').val('approved');
                 } else if (d.verdict === 'reject') {
                     $('#dish-status-select').val('rejected');
+                }
+                if (d.correctedName) {
+                    $('#approve-dish-name').val(d.correctedName);
                 }
                 // Pre-select categories and dish types from AI result
                 if (d.categories && d.categories.length) {

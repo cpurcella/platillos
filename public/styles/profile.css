@@ -96,13 +96,29 @@
     color: #888;
 }
 
+.profile-stat-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+
+.profile-stat-link:hover .profile-stat-value {
+    color: var(--color-turquoise);
+}
+
+.profile-stat-link:hover .profile-stat-label {
+    color: var(--color-turquoise-dark);
+}
+
 #edit-profile-btn {
-    margin-top: 12px;
+    margin-top: 0;
 }
 
 .btn-sm {
     padding: 0.35rem 0.9rem;
     font-size: 0.85rem;
+    line-height: 1.2;
+    box-sizing: border-box;
 }
 
 /* ── Favorites ── */
@@ -157,9 +173,19 @@
 }
 
 .favorite-card-name {
-    padding: 8px;
+    padding: 8px 8px 2px;
     font-size: 0.8rem;
     font-weight: 600;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.favorite-card-restaurant {
+    padding: 0 8px 8px;
+    font-size: 0.7rem;
+    color: #888;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -502,6 +528,107 @@
     color: #666;
 }
 
+/* ── Follow Modal ── */
+.follow-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 95vw;
+    max-width: 420px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 1001;
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.18);
+}
+
+.follow-modal .follow-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 12px;
+}
+
+/* ── Followers / Following ── */
+.follow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.follow-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.2s;
+}
+
+.follow-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.follow-card-avatar {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--color-mint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--color-turquoise-dark);
+}
+
+.follow-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.follow-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.follow-card-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--color-turquoise-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.follow-card-username {
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.follow-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.follow-page-label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
     .profile-header {
@@ -524,4 +651,29 @@
         height: 80px;
         font-size: 1.75rem;
     }
+}
+
+/* ── Follow Button ── */
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+#follow-btn {
+    min-width: 90px;
+    transition: all 0.2s;
+}
+
+#follow-btn.following {
+    background: #fff;
+    color: #15616d;
+    border: 2px solid #15616d;
+}
+
+#follow-btn.following:hover {
+    background: #fee;
+    border-color: #c44;
+    color: #c44;
 }

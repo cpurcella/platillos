@@ -67,12 +67,18 @@ router.post('/upload', async function(req, res, next) {
         req.fileId = fileId;
         var mimeType = req.file.mimetype || 'application/octet-stream';
         var variantMime = getVariantMimeType(mimeType);
-        var originalBuffer = req.file.buffer;
 
+        try {
+            var baseImage = await Jimp.read(req.file.buffer);
+        } catch (imageErr) {
+            console.error('[files] Failed to read image for file', fileId, imageErr);
+            return res.status(400).json({ success: false, message: 'Uploaded file must be a supported image.' });
+        }
+
+        var originalBuffer = await baseImage.getBufferAsync(mimeType);
         await uploadToS3(fileId, originalBuffer, mimeType);
 
         try {
-            var baseImage = await Jimp.read(originalBuffer);
             var variantDefinitions = [
                 { suffix: '_m', size: 512 },
                 { suffix: '_s', size: 256 }

@@ -18,13 +18,45 @@
                 </div>
             </div>
             <div class="dish-header-photo" id="dish-cover-container"></div>
+            <div class="dish-rating-trend hidden" id="rating-trend">
+                <div class="rating-trend-label">Rating Trend</div>
+                <div class="rating-trend-chart-wrap">
+                    <canvas id="rating-trend-chart"></canvas>
+                </div>
+            </div>
         </section>
         <section class="dish-reviews" id="dish-reviews">
             <div class="dish-actions" id="dish-actions">
                 <button class="btn btn-turquoise btn-sm hidden" id="quick-log-btn">Add My Review</button>
+                <button class="tried-it-btn hidden" id="tried-it-btn" title="Tried It">
+                    <span class="tried-it-icon">✓</span>
+                    <span class="tried-it-label">Tried It</span>
+                </button>
+                <button class="favorite-btn hidden" id="favorite-btn" title="Favorite">
+                    <span class="favorite-icon">♡</span>
+                    <span class="favorite-label">Favorite</span>
+                </button>
                 <button class="want-to-try-btn hidden" id="watchlist-btn" title="Want to Try">
+                    <span class="want-to-try-icon">☆</span>
                     <span class="want-to-try-label">Want to Try</span>
                 </button>
+            </div>
+            <div class="tried-it-popup hidden" id="tried-it-popup">
+                <div class="tried-it-popup-content">
+                    <div class="tried-it-popup-title">Quick Log</div>
+                    <label class="tried-it-field">
+                        <span>Date tried</span>
+                        <input type="date" id="tried-it-date" class="form-input">
+                    </label>
+                    <label class="tried-it-field">
+                        <span>Rating (optional, 1–10)</span>
+                        <input type="number" id="tried-it-rating" class="form-input" min="1" max="10" placeholder="—">
+                    </label>
+                    <div class="tried-it-popup-actions">
+                        <button class="btn btn-turquoise btn-sm" id="tried-it-save">Save</button>
+                        <button class="btn btn-sm" id="tried-it-cancel">Cancel</button>
+                    </div>
+                </div>
             </div>
             <h2 class="section-title">Reviews</h2>
             <div id="reviews-list" class="reviews-list"></div>
@@ -37,6 +69,7 @@
     </div>
 
     {{> footer}}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="/js/dish.js"></script>
 </body>
 </html>

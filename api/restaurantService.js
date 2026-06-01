@@ -1,6 +1,8 @@
 var db = require('../connections');
 var axios = require('axios');
 var config = require('../config');
+var locationHelper = require('./locationHelper');
+var paginationHelper = require('./paginationHelper');
 
 var allowedFields = [
     'restaurantId',
@@ -18,7 +20,7 @@ var allowedFields = [
     'statusUpdatedBy'
 ];
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review', 'out_of_area']);
 
 function normalizeFieldSelection(rawFields) {
     if (rawFields === undefined || rawFields === null) {
@@ -113,7 +115,7 @@ function resolveAuditColumns(status, userId) {
     if (status === undefined) {
         return [];
     }
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'out_of_area') {
         return [status, null, null];
     }
     var now = Date.now();
@@ -158,8 +160,8 @@ async function getRestaurants(params) {
             lng = parseFloat(params.auth.user.addressLng);
         }
         if (lat && lng) {
-            selectExtra = ', ST_Distance_Sphere(coords, ST_GeomFromText(?, 4326)) as distance';
-            selectExtraValues.push('POINT(' + lat + ' ' + lng + ')');
+            selectExtra = ', ST_Distance_Sphere(coords, ' + locationHelper.pointFromWktSql() + ') as distance';
+            selectExtraValues.push(locationHelper.buildPointWkt(lat, lng));
         }
     }
 
@@ -184,6 +186,13 @@ async function getRestaurants(params) {
             throw err;
         }
         whereClauses.push("r.status = 'needs_review'");
+    } else if (statusFilter === 'out_of_area') {
+        if (!isAdmin) {
+            var outOfAreaErr = new Error('Forbidden');
+            outOfAreaErr.status = 403;
+            throw outOfAreaErr;
+        }
+        whereClauses.push("r.status = 'out_of_area'");
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push('r.status = ?');
         whereValues.push(statusFilter);
@@ -207,17 +216,13 @@ async function getRestaurants(params) {
     var countRows = await db.query(countSql, whereValues) || [];
     var total = countRows.length ? countRows[0].total : 0;
 
-    var take = parseInt(params.pageSize, 10) || 10;
-    var page = parseInt(params.page, 10) || 1;
-    if (page < 1) page = 1;
-    var skip = (page - 1) * take;
-
-    if (params.take) {
-        var parsedTake = parseInt(params.take, 10);
-        if (!isNaN(parsedTake) && parsedTake > 0) {
-            take = parsedTake;
-        }
+    var paginationParams = Object.assign({}, params);
+    if (paginationParams.pageSize === undefined && params.take !== undefined) {
+        paginationParams.pageSize = params.take;
     }
+    var pagination = paginationHelper.normalizePagination(paginationParams, 10);
+    var take = pagination.pageSize;
+    var skip = pagination.offset;
 
     if (params.skip) {
         var parsedSkip = parseInt(params.skip, 10);
@@ -427,9 +432,34 @@ async function updateRestaurant(params) {
     return { updated: true };
 }
 
+async function getRestaurantStats(restaurantId) {
+    var threeMonthsAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+
+    var rows = await db.query(
+        "SELECT " +
+        "  COUNT(DISTINCT d.dishId) AS dishCount, " +
+        "  AVG(d.score) AS avgScore, " +
+        "  SUM(d.reviewCount) AS totalReviews, " +
+        "  SUM(CASE WHEN rv.submitted >= ? THEN 1 ELSE 0 END) AS recentReviews " +
+        "FROM dishes d " +
+        "LEFT JOIN reviews rv ON rv.dishId = d.dishId AND rv.status = 'approved' " +
+        "WHERE d.restaurantId = ? AND d.status = 'approved'",
+        [threeMonthsAgo, restaurantId]
+    );
+
+    var stats = rows && rows[0] ? rows[0] : {};
+    return {
+        dishCount: stats.dishCount || 0,
+        avgScore: stats.avgScore ? parseFloat(Number(stats.avgScore).toFixed(1)) : null,
+        totalReviews: parseInt(stats.totalReviews, 10) || 0,
+        recentReviews: parseInt(stats.recentReviews, 10) || 0
+    };
+}
+
 module.exports = {
     getRestaurants: getRestaurants,
     getRestaurant: getRestaurant,
+    getRestaurantStats: getRestaurantStats,
     updateRestaurantLatLngFromGeocode: updateRestaurantLatLngFromGeocode,
     updateRestaurant: updateRestaurant
 };

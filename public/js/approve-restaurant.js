@@ -30,11 +30,18 @@ var approveRestaurantModule = {
             $('#restaurant-lng-input').val(restaurant.lng != null ? restaurant.lng : '');
 
             var currentStatus = (restaurant.status || 'pending').toLowerCase();
-            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected', 'out_of_area'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#restaurant-status-select').val(currentStatus);
             $('#ai-evaluate-restaurant-btn').toggle(currentStatus === 'pending');
+
+            if (restaurant.aiReasoning) {
+                $('#ai-restaurant-stored-reasoning-text').text(restaurant.aiReasoning);
+                $('#ai-restaurant-stored-reasoning').show();
+            } else {
+                $('#ai-restaurant-stored-reasoning').hide();
+            }
 
             var submittedDate = restaurant.submitted ? new Date(restaurant.submitted).toLocaleString() : '';
             $('#restaurant-submitted').text(submittedDate || '');

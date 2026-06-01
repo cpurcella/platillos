@@ -6,6 +6,7 @@ var approvePhotoModule = {
         });
         $(document).on('submit', '#approve-photo-form', approvePhotoModule.handleSave);
         $(document).on('click', '#ai-evaluate-photo-btn', approvePhotoModule.handleAiEvaluate);
+        $(document).on('click', '.photo-rotate-admin-btn', approvePhotoModule.handleRotate);
     },
     loadPhoto: async function() {
         var photoId = window.approvePhotoId;
@@ -23,11 +24,18 @@ var approvePhotoModule = {
             }
 
             var currentStatus = (photo.status || 'pending').toLowerCase();
-            if (!['pending', 'needs_review', 'approved', 'rejected'].includes(currentStatus)) {
+            if (!['pending', 'needs_review', 'approved', 'rejected', 'out_of_area'].includes(currentStatus)) {
                 currentStatus = 'pending';
             }
             $('#photo-status-select').val(currentStatus);
             $('#ai-evaluate-photo-btn').toggle(currentStatus === 'pending');
+
+            if (photo.aiReasoning) {
+                $('#ai-photo-stored-reasoning-text').text(photo.aiReasoning);
+                $('#ai-photo-stored-reasoning').show();
+            } else {
+                $('#ai-photo-stored-reasoning').hide();
+            }
 
             var reviewer = photo.reviewerName || photo.reviewerEmail || '';
             var submitted = photo.reviewSubmitted ? new Date(photo.reviewSubmitted).toLocaleString() : '';
@@ -44,6 +52,7 @@ var approvePhotoModule = {
                 fileMetaParts.push(sizeKb + ' KB');
             }
             var fileMeta = fileMetaParts.join(' • ');
+            var photoUrl = photo.photoUrl ? photo.photoUrl + '?v=' + Date.now() : '';
 
             var html = `
                 <div style="display:flex;flex-direction:column;gap:12px;">
@@ -51,8 +60,9 @@ var approvePhotoModule = {
                         <div style="flex:0 0 220px;max-width:220px;">
                             <div style="font-weight:600;margin-bottom:6px;">Photo</div>
                             <div style="border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fafafa;min-height:200px;display:flex;align-items:center;justify-content:center;">
-                                ${photo.photoUrl ? '<img src="' + photo.photoUrl + '" alt="Review photo" style="display:block;width:100%;height:auto;" />' : '<div style="padding:16px;text-align:center;">No preview</div>'}
+                                ${photo.photoUrl ? '<img src="' + photoUrl + '" alt="Review photo" style="display:block;width:100%;height:auto;" />' : '<div style="padding:16px;text-align:center;">No preview</div>'}
                             </div>
+                            ${photo.photoUrl ? '<div style="display:flex;gap:8px;margin-top:8px;"><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="270">Rotate Left</button><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="90">Rotate Right</button></div>' : ''}
                             ${fileMeta ? '<div style="font-size:12px;color:#666;margin-top:6px;">' + fileMeta + '</div>' : ''}
                         </div>
                         <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;">
@@ -103,7 +113,7 @@ var approvePhotoModule = {
 
         var status = $('#photo-status-select').val();
         var normalized = (status || '').toLowerCase();
-        if (!['pending', 'needs_review', 'approved', 'rejected'].includes(normalized)) {
+        if (!['pending', 'needs_review', 'approved', 'rejected', 'out_of_area'].includes(normalized)) {
             common.showAlert('Please select a valid status.', 'error');
             return;
         }
@@ -150,6 +160,44 @@ var approvePhotoModule = {
         } finally {
             approvePhotoModule.isSaving = false;
             $btn.prop('disabled', false).text(originalText);
+        }
+    },
+    handleRotate: async function(e) {
+        var photoId = window.approvePhotoId;
+        if (!photoId) {
+            common.showAlert('Missing reviewPhotoId.', 'error');
+            return;
+        }
+
+        var rotationDegrees = parseInt($(e.currentTarget).data('rotation'), 10);
+        if ([90, 180, 270].indexOf(rotationDegrees) === -1) {
+            common.showAlert('Invalid rotation.', 'error');
+            return;
+        }
+
+        var $buttons = $('.photo-rotate-admin-btn');
+        $buttons.prop('disabled', true);
+
+        try {
+            var res = await $.ajax({
+                url: '/api/review-photos/' + encodeURIComponent(photoId),
+                method: 'PATCH',
+                dataType: 'json',
+                contentType: 'application/json',
+                processData: false,
+                data: JSON.stringify({ rotateDegreesClockwise: rotationDegrees })
+            });
+
+            if (res && res.success) {
+                common.showAlert((res && res.message) || 'Photo rotated.', 'success');
+                await approvePhotoModule.loadPhoto();
+            } else {
+                common.showAlert((res && res.message) || 'Failed to rotate photo.', 'error');
+            }
+        } catch (err) {
+            common.showAlert('Failed to rotate photo.', 'error');
+        } finally {
+            $buttons.prop('disabled', false);
         }
     },
     handleAiEvaluate: async function() {

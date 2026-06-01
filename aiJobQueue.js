@@ -110,6 +110,11 @@ async function processJobs(batchSize) {
 
             var evaluation = await handler.evaluate(client, item);
 
+            // Ensure the decision carries the correct target ID
+            if (evaluation.decision && handler.idField) {
+                evaluation.decision[handler.idField] = item[handler.idField];
+            }
+
             // Apply the decision (update status, insert tags, etc.)
             if (evaluation.decision && handler.apply) {
                 await handler.apply(evaluation.decision, evaluation.lookups);
@@ -134,7 +139,50 @@ async function processJobs(batchSize) {
     return { processed: jobs.length, succeeded: succeeded, failed: failed };
 }
 
+async function reconcileOrphans() {
+    var enqueued = 0;
+
+    // Find pending photos with no pending/processing job
+    var orphanPhotos = await db.query(
+        "SELECT rp.reviewPhotoId FROM reviews_photos rp " +
+        "WHERE LOWER(COALESCE(rp.status, 'pending')) = 'pending' " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_photo' AND aj.targetId = CAST(rp.reviewPhotoId AS CHAR) AND aj.status IN ('pending', 'processing')) " +
+        "LIMIT 20"
+    );
+    for (var i = 0; i < orphanPhotos.length; i++) {
+        await enqueueJob('evaluate_photo', orphanPhotos[i].reviewPhotoId);
+        enqueued++;
+    }
+
+    // Find pending restaurants with no pending/processing job
+    var orphanRestaurants = await db.query(
+        "SELECT r.restaurantId FROM restaurants r " +
+        "WHERE LOWER(COALESCE(r.status, 'pending')) = 'pending' " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_restaurant' AND aj.targetId = r.restaurantId AND aj.status IN ('pending', 'processing')) " +
+        "LIMIT 20"
+    );
+    for (var j = 0; j < orphanRestaurants.length; j++) {
+        await enqueueJob('evaluate_restaurant', orphanRestaurants[j].restaurantId);
+        enqueued++;
+    }
+
+    // Find pending dishes with no pending/processing job
+    var orphanDishes = await db.query(
+        "SELECT d.dishId FROM dishes d " +
+        "WHERE LOWER(COALESCE(d.status, 'pending')) = 'pending' " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_dish' AND aj.targetId = d.dishId AND aj.status IN ('pending', 'processing')) " +
+        "LIMIT 20"
+    );
+    for (var k = 0; k < orphanDishes.length; k++) {
+        await enqueueJob('evaluate_dish', orphanDishes[k].dishId);
+        enqueued++;
+    }
+
+    return { enqueued: enqueued };
+}
+
 module.exports = {
     enqueueJob: enqueueJob,
-    processJobs: processJobs
+    processJobs: processJobs,
+    reconcileOrphans: reconcileOrphans
 };

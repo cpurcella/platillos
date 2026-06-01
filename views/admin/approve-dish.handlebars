@@ -6,7 +6,7 @@
             <div class="dish-summary">
                 <div>
                     <div class="dish-summary-label">Dish</div>
-                    <div id="approve-dish-name">Loading...</div>
+                    <input type="text" id="approve-dish-name" class="approve-dish-name-input" />
                 </div>
                 <div>
                     <div class="dish-summary-label">Restaurant</div>
@@ -39,11 +39,16 @@
                 </div>
             </div>
         </div>
+        <div id="ai-dish-stored-reasoning" class="ai-reasoning-stored" style="display:none;">
+            <div class="ai-reasoning-stored-title">AI Reasoning</div>
+            <div id="ai-dish-stored-reasoning-text" class="ai-reasoning-stored-text"></div>
+        </div>
         <div class="form-row approve-dish-status-row">
             <label for="dish-status-select" class="approve-dish-status-label">Status</label>
             <select id="dish-status-select" class="approve-dish-status-select">
                 <option value="pending">Pending</option>
                 <option value="needs_review">Needs Review</option>
+                <option value="out_of_area">Out of Area</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
             </select>
@@ -56,6 +61,7 @@
             <div class="ai-result-title">AI Recommendation</div>
             <div id="ai-dish-verdict"></div>
             <div id="ai-dish-reasoning" class="ai-result-reasoning"></div>
+            <div id="ai-dish-metadata-suggestions" class="ai-metadata-suggestions"></div>
         </div>
     </div>
     <script src="/js/approve-dish.js"></script>

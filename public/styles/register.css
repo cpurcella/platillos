@@ -9,8 +9,17 @@
 }
 
 .register-container .form-group.date-compact .form-input {
+    width: 100%;
     max-width: 14rem;
     min-width: 10rem;
+}
+
+#address-autocomplete {
+    width: 100%;
+}
+
+#address-autocomplete gmp-place-autocomplete {
+    width: 100%;
 }
 
 @media (max-width: 640px) {
@@ -20,6 +29,7 @@
     }
 
     .register-container .form-group.date-compact .form-input {
-        max-width: 12rem;
+        max-width: min(100%, 12rem);
+        min-width: 0;
     }
 }

@@ -1,3 +1,208 @@
+/* ── Horizontal Shelf Layout ── */
+
+#dishes-list-module {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#shelves-container {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.shelf {
+    margin-bottom: 1.5rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.shelf-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-turquoise-dark, #1a6b5a);
+    margin: 0 0 0.6rem 0;
+    padding: 0;
+}
+
+.shelf-track {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,0.15) transparent;
+    align-items: flex-start;
+}
+
+.shelf-track::-webkit-scrollbar {
+    height: 4px;
+}
+
+.shelf-track::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+    border-radius: 2px;
+}
+
+.shelf-card {
+    flex: 0 0 auto;
+    width: 130px;
+    text-decoration: none;
+    color: inherit;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+}
+
+.shelf-card:visited,
+.shelf-card:hover,
+.shelf-card:active {
+    color: inherit;
+    text-decoration: none;
+}
+
+.shelf-card-img {
+    width: 130px;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #eee;
+    display: block;
+}
+
+.shelf-card-no-photo {
+    min-height: 0;
+    justify-content: flex-start;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.shelf-card-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-top: 5px;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.shelf-card-no-photo .shelf-card-name {
+    margin-top: 0;
+    font-size: 0.84rem;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.shelf-card-no-photo .shelf-card-rating {
+    margin-top: 4px;
+}
+
+.shelf-card-restaurant {
+    font-size: 0.72rem;
+    color: #888;
+    margin-top: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shelf-card-reviewer {
+    font-size: 0.68rem;
+    color: var(--color-turquoise-dark, #007C87);
+    margin-top: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shelf-card-rating {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-top: 2px;
+}
+
+.shelf-star {
+    font-size: 0.85rem;
+    line-height: 1;
+    color: #d8d8d8;
+}
+
+.shelf-star-full {
+    color: #f5a623;
+}
+
+.shelf-star-half {
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+    color: #d8d8d8;
+}
+
+.shelf-star-half::before {
+    content: '★';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50%;
+    overflow: hidden;
+    color: #f5a623;
+}
+
+.shelf-no-rating {
+    font-size: 0.75rem;
+    color: #aaa;
+}
+
+.shelf-empty {
+    text-align: center;
+    color: #888;
+    padding: 2rem 0;
+}
+
+.search-empty {
+    text-align: center;
+    color: #888;
+    padding: 2rem 0;
+}
+
+@media (max-width: 640px) {
+    .shelf-card {
+        width: 110px;
+    }
+
+    .shelf-card-img {
+        width: 110px;
+        height: 110px;
+    }
+
+    .shelf-card-no-photo {
+        min-height: 0;
+        padding: 0;
+    }
+
+    .shelf-title {
+        font-size: 1.1rem;
+    }
+
+    .shelf-track {
+        gap: 10px;
+    }
+}
+
+/* ── Vertical Search Result Cards ── */
+
 .dish-card {
     display: flex;
     flex-direction: column;
@@ -9,6 +214,8 @@
     max-width: 800px;
     min-height: 110px;
     width: 75vw;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 a.dish-card {text-decoration: none; color: inherit;}
@@ -21,10 +228,11 @@ a.dish-card:active {color: inherit;}
     flex-direction: row;
     align-items: center;
     gap: 18px;
+    min-width: 0;
 }
 
 .dish-card-info {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -36,6 +244,8 @@ a.dish-card:active {color: inherit;}
     font-weight: 550;
     margin-bottom: 0;
     word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dish-meta {
@@ -87,6 +297,8 @@ a.dish-card:active {color: inherit;}
 
 .dish-star-half {
     position: relative;
+    display: inline-block;
+    vertical-align: top;
     color: #d8d8d8;
 }
 
@@ -132,18 +344,23 @@ a.dish-card:active {color: inherit;}
         max-width: none;
         margin: 12px 0;
         padding: 9px 12px;
-        box-sizing: border-box;
     }
 
     .dish-card-content {
-        flex-direction: row;
-        align-items: center;
-        gap: 12px;
+        gap: 10px;
     }
 
     .dish-cover-photo {
-        width: 72px;
-        height: 72px;
+        width: 60px;
+        height: 60px;
+    }
+
+    .dish-name {
+        font-size: 1.1em;
+    }
+
+    .want-to-try-card-btn {
+        display: none;
     }
 }
 
@@ -177,5 +394,213 @@ a.dish-card:active {color: inherit;}
 .want-to-try-card-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
+}
+
+/* ── Feed Tabs ── */
+
+#feed-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.feed-tab {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.feed-tab:hover {
+    color: var(--color-turquoise-dark);
+}
+
+.feed-tab.active {
+    color: var(--color-turquoise-dark);
+    border-bottom-color: var(--color-turquoise-dark);
+}
+
+/* ── Feed Cards ── */
+
+#feed-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.feed-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.feed-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.feed-card-author {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.feed-card-author:hover .feed-card-author-name {
+    color: var(--color-turquoise-dark);
+    text-decoration: underline;
+}
+
+.feed-card-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.feed-card-avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-turquoise);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.feed-card-author-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.feed-card-time {
+    font-size: 0.78rem;
+    color: #999;
+}
+
+.feed-card-dish {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f7f7f7;
+    margin-bottom: 8px;
+}
+
+.feed-card-dish:hover {
+    background: #f0f0f0;
+}
+
+.feed-card-dish-photo {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.feed-card-dish-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.feed-card-dish-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.feed-card-restaurant {
+    font-size: 0.78rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.feed-card-rating {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+.feed-card-text {
+    font-size: 0.9rem;
+    color: #333;
+    line-height: 1.45;
+    margin-bottom: 8px;
+}
+
+.feed-card-photos {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.feed-card-photo {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.feed-card-footer {
+    display: flex;
+    align-items: center;
+}
+
+.feed-card-votes {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.feed-empty {
+    text-align: center;
+    color: #888;
+    padding: 2rem 1rem;
+    font-size: 0.95rem;
+}
+
+.feed-loading {
+    text-align: center;
+    color: #999;
+    padding: 1rem;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+    .feed-tab {
+        padding: 8px 10px;
+        font-size: 0.82rem;
+    }
+
+    .feed-card {
+        padding: 12px;
+    }
+
+    .feed-card-photo {
+        width: 70px;
+        height: 70px;
+    }
 }
 

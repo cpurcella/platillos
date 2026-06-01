@@ -1,7 +1,9 @@
 var db = require('../connections');
 var config = require('../config');
+var { rotateStoredPhoto } = require('../ai/reviewPhotos');
+var paginationHelper = require('./paginationHelper');
 
-var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review']);
+var VALID_STATUSES = new Set(['approved', 'rejected', 'pending', 'needs_review', 'out_of_area']);
 
 function buildPhotoUrl(fileId) {
     return fileId ? 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId : null;
@@ -30,11 +32,26 @@ function normalizeRequiredStatus(rawStatus) {
     return status;
 }
 
+function normalizeOptionalRotationDegrees(rawDegrees) {
+    if (rawDegrees === undefined || rawDegrees === null || rawDegrees === '') {
+        return undefined;
+    }
+
+    var degrees = Number(rawDegrees);
+    if ([0, 90, 180, 270].indexOf(degrees) === -1) {
+        var err = new Error('Invalid rotation');
+        err.status = 400;
+        throw err;
+    }
+
+    return degrees;
+}
+
 function resolveAuditColumns(status, userId) {
     if (status === undefined) {
         return [];
     }
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'out_of_area') {
         return [status, null, null];
     }
     var now = Date.now();
@@ -60,6 +77,7 @@ async function getReviewPhotos(params) {
             rp.status,
             rp.statusUpdated,
             rp.statusUpdatedBy,
+            rp.aiReasoning,
             r.review AS reviewContent,
             r.rating,
             r.submitted AS reviewSubmitted,
@@ -132,12 +150,9 @@ async function getReviewPhotos(params) {
     var countRows = await db.query(countSql, whereValues) || [];
     var total = (countRows[0] && countRows[0].total) || 0;
 
-    var pageSize = parseInt(params.pageSize, 10) || 10;
-    var page = parseInt(params.page, 10) || 1;
-    if (page < 1) {
-        page = 1;
-    }
-    var offset = (page - 1) * pageSize;
+    var pagination = paginationHelper.normalizePagination(params, 10);
+    var pageSize = pagination.pageSize;
+    var offset = pagination.offset;
 
     var dataSql = selectClause + fromClause + whereSql + ' ORDER BY rp.reviewPhotoId DESC LIMIT ? OFFSET ?';
     var dataValues = whereValues.concat([pageSize, offset]);
@@ -174,17 +189,25 @@ async function updateReviewPhoto(params) {
         throw missingErr;
     }
 
-    var statusValue = normalizeRequiredStatus(params.status);
+    var statusValue = normalizeOptionalStatus(params.status);
+    var rotationDegrees = normalizeOptionalRotationDegrees(params.rotateDegreesClockwise);
+
+    if (statusValue === undefined && rotationDegrees === undefined) {
+        var missingUpdateErr = new Error('Status or rotation is required');
+        missingUpdateErr.status = 400;
+        throw missingUpdateErr;
+    }
 
     var connection = await db.getConnection();
     try {
         await connection.beginTransaction();
 
         var rowsResult = await connection.query(
-            'SELECT rp.reviewPhotoId, rp.fileId, r.dishId, d.coverPhoto ' +
+            'SELECT rp.reviewPhotoId, rp.fileId, r.dishId, d.coverPhoto, f.fileType ' +
             'FROM reviews_photos rp ' +
             'JOIN reviews r ON rp.reviewId = r.reviewId ' +
             'JOIN dishes d ON r.dishId = d.dishId ' +
+            'JOIN files f ON rp.fileId = f.fileId ' +
             'WHERE rp.reviewPhotoId = ? FOR UPDATE',
             [reviewPhotoId]
         );
@@ -196,17 +219,23 @@ async function updateReviewPhoto(params) {
         }
 
         var row = rows[0];
-        var audit = resolveAuditColumns(statusValue, params?.auth?.user?.userId);
-        var sql = 'UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ?';
-        var values = [audit[0], audit[1], audit[2], reviewPhotoId];
-        await connection.query(sql, values);
+        if (rotationDegrees) {
+            await rotateStoredPhoto(row.fileId, row.fileType, rotationDegrees);
+        }
 
-        // Set as dish cover photo if approving and dish has no cover yet
-        if (statusValue === 'approved' && !row.coverPhoto && row.fileId && row.dishId) {
-            await connection.query(
-                "UPDATE dishes SET coverPhoto = ? WHERE dishId = ? AND (coverPhoto IS NULL OR coverPhoto = '')",
-                [row.fileId, row.dishId]
-            );
+        if (statusValue !== undefined) {
+            var audit = resolveAuditColumns(statusValue, params?.auth?.user?.userId);
+            var sql = 'UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ?';
+            var values = [audit[0], audit[1], audit[2], reviewPhotoId];
+            await connection.query(sql, values);
+
+            // Set as dish cover photo if approving and dish has no cover yet
+            if (statusValue === 'approved' && !row.coverPhoto && row.fileId && row.dishId) {
+                await connection.query(
+                    "UPDATE dishes SET coverPhoto = ? WHERE dishId = ? AND (coverPhoto IS NULL OR coverPhoto = '')",
+                    [row.fileId, row.dishId]
+                );
+            }
         }
 
         await connection.commit();
@@ -221,7 +250,7 @@ async function updateReviewPhoto(params) {
         connection.release();
     }
 
-    return { updated: true };
+    return { updated: statusValue !== undefined, rotated: Boolean(rotationDegrees) };
 }
 
 module.exports = {

@@ -58,6 +58,22 @@
     gap: 10px;
 }
 
+.approve-dish-name-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.approve-dish-name-input:focus {
+    outline: none;
+    border-color: var(--color-turquoise, #2ac1a6);
+    box-shadow: 0 0 0 2px rgba(42, 193, 166, 0.15);
+}
+
 #approve-dish-content .dish-summary-label,
 #approve-dish-content .metadata-group-label,
 #approve-dish-content .metadata-section-title {
@@ -357,4 +373,51 @@
     margin-top: 6px;
     font-size: 0.9rem;
     color: #555;
+}
+
+.ai-result-box .ai-result-subtitle {
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.ai-metadata-suggestion {
+    margin-top: 8px;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.ai-metadata-suggestion-name {
+    font-weight: 600;
+    color: #374151;
+}
+
+.ai-metadata-suggestion-reason {
+    margin-top: 4px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+/* Stored AI reasoning (from auto-review) */
+.ai-reasoning-stored {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 6px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+}
+
+.ai-reasoning-stored-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #f57f17;
+}
+
+.ai-reasoning-stored-text {
+    font-size: 0.9rem;
+    color: #555;
+    white-space: pre-wrap;
 }

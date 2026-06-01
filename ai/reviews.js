@@ -278,6 +278,9 @@ async function evaluateSingleReview(client, review) {
     var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizeReviewDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+    if (decision) {
+        decision.reviewId = review.reviewId;
+    }
 
     var sources = contentParts.flatMap(function(part) {
         if (!part) return [];
@@ -332,9 +335,10 @@ async function applyReviewDecisions(decisions) {
             var newStatus = resolveAiStatus(decision.verdict, decision.confidence);
 
             if (newStatus && currentStatus === 'pending') {
+                var aiReasoning = newStatus === 'needs_review' ? (decision.reasoning || null) : null;
                 var updateResult = await connection.query(
-                    "UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
-                    [newStatus, Date.now(), reviewerUserId, decision.reviewId]
+                    "UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    [newStatus, Date.now(), reviewerUserId, aiReasoning, decision.reviewId]
                 );
 
                 var affectedRows = 0;

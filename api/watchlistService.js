@@ -1,4 +1,5 @@
 var db = require('../connections');
+var paginationHelper = require('./paginationHelper');
 
 async function isOnWatchlist(userId, dishId) {
     var rows = await db.query(
@@ -30,9 +31,10 @@ async function removeFromWatchlist(userId, dishId) {
 }
 
 async function getWatchlist(userId, page, pageSize) {
-    page = page || 1;
-    pageSize = pageSize || 20;
-    var offset = (page - 1) * pageSize;
+    var pagination = paginationHelper.normalizePagination({ page: page, pageSize: pageSize }, 20);
+    page = pagination.page;
+    pageSize = pagination.pageSize;
+    var offset = pagination.offset;
 
     var countRows = await db.query(
         'SELECT COUNT(*) AS total FROM userWatchlist WHERE userId = ?',

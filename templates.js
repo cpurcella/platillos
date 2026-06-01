@@ -24,13 +24,16 @@ var templates = {
                     handlebars.registerPartial(partialName, partialSource);
                 }
             }
-            var context = req.allParams.auth || {};
+            var context = Object.assign({}, req.allParams.auth || {}, { csrfToken: req.csrfToken || '' });
+            if (context.user) {
+                context.user = Object.assign({}, context.user);
+            }
             if (context.user && context.user.avatarFileId) {
                 context.user.avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + context.user.avatarFileId + '_s';
             }
             if (typeof dataProviders[templateName] === 'function') {
                 var extraData = await dataProviders[templateName](req);
-                context = Object.assign({}, context, extraData);
+                context = Object.assign({}, context, extraData, { csrfToken: req.csrfToken || '' });
             }
             var template = handlebars.compile(source);
             var html = template(context);

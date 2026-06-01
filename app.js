@@ -7,6 +7,8 @@ var authService = require("./api/authService")
 var cookieParser = require('cookie-parser')
 var config = require("./config")
 var ai = require("./ai/restaurants")
+var cookieOptions = require('./api/cookieOptions')
+var csrf = require('./api/csrf')
 
 process.on('uncaughtException', function(err) {
     console.error('[uncaughtException]', err && err.stack ? err.stack : err);
@@ -103,12 +105,13 @@ router.use(async function(req, res, next) {
             req.allParams.auth = await authService.getSession(req.signedCookies.sessionId)
         } catch(e) {
             console.log("Couldn't find session " + req.signedCookies.sessionId)
-            res.clearCookie("sessionId")
+            res.clearCookie('sessionId', cookieOptions.sessionCookieOptions())
         }
     }
     next()
 })
 
+router.use(csrf.middleware)
 
 router.use('/api', require('./api/index'));
 
@@ -117,12 +120,7 @@ router.get('/logout', async function(req, res) {
     if (sessionId) {
         await authService.endSession(sessionId);
     }
-    res.clearCookie('sessionId', {
-        httpOnly: true,
-        sameSite: 'lax',
-        signed: true,
-        path: '/'
-    });
+    res.clearCookie('sessionId', cookieOptions.sessionCookieOptions());
     res.redirect('/');
 });
 
@@ -160,8 +158,23 @@ router.get('*', async function(req, res, next) {
         } catch (err) {
             // fall through
         }
-    }
-    var templateName = _urlPath.replace(/^[\/]/, '') || 'index';
+    }    // Restaurant profile routes: /restaurants/:restaurantId or /restaurants/:restaurantId/:slug
+    if (/^\/restaurants\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)?$/.test(_urlPath)) {
+        try {
+            await templates.renderTemplate('restaurant', req, res);
+            return;
+        } catch (err) {
+            // fall through
+        }
+    }    // Dedicated search page: /search
+    if (_urlPath === '/search') {
+        try {
+            await templates.renderTemplate('search', req, res);
+            return;
+        } catch (err) {
+            // fall through
+        }
+    }    var templateName = _urlPath.replace(/^[\/]/, '') || 'index';
     try {
         await templates.renderTemplate(templateName, req, res);
     } catch (err) {
@@ -173,7 +186,13 @@ var app = express();
 app.use(xssClean());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: function(res, filePath) {
+        if (/\.(js|css|svg|png|jpg|jpeg|gif|webp|woff|woff2|ttf|otf)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=300');
+        }
+    }
+}));
 app.use('/', router);
 
 app.use(function(err, req, res, next) {

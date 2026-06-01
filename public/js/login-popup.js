@@ -10,6 +10,8 @@ $(document).ready(function() {
         closeBtn.trigger('focus');
     }
 
+    window.showLoginPopup = openPopup;
+
     function closePopup() {
         overlay.removeClass('is-visible');
         popup.addClass('hidden');

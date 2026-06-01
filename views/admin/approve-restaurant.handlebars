@@ -30,11 +30,16 @@
                         <input type="text" id="restaurant-lng-input" name="lng">
                     </div>
                 </div>
+                <div id="ai-restaurant-stored-reasoning" class="ai-reasoning-stored" style="display:none;">
+                    <div class="ai-reasoning-stored-title">AI Reasoning</div>
+                    <div id="ai-restaurant-stored-reasoning-text" class="ai-reasoning-stored-text"></div>
+                </div>
                 <div class="approval-status-row">
                     <label for="restaurant-status-select">Status</label>
                     <select id="restaurant-status-select" name="status">
                         <option value="pending">Pending</option>
                         <option value="needs_review">Needs Review</option>
+                        <option value="out_of_area">Out of Area</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>

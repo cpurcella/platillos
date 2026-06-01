@@ -217,6 +217,15 @@ header .btn-turquoise {
     font-size: 0.97em;
     font-weight: 500;
 }
+.form-group.has-validation-error {
+    scroll-margin-top: 1rem;
+}
+.form-input.invalid,
+select.invalid,
+textarea.invalid {
+    border-color: #b91c1c;
+    background: #fff7f7;
+}
 .alert {
     position: fixed;
     top: 1.5rem;
@@ -394,4 +403,33 @@ header .btn-turquoise {
     .modal {
         padding: 18px 12px;
     }
+}
+
+/* ── Shared Vote Buttons ── */
+
+.review-vote-btn {
+    padding: 2px 4px;
+    border: none;
+    background: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.2s;
+    line-height: 1;
+}
+
+.review-vote-btn:hover {
+    opacity: 0.8;
+}
+
+.review-vote-btn.active {
+    opacity: 1;
+}
+
+.review-vote-count {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #555;
+    min-width: 16px;
+    text-align: center;
 }

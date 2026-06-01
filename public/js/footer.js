@@ -3,6 +3,13 @@
 var footerModule = {
     setHandlers: function() {
         $('.footer-plus-btn').on('click', async function(event) {
+            if (window.dishPage && window.dishPage.dishData) {
+                var d = window.dishPage.dishData;
+                window._addReviewPreselect = {
+                    restaurant: { restaurantId: d.restaurantId, name: d.restaurantName || '' },
+                    dish: { dishId: d.dishId, name: d.name || '' }
+                };
+            }
             common.showModal('/add-review');
         });
     }

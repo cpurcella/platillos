@@ -8,7 +8,7 @@
 <body>
     <div class="register-container">
         <h1 class="platillos-title">Platillos</h1>
-        <form id="register-form">
+        <form id="register-form" novalidate>
             <div class="form-group">
                 <label class="form-label" for="username">Username</label>
                 <input class="form-input" type="text" id="username" name="username" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]{3,30}" placeholder="letters, numbers, underscores">
@@ -22,10 +22,10 @@
                     <label class="form-label" for="lastName">Last Name</label>
                     <input class="form-input" type="text" id="lastName" name="lastName" required>
                 </div>
+            </div>
             <div class="form-group date-compact">
                 <label class="form-label" for="dob">Date of Birth</label>
                 <input class="form-input" type="date" id="dob" name="dob" required>
-            </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -48,10 +48,11 @@
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label" for="confirmationCode">Ad&#8204;dress
+                <label class="form-label">Ad&#8204;dress
                     <span class="tooltip" tabindex="0"><span class="tooltip-icon" aria-label="More info" role="img">?</span><span class="tooltip-content"><strong>Why do I need to provide this?</strong><br>Your address will only be used to highlight dishes and restaurants close to you.</span></span>
                 </label>
-                <input class="form-input" type="text" id="confirmationCode" name="confirmationCode" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <div id="address-autocomplete"></div>
+                <input type="hidden" id="addressSelected" name="addressSelected" required data-required-message="Please select an address from the dropdown.">
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -96,9 +97,9 @@
             <button id="goToHomeBtn" class="btn btn-turquoise" type="button">Go to Home</button>
         </div>
     </div>
-    <script src="/js/google-places.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=REMOVED_CREDENTIAL&loading=async" async defer></script>
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=REMOVED_CREDENTIAL&libraries=places" async defer></script>
+    <script src="/js/google-places.js"></script>
     <script src="/js/register.js"></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ var { getOpenAiClient, clampLimit } = require('./client');
 var { formatDate, extractJsonResult, resolveAiStatus } = require('./utils');
 
 var VALID_VERDICTS = ['approve', 'reject', 'manual_review'];
+var VALID_METADATA_SUGGESTION_TYPES = ['category', 'dishType', 'tag'];
 
 async function fetchCategoriesAndDishTypes() {
     var results = await Promise.all([
@@ -43,9 +44,17 @@ async function fetchPendingDishes(limit) {
     });
 }
 
-function buildDishPrompt(dish, lookups) {
+async function fetchExistingDishNames(restaurantId, excludeDishId) {
+    var rows = await db.query(
+        "SELECT name FROM dishes WHERE restaurantId = ? AND dishId != ? AND LOWER(COALESCE(status, 'pending')) != 'rejected'",
+        [restaurantId, excludeDishId]
+    ) || [];
+    return rows.map(function(r) { return r.name; });
+}
+
+function buildDishPrompt(dish, lookups, existingDishes) {
     var lines = [
-        'You are validating a restaurant menu submission. Confirm whether this dish is real or reasonable for the restaurant to have, and tag it with the appropriate categories and dish types.',
+        'You are validating a restaurant menu submission. Confirm whether this dish is real and appears on the restaurant\'s actual menu.',
         '',
         'Dish ID: ' + (dish.dishId || ''),
         'Dish: ' + (dish.dishName || 'Unknown Dish'),
@@ -62,13 +71,28 @@ function buildDishPrompt(dish, lookups) {
         lines.push('Submitted: ' + submittedIso);
     }
 
+    if (existingDishes && existingDishes.length) {
+        lines.push('');
+        lines.push('OTHER DISHES ALREADY AT THIS RESTAURANT: ' + existingDishes.join(', '));
+    }
+
     lines.push('');
     lines.push('Tasks:');
-    lines.push("1. Search the web (especially the restaurant's website or reputable sources) to see if the dish appears on their menu.");
-    lines.push("2. If the dish is not mentioned, assess whether the dish reasonably fits the restaurant's cuisine and style.");
-    lines.push('3. Flag any concerns such as mismatched cuisine, implausible dishes, or known hoaxes.');
-    lines.push('4. Return a verdict (approve, reject, or manual_review) and explain your reasoning.');
-    lines.push('5. Tag the dish with ALL applicable categories, dish types, and tags from the lists below. Pick every relevant option -- a dish can have multiple categories, types, and tags.');
+    lines.push("1. Search the web (especially the restaurant's website, online menu, or reputable review sites) to see if this dish appears on their actual menu.");
+    lines.push('   - Many restaurants publish menus as PDF documents. Search for PDF menu links on the restaurant\'s website (look for paths like /uploads/, /menus/, /documents/, or links labeled "Menu").');
+    lines.push('   - Try searching for the restaurant name plus "menu" and "pdf" to find downloadable menus that may not appear in standard web results.');
+    lines.push('   - Seasonal or rotating menus are common at farm-to-table and fine dining restaurants. A dish may only appear on a recent PDF menu, not on a cached HTML page.');
+    lines.push('2. If this dish is essentially a duplicate of another dish already at this restaurant (listed above), REJECT it. Near-duplicates count (e.g. "Chicken Wings" and "Fried Chicken Wings" are the same dish).');
+    lines.push('   - Do not treat a broad canonical dish-family name as a duplicate just because the menu has named variants. For example, "Banh Mi" can be valid at a Vietnamese sandwich shop whose menu lists several banh mi varieties, unless another existing dish is already the same broad "Banh Mi" entry.');
+    lines.push('3. If the dish is clearly implausible, a hoax, or has no connection to anything the restaurant serves, REJECT it. Do not reject merely because the exact submitted name is broader than the menu item names.');
+    lines.push('4. If you find the EXACT dish name on the menu, APPROVE it.');
+    lines.push('5. If the submitted dish is a canonical dish family or restaurant specialty and the restaurant/menu clearly supports that family (for example, a restaurant named for the dish, a menu category for it, or multiple menu items sharing that base name), APPROVE it even if the menu lists variants rather than one exact broad item. Keep correctedName null unless the submitted name is clearly wrong.');
+    lines.push('6. If you find a very close match (e.g. "Pork Confit" on the menu vs "Local Pork Confit" submitted, or a past/seasonal menu variant), you may correct the dish name to match the menu and APPROVE it. Set correctedName to the correct name from the menu. Only use MANUAL_REVIEW if you are unsure which name is correct.');
+    lines.push('7. If you cannot find the dish or anything close to it, but the restaurant is known for seasonal/rotating menus or the restaurant concept strongly suggests the dish could be legitimate, prefer MANUAL_REVIEW over REJECT.');
+    lines.push('8. Only REJECT when you are confident the dish does not and has not existed at this restaurant.');
+    lines.push('9. Tag the dish with ALL applicable categories, dish types, and tags from the lists below. Pick every relevant option -- a dish can have multiple categories, types, and tags.');
+    lines.push('10. Use only exact names from the valid lists in categories, dishTypes, and tags. If an important food or drink category, dish type, or tag is missing from our lists, do not force a weak match and do not invent it in those arrays. Add it to suggestedMetadata with type, name, and a brief justification so an admin can decide whether to add it later.');
+    lines.push('    - Good suggestions are specific and reusable, such as a missing cocktail style, beer style, flavor descriptor, preparation method, dietary tag, or menu category.');
     lines.push('');
 
     var categoryNames = lookups.categories.map(function(c) { return c.category; });
@@ -83,7 +107,7 @@ function buildDishPrompt(dish, lookups) {
     lines.push('VALID TAGS (pick all that apply): ' + tagNames.join(', '));
     lines.push('');
 
-    lines.push('Return the category, dish type, and tag names exactly as listed above in the "categories", "dishTypes", and "tags" arrays of your response.');
+    lines.push('Return the category, dish type, and tag names exactly as listed above in the "categories", "dishTypes", and "tags" arrays of your response. If you corrected the dish name, include the corrected name in "correctedName" (otherwise null). If there are no metadata coverage gaps, return an empty suggestedMetadata array.');
     lines.push('');
     lines.push('Provide your decision as JSON according to the given schema, citing sources when possible.');
 
@@ -106,7 +130,7 @@ function buildDishJsonSchema() {
                     minItems: 1,
                     items: {
                         type: 'object',
-                        required: ['dishId', 'verdict', 'confidence', 'reasoning', 'evidence', 'concerns', 'categories', 'dishTypes', 'tags'],
+                        required: ['dishId', 'verdict', 'confidence', 'reasoning', 'evidence', 'correctedName', 'concerns', 'categories', 'dishTypes', 'tags', 'suggestedMetadata'],
                         additionalProperties: false,
                         properties: {
                             dishId: {
@@ -129,6 +153,10 @@ function buildDishJsonSchema() {
                                 items: {
                                     type: 'string'
                                 }
+                            },
+                            correctedName: {
+                                type: ['string', 'null'],
+                                description: 'If the dish name is a close match but not exact, provide the corrected name from the menu. Null if no correction needed.'
                             },
                             concerns: {
                                 type: 'array',
@@ -153,6 +181,26 @@ function buildDishJsonSchema() {
                                 items: {
                                     type: 'string'
                                 }
+                            },
+                            suggestedMetadata: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    additionalProperties: false,
+                                    required: ['type', 'name', 'justification'],
+                                    properties: {
+                                        type: {
+                                            type: 'string',
+                                            enum: VALID_METADATA_SUGGESTION_TYPES
+                                        },
+                                        name: {
+                                            type: 'string'
+                                        },
+                                        justification: {
+                                            type: 'string'
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -160,6 +208,36 @@ function buildDishJsonSchema() {
             }
         }
     };
+}
+
+function normalizeSuggestionText(value, maxLength) {
+    var text = String(value || '').trim();
+    return text.length > maxLength ? text.slice(0, maxLength).trim() : text;
+}
+
+function normalizeSuggestedMetadata(suggestions) {
+    if (!Array.isArray(suggestions)) {
+        return [];
+    }
+
+    return suggestions.map(function(suggestion) {
+        var type = String(suggestion && suggestion.type || '').trim();
+        if (VALID_METADATA_SUGGESTION_TYPES.indexOf(type) === -1) {
+            return null;
+        }
+
+        var name = normalizeSuggestionText(suggestion.name, 80);
+        var justification = normalizeSuggestionText(suggestion.justification, 500);
+        if (!name || !justification) {
+            return null;
+        }
+
+        return {
+            type: type,
+            name: name,
+            justification: justification
+        };
+    }).filter(Boolean);
 }
 
 function normalizeDishDecision(decision) {
@@ -179,9 +257,11 @@ function normalizeDishDecision(decision) {
         reasoning: decision.reasoning || '',
         evidence: Array.isArray(decision.evidence) ? decision.evidence : [],
         concerns: Array.isArray(decision.concerns) ? decision.concerns : [],
+        correctedName: decision.correctedName || null,
         categories: Array.isArray(decision.categories) ? decision.categories : [],
         dishTypes: Array.isArray(decision.dishTypes) ? decision.dishTypes : [],
-        tags: Array.isArray(decision.tags) ? decision.tags : []
+        tags: Array.isArray(decision.tags) ? decision.tags : [],
+        suggestedMetadata: normalizeSuggestedMetadata(decision.suggestedMetadata)
     };
 }
 
@@ -226,7 +306,8 @@ async function evaluatePendingDishes(options) {
 
 async function evaluateSingleDish(client, dish) {
     var lookups = await fetchCategoriesAndDishTypes();
-    var userPrompt = buildDishPrompt(dish, lookups);
+    var existingDishes = await fetchExistingDishNames(dish.restaurantId, dish.dishId);
+    var userPrompt = buildDishPrompt(dish, lookups, existingDishes);
 
     var response;
     try {
@@ -240,7 +321,7 @@ async function evaluateSingleDish(client, dish) {
                     content: [
                         {
                             type: 'input_text',
-                            text: 'You are a culinary fact-checker verifying restaurant menu submissions. Use current web sources to confirm dishes.'
+                            text: 'You are a culinary fact-checker verifying restaurant menu submissions. Use current web sources to confirm dishes. Many restaurants -- especially farm-to-table, fine dining, and seasonal concepts -- rotate menus frequently and publish them as PDF documents on their websites. Always search for PDF menus in addition to HTML pages. When the exact dish name is not found but a close variant exists on a current or recent menu, correct the name to match the menu and approve it. When the submitted name is a canonical dish family or house specialty supported by the restaurant name, menu categories, or multiple menu variants, approve the broad dish name without correction. Set correctedName to the accurate name from the menu only when the submitted name is clearly wrong. Only flag for manual review if you are genuinely unsure which name is correct.'
                         }
                     ]
                 },
@@ -281,6 +362,9 @@ async function evaluateSingleDish(client, dish) {
     var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizeDishDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+    if (decision) {
+        decision.dishId = dish.dishId;
+    }
 
     var sources = contentParts.flatMap(function(part) {
         if (!part) return [];
@@ -372,9 +456,12 @@ async function applyDishDecisions(decisions, lookups) {
             var newStatus = resolveAiStatus(decision.verdict, decision.confidence);
 
             if (newStatus && currentStatus === 'pending') {
+                var aiReasoning = newStatus === 'needs_review' ? (decision.reasoning || null) : null;
+                var nameSql = decision.correctedName ? ', name = ?' : '';
+                var nameParams = decision.correctedName ? [decision.correctedName] : [];
                 var updateResult = await connection.query(
-                    "UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
-                    [newStatus, Date.now(), reviewerUserId, decision.dishId]
+                    "UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ?" + nameSql + " WHERE dishId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    [newStatus, Date.now(), reviewerUserId, aiReasoning].concat(nameParams).concat([decision.dishId])
                 );
 
                 var affectedRows = 0;
@@ -414,6 +501,17 @@ async function applyDishDecisions(decisions, lookups) {
                     [tagValues]
                 );
             }
+
+            if (decision.suggestedMetadata && decision.suggestedMetadata.length) {
+                var now = Date.now();
+                var suggestionValues = decision.suggestedMetadata.map(function(suggestion) {
+                    return [decision.dishId, suggestion.type, suggestion.name, suggestion.justification, 'pending', now];
+                });
+                await connection.query(
+                    'INSERT IGNORE INTO aiMetadataSuggestions (dishId, metadataType, name, justification, status, createdAt) VALUES ?',
+                    [suggestionValues]
+                );
+            }
         }
 
         await connection.commit();
@@ -436,5 +534,9 @@ module.exports = {
     applyDishDecisions: applyDishDecisions,
     evaluateSingleDish: evaluateSingleDish,
     fetchPendingDishes: fetchPendingDishes,
-    fetchCategoriesAndDishTypes: fetchCategoriesAndDishTypes
+    fetchCategoriesAndDishTypes: fetchCategoriesAndDishTypes,
+    buildDishPrompt: buildDishPrompt,
+    buildDishJsonSchema: buildDishJsonSchema,
+    normalizeDishDecision: normalizeDishDecision,
+    normalizeSuggestedMetadata: normalizeSuggestedMetadata
 };

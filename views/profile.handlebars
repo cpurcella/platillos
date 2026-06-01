@@ -19,23 +19,22 @@
                 <div class="profile-location" id="profile-location"></div>
                 <p class="profile-bio" id="profile-bio"></p>
                 <div class="profile-stats" id="profile-stats"></div>
-                <button class="btn btn-outline btn-sm hidden" id="edit-profile-btn">Edit Profile</button>
-                <a href="/logout" class="btn btn-outline btn-sm hidden" id="logout-btn">Log Out</a>
+                <div class="profile-actions">
+                    <button class="btn btn-outline btn-sm hidden" id="edit-profile-btn">Edit Profile</button>
+                    <button class="btn btn-turquoise btn-sm hidden" id="follow-btn">Follow</button>
+                    <a href="/logout" class="btn btn-outline btn-sm hidden" id="logout-btn">Log Out</a>
+                </div>
             </div>
         </section>
 
         <section class="profile-tabs">
-            <button class="profile-tab active" data-tab="favorites">Favorites</button>
-            <button class="profile-tab" data-tab="reviews">Reviews</button>
+            <button class="profile-tab active" data-tab="reviews">Reviews</button>
             <button class="profile-tab" data-tab="diary">Diary</button>
+            <button class="profile-tab" data-tab="favorites">Favorites</button>
             <button class="profile-tab" data-tab="watchlist">Want to Try</button>
         </section>
 
-        <section class="profile-tab-content" id="tab-favorites">
-            <div class="favorites-grid" id="favorites-grid"></div>
-        </section>
-
-        <section class="profile-tab-content hidden" id="tab-reviews">
+        <section class="profile-tab-content" id="tab-reviews">
             <div class="reviews-list" id="profile-reviews-list"></div>
         </section>
 
@@ -45,10 +44,23 @@
             <div class="diary-entries-list" id="diary-entries-list"></div>
         </section>
 
-        <section class="profile-tab-content hidden" id="tab-watchlist">
-            <div class="watchlist-list" id="watchlist-list"></div>
-            <div class="watchlist-pagination" id="watchlist-pagination"></div>
+        <section class="profile-tab-content hidden" id="tab-favorites">
+            <div class="favorites-grid" id="favorites-grid"></div>
         </section>
+
+        <section class="profile-tab-content hidden" id="tab-watchlist">
+            <div class="favorites-grid" id="watchlist-list"></div>
+        </section>
+
+    </div>
+
+    <!-- Follow List Modal -->
+    <div class="modal-overlay hidden" id="follow-modal-overlay"></div>
+    <div class="follow-modal hidden" id="follow-modal">
+        <button class="close-modal" aria-label="Close">&times;</button>
+        <h2 class="section-title" id="follow-modal-title"></h2>
+        <div class="follow-list" id="follow-modal-list"></div>
+        <div class="follow-pagination" id="follow-modal-pagination"></div>
     </div>
 
     <!-- Edit Profile Modal -->

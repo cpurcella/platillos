@@ -1,6 +1,30 @@
 // common.js - Utility functions for Platillos
 
 var common = (function() {
+    function isUnsafeMethod(method) {
+        return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || 'GET').toUpperCase());
+    }
+
+    function isSameOrigin(url) {
+        if (!url || url.charAt(0) === '/') return true;
+        var parsed = document.createElement('a');
+        parsed.href = url;
+        return parsed.protocol === window.location.protocol && parsed.host === window.location.host;
+    }
+
+    function getCsrfToken() {
+        return $('meta[name="csrf-token"]').attr('content') || '';
+    }
+
+    $.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+        if (isUnsafeMethod(options.type || options.method) && isSameOrigin(options.url)) {
+            var token = getCsrfToken();
+            if (token) {
+                jqXHR.setRequestHeader('X-CSRF-Token', token);
+            }
+        }
+    });
+
     function showAlert(message, type) {
         var $alert = $('<div class="alert"></div>').addClass(type || 'info').text(message);
         $('body').prepend($alert);

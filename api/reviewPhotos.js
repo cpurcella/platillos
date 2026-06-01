@@ -50,7 +50,15 @@ router.patch('/:reviewPhotoId', requireAdmin, async function(req, res) {
         var params = Object.assign({}, req.allParams || {}, { reviewPhotoId: req.params.reviewPhotoId });
         var result = await reviewPhotoService.updateReviewPhoto(params);
         var status = params.status ? String(params.status).toLowerCase() : '';
-        var message = status ? 'Photo ' + status : 'Photo updated';
+        var rotation = params.rotateDegreesClockwise !== undefined && params.rotateDegreesClockwise !== null && params.rotateDegreesClockwise !== '';
+        var message = 'Photo updated';
+        if (status && rotation) {
+            message = 'Photo rotated and ' + status;
+        } else if (status) {
+            message = 'Photo ' + status;
+        } else if (rotation) {
+            message = 'Photo rotated';
+        }
         res.json({ success: true, message: message, data: result });
     } catch (err) {
         if (err.status) {

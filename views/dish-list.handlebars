@@ -1,11 +1,29 @@
 <div id="dishes-list-module">
     <div class="search-bar-row">
-        <input type="text" id="searchInput" name="search" placeholder="Search dishes..." class="form-input">
-        <a href="javascript:void(0)" class="btn" id="searchBtn">Search</a>
+        <input type="text" id="searchInput" name="search" placeholder="Search dishes and people..." class="form-input">
+        <a href="javascript:void(0)" class="btn btn-turquoise" id="searchBtn">Search</a>
     </div>
-    <div id="dishes-container">
+    <div id="feed-tabs" style="display:none">
+        <button class="feed-tab active" data-tab="discover">Discover</button>
+        <button class="feed-tab" data-tab="following">Following</button>
+        <button class="feed-tab" data-tab="popular">Popular</button>
+        <button class="feed-tab" data-tab="recent">Recent</button>
     </div>
-    <div id="pagination"></div>
+    <div id="feed-container" style="display:none"></div>
+    <div id="feed-loading" style="display:none" class="feed-loading">Loading...</div>
+    <div id="shelves-container"></div>
+    <div id="search-results" style="display:none">
+        <div id="people-results" style="display:none">
+            <h3 class="search-section-title">People</h3>
+            <div id="people-container"></div>
+            <a id="people-see-more" class="see-more-link" style="display:none">See more &rsaquo;</a>
+        </div>
+        <h3 class="search-section-title">Dishes</h3>
+        <div id="dishes-container"></div>
+        <a id="dishes-see-more" class="see-more-link" style="display:none">See more &rsaquo;</a>
+        <div id="pagination"></div>
+    </div>
     <link rel="stylesheet" href="/css/dish-list.css">
+    <link rel="stylesheet" href="/styles/search.css">
     <script src="/js/dish-list.js"></script>
 </div>

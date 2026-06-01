@@ -4,11 +4,16 @@
         <h2>Review Photo</h2>
         <form id="approve-photo-form">
             <div id="approve-photo-content">Loading...</div>
+            <div id="ai-photo-stored-reasoning" class="ai-reasoning-stored" style="display:none;">
+                <div class="ai-reasoning-stored-title">AI Reasoning</div>
+                <div id="ai-photo-stored-reasoning-text" class="ai-reasoning-stored-text"></div>
+            </div>
             <div class="approval-status-row">
                 <label for="photo-status-select">Status</label>
                 <select id="photo-status-select">
                     <option value="pending">Pending</option>
                     <option value="needs_review">Needs Review</option>
+                    <option value="out_of_area">Out of Area</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
                 </select>

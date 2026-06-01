@@ -1,7 +1,7 @@
 CREATE TABLE `userFavorites` (
   `userId` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `dishId` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `position` tinyint NOT NULL,
+  `position` int NOT NULL,
   `createdAt` bigint NOT NULL,
   PRIMARY KEY (`userId`, `position`),
   UNIQUE KEY `idx_userFavorites_dish` (`userId`, `dishId`),

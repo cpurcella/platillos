@@ -3,7 +3,11 @@
 var validate = (function() {
     var _validationRules = {
         required: function(input) {
-            return $(input).val().trim() !== '';
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                return input.checked;
+            }
+            var value = $(input).val();
+            return value != null && String(value).trim() !== '';
         },
         confirm: function(input) {
             var partner = $('#' + $(input).data('confirm'));
@@ -45,11 +49,16 @@ var validate = (function() {
         var $input = $(input);
         var $group = $input.closest('.form-group');
         $group.find('.validation-note').remove();
+        $group.removeClass('has-validation-error');
+        if ($group.attr('data-validation-focus') === 'true') {
+            $group.removeAttr('tabindex data-validation-focus');
+        }
         $input.removeClass('invalid');
 
         if (input.required && !_validationRules.required(input)) {
             valid = false;
-            showValidation($input, 'This field is required.');
+            var msg = $input.data('required-message') || 'This field is required.';
+            showValidation($input, msg);
         }
         if ($input.data('confirm') && !_validationRules.confirm(input)) {
             valid = false;
@@ -80,23 +89,66 @@ var validate = (function() {
 
     function showValidation($input, message) {
         var $group = $input.closest('.form-group');
+        $group.addClass('has-validation-error');
         $input.addClass('invalid');
         var $note = $('<div class="validation-note"></div>').text(message);
         $group.append($note);
     }
 
+    function focusWithoutScrolling(element) {
+        if (!element || typeof element.focus !== 'function') return;
+        try {
+            element.focus({ preventScroll: true });
+        } catch (err) {
+            element.focus();
+        }
+    }
+
+    function isFocusableTarget($element) {
+        return $element.length && $element.is(':visible') && !$element.prop('disabled');
+    }
+
+    function scrollToInvalidInput(input) {
+        var $input = $(input);
+        var $group = $input.closest('.form-group');
+        var target = $group.length ? $group[0] : input;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+        if (isFocusableTarget($input) && input.type !== 'hidden') {
+            focusWithoutScrolling(input);
+            return;
+        }
+
+        var $focusTarget = $group.find('input:not([type="hidden"]), select, textarea, button').filter(':visible').first();
+        if ($focusTarget.length) {
+            focusWithoutScrolling($focusTarget[0]);
+            return;
+        }
+
+        if ($group.length) {
+            $group.attr('tabindex', '-1').attr('data-validation-focus', 'true');
+            focusWithoutScrolling($group[0]);
+        }
+    }
+
     function validateForm(form) {
         var valid = true;
-        var $inputs = $(form).find('input');
-        $inputs.each(function() {
-            if (!validateInput(this)) valid = false;
+        var firstInvalid = null;
+        $(form).find('input, select, textarea').each(function() {
+            if (!validateInput(this)) {
+                valid = false;
+                if (!firstInvalid) firstInvalid = this;
+            }
         });
+        if (firstInvalid) {
+            scrollToInvalidInput(firstInvalid);
+        }
         return valid;
     }
 
     function setHandlers() {
         $('form').each(function() {
-            $(this).find('input').on('blur', onInputBlur);
+            $(this).find('input, select, textarea').on('blur', onInputBlur);
         });
     }
 

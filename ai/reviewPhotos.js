@@ -1,13 +1,116 @@
 var db = require('../connections');
+var Jimp = require('jimp');
+var { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 var config = require('../config');
 var { getOpenAiClient, clampLimit } = require('./client');
 var { extractJsonResult, resolveAiStatus } = require('./utils');
+
+var s3 = new S3Client({
+    credentials: {
+        accessKeyId: config.awsAccessKey,
+        secretAccessKey: config.awsSecretKey
+    },
+    region: config.awsRegion
+});
 
 function buildPublicFileUrl(fileId) {
     if (!fileId) {
         return null;
     }
     return 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId;
+}
+
+function getStoredMimeType(fileType) {
+    switch (String(fileType || '').toLowerCase()) {
+        case 'png':
+            return Jimp.MIME_PNG;
+        case 'bmp':
+            return Jimp.MIME_BMP;
+        case 'tiff':
+        case 'tif':
+            return Jimp.MIME_TIFF;
+        case 'gif':
+            return Jimp.MIME_GIF;
+        case 'webp':
+            return Jimp.MIME_WEBP;
+        case 'jpg':
+        case 'jpeg':
+        default:
+            return Jimp.MIME_JPEG;
+    }
+}
+
+function getVariantMimeType(mimeType) {
+    switch ((mimeType || '').toLowerCase()) {
+        case Jimp.MIME_PNG:
+            return Jimp.MIME_PNG;
+        case Jimp.MIME_BMP:
+            return Jimp.MIME_BMP;
+        case Jimp.MIME_TIFF:
+            return Jimp.MIME_TIFF;
+        case Jimp.MIME_GIF:
+            return Jimp.MIME_GIF;
+        case Jimp.MIME_WEBP:
+            return Jimp.MIME_WEBP;
+        default:
+            return Jimp.MIME_JPEG;
+    }
+}
+
+function getValidRotationDegrees(value) {
+    return [0, 90, 180, 270].indexOf(value) === -1 ? 0 : value;
+}
+
+async function uploadToS3(key, buffer, contentType) {
+    await s3.send(new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        ACL: 'public-read'
+    }));
+}
+
+async function getObjectBuffer(key) {
+    var response = await s3.send(new GetObjectCommand({
+        Bucket: config.bucket,
+        Key: key
+    }));
+
+    return Buffer.from(await response.Body.transformToByteArray());
+}
+
+async function rotateStoredPhoto(fileId, fileType, rotateDegreesClockwise) {
+    var rotationDegrees = getValidRotationDegrees(rotateDegreesClockwise);
+    if (!rotationDegrees || !fileId) {
+        return false;
+    }
+
+    var mimeType = getStoredMimeType(fileType);
+    var variantMime = getVariantMimeType(mimeType);
+    var originalBuffer = await getObjectBuffer(fileId);
+    var image = await Jimp.read(originalBuffer);
+
+    image.rotate(-rotationDegrees);
+
+    var rotatedOriginalBuffer = await image.getBufferAsync(mimeType);
+    await uploadToS3(fileId, rotatedOriginalBuffer, mimeType);
+
+    var variantDefinitions = [
+        { suffix: '_m', size: 512 },
+        { suffix: '_s', size: 256 }
+    ];
+
+    await Promise.all(variantDefinitions.map(async function(def) {
+        var variant = image.clone().cover(def.size, def.size);
+        if (variantMime === Jimp.MIME_JPEG) {
+            variant.quality(80);
+        }
+        var buffer = await variant.getBufferAsync(variantMime);
+        await uploadToS3(fileId + def.suffix, buffer, variantMime);
+    }));
+
+    return true;
 }
 
 async function fetchPendingReviewPhotos(limit) {
@@ -78,10 +181,11 @@ function buildPhotoPrompt(photo) {
     lines.push('1. Confirm whether the image is an appropriate, high-quality depiction of the dish being reviewed.');
     lines.push('2. Use web search to look up the dish at the restaurant and verify the photo matches what the dish should look like.');
     lines.push('3. Flag any issues such as unrelated food, people, explicit content, text overlays, or low quality.');
-    lines.push('4. Decide if the photo should be approved, rejected, or requires manual review.');
-    lines.push('5. If the dish lacks a cover photo (or this image is significantly better), indicate whether it should become the new cover photo.');
+    lines.push('4. Decide whether the photo is already oriented correctly for normal viewing. If not, specify how many clockwise degrees are needed to fix it (0, 90, 180, or 270 only).');
+    lines.push('5. Decide if the photo should be approved, rejected, or requires manual review.');
+    lines.push('6. If the dish lacks a cover photo (or this image is significantly better), indicate whether it should become the new cover photo.');
     lines.push('');
-    lines.push('Return a JSON object with your verdict, confidence, reasoning, and whether to set it as the cover photo.');
+    lines.push('Return a JSON object with your verdict, confidence, orientation assessment, reasoning, and whether to set it as the cover photo.');
 
     return lines.join('\n');
 }
@@ -102,12 +206,9 @@ function buildPhotoJsonSchema() {
                     minItems: 1,
                     items: {
                         type: 'object',
-                        required: ['reviewPhotoId', 'verdict', 'confidence', 'reasoning', 'setAsCoverPhoto', 'coverPhotoReasoning', 'issues', 'evidence'],
+                        required: ['verdict', 'confidence', 'reasoning', 'orientationCorrect', 'rotateDegreesClockwise', 'orientationReasoning', 'setAsCoverPhoto', 'coverPhotoReasoning', 'issues', 'evidence'],
                         additionalProperties: false,
                         properties: {
-                            reviewPhotoId: {
-                                type: 'integer'
-                            },
                             verdict: {
                                 type: 'string',
                                 enum: ['approve', 'reject', 'manual_review']
@@ -118,6 +219,16 @@ function buildPhotoJsonSchema() {
                                 maximum: 1
                             },
                             reasoning: {
+                                type: 'string'
+                            },
+                            orientationCorrect: {
+                                type: 'boolean'
+                            },
+                            rotateDegreesClockwise: {
+                                type: 'number',
+                                enum: [0, 90, 180, 270]
+                            },
+                            orientationReasoning: {
                                 type: 'string'
                             },
                             setAsCoverPhoto: {
@@ -161,6 +272,9 @@ function normalizePhotoDecision(decision) {
         verdict: verdict,
         confidence: typeof decision.confidence === 'number' ? Math.max(0, Math.min(1, decision.confidence)) : null,
         reasoning: decision.reasoning || '',
+        orientationCorrect: Boolean(decision.orientationCorrect),
+        rotateDegreesClockwise: getValidRotationDegrees(decision.rotateDegreesClockwise),
+        orientationReasoning: decision.orientationReasoning || '',
         setAsCoverPhoto: Boolean(decision.setAsCoverPhoto),
         coverPhotoReasoning: decision.coverPhotoReasoning || '',
         issues: Array.isArray(decision.issues) ? decision.issues : [],
@@ -273,6 +387,12 @@ async function evaluateSingleReviewPhoto(client, photo) {
     var parsed = (parsedContent && parsedContent.parsed) || extractJsonResult(response) || {};
     var decisions = Array.isArray(parsed.decisions) ? parsed.decisions.map(normalizePhotoDecision).filter(Boolean) : [];
     var decision = decisions.length ? decisions[0] : null;
+    if (decision) {
+        decision.reviewPhotoId = photo.reviewPhotoId;
+    } else if (parsed.verdict) {
+        decision = normalizePhotoDecision(parsed);
+        if (decision) decision.reviewPhotoId = photo.reviewPhotoId;
+    }
 
     var sources = contentParts.flatMap(function(part) {
         if (!part) return [];
@@ -313,10 +433,11 @@ async function applyPhotoDecisions(decisions) {
             }
 
             var selectResult = await connection.query(
-                "SELECT rp.reviewPhotoId, rp.status, rp.fileId, rp.reviewId, r.dishId, d.coverPhoto " +
+                "SELECT rp.reviewPhotoId, rp.status, rp.fileId, rp.reviewId, r.dishId, d.coverPhoto, f.fileType " +
                 "FROM reviews_photos rp " +
                 "JOIN reviews r ON rp.reviewId = r.reviewId " +
                 "JOIN dishes d ON r.dishId = d.dishId " +
+                "JOIN files f ON rp.fileId = f.fileId " +
                 "WHERE rp.reviewPhotoId = ? FOR UPDATE",
                 [decision.reviewPhotoId]
             );
@@ -331,10 +452,15 @@ async function applyPhotoDecisions(decisions) {
             var finalStatus = currentStatus;
             var newStatus = resolveAiStatus(decision.verdict, decision.confidence);
 
+            if (currentStatus === 'pending' && newStatus === 'approved' && decision.rotateDegreesClockwise) {
+                await rotateStoredPhoto(row.fileId, row.fileType, decision.rotateDegreesClockwise);
+            }
+
             if (newStatus && currentStatus === 'pending') {
+                var aiReasoning = newStatus === 'needs_review' ? (decision.reasoning || null) : null;
                 var updateResult = await connection.query(
-                    "UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE reviewPhotoId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
-                    [newStatus, Date.now(), reviewerUserId, decision.reviewPhotoId]
+                    "UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewPhotoId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    [newStatus, Date.now(), reviewerUserId, aiReasoning, decision.reviewPhotoId]
                 );
 
                 var affectedRows = 0;
@@ -388,5 +514,6 @@ module.exports = {
     evaluatePendingReviewPhotos: evaluatePendingReviewPhotos,
     applyPhotoDecisions: applyPhotoDecisions,
     evaluateSingleReviewPhoto: evaluateSingleReviewPhoto,
-    fetchPendingReviewPhotos: fetchPendingReviewPhotos
+    fetchPendingReviewPhotos: fetchPendingReviewPhotos,
+    rotateStoredPhoto: rotateStoredPhoto
 };

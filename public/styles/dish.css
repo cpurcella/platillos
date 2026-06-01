@@ -34,10 +34,75 @@
     font-weight: 500;
 }
 
+.dish-restaurant a {
+    color: var(--color-turquoise-dark, #007C87);
+    text-decoration: none;
+}
+
+.dish-restaurant a:hover {
+    text-decoration: underline;
+}
+
 .dish-score {
     font-size: 1.2rem;
     font-weight: 600;
     color: #15616d;
+}
+
+.dish-rating-trend {
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+    margin-top: 4px;
+}
+
+.rating-trend-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+}
+
+.rating-trend-chart-wrap {
+    position: relative;
+    height: 160px;
+}
+
+.favorite-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    color: #555;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.favorite-btn:hover {
+    border-color: #e25555;
+    color: #e25555;
+}
+
+.favorite-btn.active {
+    border-color: #e25555;
+    background: #fdeaea;
+    color: #e25555;
+}
+
+.favorite-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.favorite-icon {
+    font-size: 1rem;
+    line-height: 1;
 }
 
 .dish-header-photo {
@@ -100,6 +165,11 @@
     border-radius: 10px;
     padding: 12px 16px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.review-card-highlight {
+    border: 2px solid var(--color-turquoise-dark);
+    background: var(--color-mint-bg, #f0fafa);
 }
 
 .review-card-header {
@@ -181,10 +251,24 @@ a.review-author-link:hover .review-author-name {
 }
 
 .review-meta {
-    margin-top: 8px;
     font-size: 0.85rem;
     color: #666;
 }
+
+.review-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+.review-votes {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* vote button styles in common.css */
 
 .reviews-pagination {
     display: flex;
@@ -264,6 +348,100 @@ a.review-author-link:hover .review-author-name {
 .want-to-try-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.want-to-try-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* ── Tried It Button ── */
+.tried-it-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    color: #555;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tried-it-btn:hover {
+    border-color: #e36414;
+    color: #e36414;
+}
+
+.tried-it-btn.active {
+    border-color: #e36414;
+    background: #fef0e5;
+    color: #e36414;
+    cursor: default;
+}
+
+.tried-it-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* ── Tried It Popup ── */
+.tried-it-popup {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.tried-it-popup-content {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tried-it-popup-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #333;
+}
+
+.tried-it-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.tried-it-field input {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.tried-it-popup-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+    .dish-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    #quick-log-btn {
+        width: 100%;
+    }
 }
 
 @media (min-width: 768px) {

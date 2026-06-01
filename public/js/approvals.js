@@ -257,16 +257,17 @@ var approvalsModule = {
     },
     loadPendingCounts: function() {
         var endpoints = [
-            { url: '/api/reviews?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/reviews?status=needs_review&page=1&pageSize=1', badge: '#badge-reviews' },
-            { url: '/api/dishes?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/dishes?status=needs_review&page=1&pageSize=1', badge: '#badge-dishes' },
-            { url: '/api/restaurants?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/restaurants?status=needs_review&page=1&pageSize=1', badge: '#badge-restaurants' },
-            { url: '/api/review-photos?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/review-photos?status=needs_review&page=1&pageSize=1', badge: '#badge-photos' }
+            { url: '/api/reviews?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/reviews?status=needs_review&page=1&pageSize=1', outOfAreaUrl: '/api/reviews?status=out_of_area&page=1&pageSize=1', badge: '#badge-reviews' },
+            { url: '/api/dishes?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/dishes?status=needs_review&page=1&pageSize=1', outOfAreaUrl: '/api/dishes?status=out_of_area&page=1&pageSize=1', badge: '#badge-dishes' },
+            { url: '/api/restaurants?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/restaurants?status=needs_review&page=1&pageSize=1', outOfAreaUrl: '/api/restaurants?status=out_of_area&page=1&pageSize=1', badge: '#badge-restaurants' },
+            { url: '/api/review-photos?status=pending&page=1&pageSize=1', needsReviewUrl: '/api/review-photos?status=needs_review&page=1&pageSize=1', outOfAreaUrl: '/api/review-photos?status=out_of_area&page=1&pageSize=1', badge: '#badge-photos' }
         ];
         endpoints.forEach(function(ep) {
-            $.when($.get(ep.url), $.get(ep.needsReviewUrl)).then(function(pendingRes, needsReviewRes) {
+            $.when($.get(ep.url), $.get(ep.needsReviewUrl), $.get(ep.outOfAreaUrl)).then(function(pendingRes, needsReviewRes, outOfAreaRes) {
                 var pendingCount = (pendingRes[0] && typeof pendingRes[0].total === 'number') ? pendingRes[0].total : 0;
                 var needsReviewCount = (needsReviewRes[0] && typeof needsReviewRes[0].total === 'number') ? needsReviewRes[0].total : 0;
-                var count = pendingCount + needsReviewCount;
+                var outOfAreaCount = (outOfAreaRes[0] && typeof outOfAreaRes[0].total === 'number') ? outOfAreaRes[0].total : 0;
+                var count = pendingCount + needsReviewCount + outOfAreaCount;
                 if (count > 0) {
                     $(ep.badge).text(count).show();
                 } else {
