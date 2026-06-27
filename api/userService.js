@@ -514,6 +514,38 @@ async function searchUsers(query, limit) {
     });
 }
 
+async function getAdminUsers(params) {
+    params = params || {};
+    var pagination = paginationHelper.normalizePagination(params, 20);
+    var whereClauses = [];
+    var whereValues = [];
+    var q = params.q ? String(params.q).trim() : '';
+
+    if (q) {
+        var pattern = '%' + q + '%';
+        whereClauses.push('(username LIKE ? OR firstName LIKE ? OR lastName LIKE ? OR email LIKE ?)');
+        whereValues.push(pattern, pattern, pattern, pattern);
+    }
+
+    var whereSql = whereClauses.length ? ' WHERE ' + whereClauses.join(' AND ') : '';
+    var countRows = await db.query('SELECT COUNT(*) AS total FROM users' + whereSql, whereValues);
+    var total = countRows && countRows[0] ? countRows[0].total : 0;
+    var sql = `SELECT userId, username, firstName, lastName, email, phone,
+                      addressCity, addressState, isAdmin, emailVerified,
+                      phoneVerified, created, lastLogin
+               FROM users` + whereSql + `
+               ORDER BY created DESC
+               LIMIT ? OFFSET ?`;
+    var rows = await db.query(sql, whereValues.concat([pagination.pageSize, pagination.offset]));
+
+    return {
+        items: rows || [],
+        total: total,
+        page: pagination.page,
+        pageSize: pagination.pageSize
+    };
+}
+
 module.exports = {
     registerUser: registerUser,
     getUser: getUser,
@@ -537,5 +569,6 @@ module.exports = {
     isFollowing: isFollowing,
     getFollowers: getFollowers,
     getFollowing: getFollowing,
-    searchUsers: searchUsers
+    searchUsers: searchUsers,
+    getAdminUsers: getAdminUsers
 };

@@ -54,7 +54,7 @@ async function authenticate(email, password) {
     }
     var session = await startSession(userId);
     var userObj = await userService.getUser(userId);
-    var redirect = (userObj && userObj.isAdmin === 1) ? '/admin/approvals' : '/';
+    var redirect = (userObj && userObj.isAdmin === 1) ? '/admin' : '/';
     return { session: session, redirect: redirect };
 }
 

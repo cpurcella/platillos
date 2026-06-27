@@ -27,6 +27,16 @@ router.post('/register', authorization.verifyRecaptcha, async function(req, res)
     }
 });
 
+// Admin-only paginated users table
+router.get('/admin', authorization.requireAdmin, async function(req, res) {
+    try {
+        var result = await userService.getAdminUsers(req.allParams || {});
+        res.json({ success: true, data: result.items, total: result.total });
+    } catch (err) {
+        res.status(err.status || 500).json({ success: false, message: err.message });
+    }
+});
+
 // Get public profile by username
 router.get('/profile/:username', async function(req, res) {
     try {

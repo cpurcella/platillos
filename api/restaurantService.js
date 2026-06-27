@@ -253,7 +253,9 @@ async function getRestaurant(params) {
     }
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
-    var sql = 'SELECT r.*, c.city as cityName, u.firstName as submitterFirstName, u.lastName as submitterLastName, u.email as submitterEmail FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId LEFT JOIN users u ON r.submittedBy = u.userId WHERE r.restaurantId = ?';
+    var submitterSelect = isAdmin ? ', u.firstName as submitterFirstName, u.lastName as submitterLastName, u.email as submitterEmail' : '';
+    var submitterJoin = isAdmin ? ' LEFT JOIN users u ON r.submittedBy = u.userId' : '';
+    var sql = 'SELECT r.*, c.city as cityName' + submitterSelect + ' FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId' + submitterJoin + ' WHERE r.restaurantId = ?';
     var vals = [params.restaurantId];
 
     if (!isAdmin) {

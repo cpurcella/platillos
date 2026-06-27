@@ -3,10 +3,12 @@ var approvalsModule = {
     dishGrid: null,
     restaurantGrid: null,
     photoGrid: null,
+    userGrid: null,
     reviewStatus: 'pending',
     dishStatus: 'pending',
     restaurantStatus: 'pending',
     photoStatus: 'pending',
+    userSearch: '',
 
     buildDataUrl: function(baseUrl, statusGetter, page, limit) {
         var normalizedLimit = limit || 10;
@@ -39,6 +41,7 @@ var approvalsModule = {
             approvalsModule.initDishesGrid();
             approvalsModule.initRestaurantsGrid();
             approvalsModule.initPhotosGrid();
+            approvalsModule.initUsersGrid();
             approvalsModule.loadPendingCounts();
         });
         $('#reviews-grid').on('click', '.approve-btn', approvalsModule.openApproveModal);
@@ -64,6 +67,13 @@ var approvalsModule = {
             var status = $(this).val();
             approvalsModule.photoStatus = status;
             approvalsModule.initPhotosGrid(status);
+        });
+        $('#users-search-filter').on('input', function() {
+            approvalsModule.userSearch = $(this).val().trim();
+            clearTimeout(approvalsModule.userSearchTimer);
+            approvalsModule.userSearchTimer = setTimeout(function() {
+                approvalsModule.initUsersGrid();
+            }, 250);
         });
     },
     initReviewsGrid: function(status) {
@@ -254,6 +264,69 @@ var approvalsModule = {
             approvalsModule.photoGrid.render(document.getElementById('photos-grid'));
         }
         $('#photos-status-filter').val(status);
+    },
+    initUsersGrid: function() {
+        var baseUrl = '/api/users/admin';
+        var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, null);
+        var buildUserUrl = function(page, limit) {
+            var normalizedLimit = limit || paginationConfig.limit;
+            var normalizedPage = (typeof page === 'number' && page >= 0) ? page : 0;
+            var paramsObj = {
+                page: normalizedPage + 1,
+                pageSize: normalizedLimit
+            };
+            if (approvalsModule.userSearch) {
+                paramsObj.q = approvalsModule.userSearch;
+            }
+            return baseUrl + '?' + new URLSearchParams(paramsObj).toString();
+        };
+        paginationConfig.server.url = function(prev, page, limit) {
+            return buildUserUrl(page, limit);
+        };
+        var serverConfig = {
+            url: function() { return buildUserUrl(0, paginationConfig.limit); },
+            then: function(res) {
+                var data = (res && res.data) || [];
+                return data.map(function(u) {
+                    var name = [u.firstName, u.lastName].filter(Boolean).join(' ');
+                    var location = [u.addressCity, u.addressState].filter(Boolean).join(', ');
+                    var profile = u.username
+                        ? '<a href="/users/' + encodeURIComponent(u.username) + '" class="btn btn-turquoise">Profile</a>'
+                        : '';
+                    return [
+                        name || '',
+                        u.username || '',
+                        u.email || '',
+                        u.phone || '',
+                        location || '',
+                        u.isAdmin === 1 ? 'Yes' : 'No',
+                        u.emailVerified ? 'Yes' : 'No',
+                        u.phoneVerified ? 'Yes' : 'No',
+                        u.created ? new Date(u.created).toLocaleString() : '',
+                        u.lastLogin ? new Date(u.lastLogin).toLocaleString() : '',
+                        gridjs.html(profile)
+                    ];
+                });
+            },
+            total: function(res) {
+                return (res && typeof res.total === 'number') ? res.total : 0;
+            }
+        };
+        if (approvalsModule.userGrid) {
+            approvalsModule.userGrid.updateConfig({
+                server: serverConfig,
+                pagination: paginationConfig
+            }).forceRender();
+        } else {
+            approvalsModule.userGrid = new gridjs.Grid({
+                columns: ['Name', 'Username', 'Email', 'Phone', 'Location', 'Admin', 'Email Verified', 'Phone Verified', 'Created', 'Last Login', 'Profile'],
+                search: false,
+                sort: true,
+                server: serverConfig,
+                pagination: paginationConfig
+            });
+            approvalsModule.userGrid.render(document.getElementById('users-grid'));
+        }
     },
     loadPendingCounts: function() {
         var endpoints = [

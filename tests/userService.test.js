@@ -310,3 +310,82 @@ describe('userService pagination caps', function() {
         expect(db.query.mock.calls[0][1][3]).toBe(50);
     });
 });
+
+describe('userService.getAdminUsers', function() {
+    beforeEach(function() {
+        db.query.mockReset();
+    });
+
+    test('selects only contact-level admin fields and omits sensitive profile/auth fields', async function() {
+        db.query
+            .mockResolvedValueOnce([{ total: 1 }])
+            .mockResolvedValueOnce([{
+                userId: 'user-1',
+                username: 'janedoe',
+                firstName: 'Jane',
+                lastName: 'Doe',
+                email: 'jane@example.com',
+                phone: '5551234567',
+                addressCity: 'Albuquerque',
+                addressState: 'NM',
+                isAdmin: 0,
+                emailVerified: 1,
+                phoneVerified: 1,
+                created: 1000,
+                lastLogin: 2000
+            }]);
+
+        var result = await userService.getAdminUsers({ page: 1, pageSize: 20 });
+        var sql = db.query.mock.calls[1][0];
+
+        expect(sql).toContain('SELECT userId, username, firstName, lastName, email, phone');
+        expect(sql).toContain('addressCity, addressState, isAdmin, emailVerified');
+        expect(sql).not.toContain('addressStreet');
+        expect(sql).not.toContain('addressZip');
+        expect(sql).not.toContain('dob');
+        expect(sql).not.toContain('addressLat');
+        expect(sql).not.toContain('addressLng');
+        expect(sql).not.toContain('password');
+        expect(sql).not.toContain('emailToken');
+        expect(result.items[0]).toEqual({
+            userId: 'user-1',
+            username: 'janedoe',
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane@example.com',
+            phone: '5551234567',
+            addressCity: 'Albuquerque',
+            addressState: 'NM',
+            isAdmin: 0,
+            emailVerified: 1,
+            phoneVerified: 1,
+            created: 1000,
+            lastLogin: 2000
+        });
+    });
+
+    test('normalizes pagination and sorts newest users first', async function() {
+        db.query
+            .mockResolvedValueOnce([{ total: 0 }])
+            .mockResolvedValueOnce([]);
+
+        var result = await userService.getAdminUsers({ page: '3', pageSize: '500' });
+
+        expect(db.query.mock.calls[1][0]).toContain('ORDER BY created DESC');
+        expect(db.query.mock.calls[1][1]).toEqual([100, 200]);
+        expect(result.page).toBe(3);
+        expect(result.pageSize).toBe(100);
+    });
+
+    test('searches username, name, and email', async function() {
+        db.query
+            .mockResolvedValueOnce([{ total: 0 }])
+            .mockResolvedValueOnce([]);
+
+        await userService.getAdminUsers({ q: 'jane', page: 1, pageSize: 10 });
+
+        expect(db.query.mock.calls[0][0]).toContain('username LIKE ? OR firstName LIKE ? OR lastName LIKE ? OR email LIKE ?');
+        expect(db.query.mock.calls[0][1]).toEqual(['%jane%', '%jane%', '%jane%', '%jane%']);
+        expect(db.query.mock.calls[1][1]).toEqual(['%jane%', '%jane%', '%jane%', '%jane%', 10, 0]);
+    });
+});

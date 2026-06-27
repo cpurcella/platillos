@@ -59,4 +59,35 @@ describe('restaurantService location WKT', function() {
 
         expect(db.query.mock.calls[1][1].slice(-2)).toEqual([100, 25]);
     });
+
+    test('getRestaurant does not select submitter email for public requests', async function() {
+        db.query.mockResolvedValueOnce([{ restaurantId: 'restaurant-1', status: 'approved' }]);
+
+        var restaurant = await restaurantService.getRestaurant({ restaurantId: 'restaurant-1' });
+        var sql = db.query.mock.calls[0][0];
+
+        expect(restaurant.restaurantId).toBe('restaurant-1');
+        expect(sql).not.toContain('submitterEmail');
+        expect(sql).not.toContain('u.email');
+        expect(sql).toContain("AND r.status = 'approved'");
+    });
+
+    test('getRestaurant keeps submitter email for admin requests', async function() {
+        db.query.mockResolvedValueOnce([{
+            restaurantId: 'restaurant-1',
+            status: 'pending',
+            submitterEmail: 'reviewer@example.com'
+        }]);
+
+        var restaurant = await restaurantService.getRestaurant({
+            restaurantId: 'restaurant-1',
+            auth: { user: { isAdmin: 1 } }
+        });
+        var sql = db.query.mock.calls[0][0];
+
+        expect(restaurant.submitterEmail).toBe('reviewer@example.com');
+        expect(sql).toContain('u.email as submitterEmail');
+        expect(sql).toContain('LEFT JOIN users u');
+        expect(sql).not.toContain("AND r.status = 'approved'");
+    });
 });

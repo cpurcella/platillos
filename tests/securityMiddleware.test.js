@@ -1,4 +1,5 @@
 var supertest = require('supertest');
+var signature = require('cookie-signature');
 
 process.env.env = 'prod';
 process.env.cookieSecret = 'test-cookie-secret';
@@ -20,6 +21,10 @@ var authService = require('../api/authService');
 var app = require('../app');
 var request = supertest(app);
 
+function signedSessionCookie(sessionId) {
+    return 'sessionId=' + encodeURIComponent('s:' + signature.sign(sessionId, process.env.cookieSecret));
+}
+
 function getCsrf(res) {
     var match = res.text.match(/<meta name="csrf-token" content="([^"]+)">/);
     var cookies = res.headers['set-cookie'] || [];
@@ -32,6 +37,8 @@ function getCsrf(res) {
 describe('security middleware', function() {
     beforeEach(function() {
         authService.authenticate.mockReset();
+        authService.getSession.mockReset();
+        authService.getSession.mockRejectedValue(new Error('no session'));
     });
 
     test('rendered pages include a CSRF token and signed CSRF cookie', async function() {
@@ -86,5 +93,89 @@ describe('security middleware', function() {
 
         expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
+    });
+
+    test('client-supplied auth params cannot satisfy admin authorization', async function() {
+        var csrf = getCsrf(await request.get('/login'));
+        var res = await request.patch('/api/dishes/dish-1')
+            .set('Cookie', csrf.cookie)
+            .set('X-CSRF-Token', csrf.token)
+            .send({
+                auth: { user: { userId: 'attacker', isAdmin: 1 } },
+                status: 'approved'
+            });
+
+        expect(res.status).toBe(401);
+        expect(res.body.success).toBe(false);
+    });
+
+    test('admin users API rejects non-admin sessions', async function() {
+        authService.getSession.mockResolvedValueOnce({
+            user: { userId: 'user-1', isAdmin: 0 }
+        });
+
+        var res = await request.get('/api/users/admin').set('Cookie', signedSessionCookie('session-1'));
+
+        expect(res.status).toBe(403);
+        expect(res.body.success).toBe(false);
+    });
+
+    test('client-supplied auth params cannot satisfy admin users API authorization', async function() {
+        var res = await request.get('/api/users/admin?auth[user][isAdmin]=1');
+
+        expect(res.status).toBe(401);
+        expect(res.body.success).toBe(false);
+    });
+
+    test('admin users API returns paginated data for admins', async function() {
+        var db = require('../connections');
+        authService.getSession.mockResolvedValueOnce({
+            user: { userId: 'admin-1', isAdmin: 1 }
+        });
+        db.query
+            .mockResolvedValueOnce([{ total: 1 }])
+            .mockResolvedValueOnce([{ userId: 'user-1', username: 'janedoe' }]);
+
+        var res = await request.get('/api/users/admin?page=1&pageSize=10').set('Cookie', signedSessionCookie('session-1'));
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({
+            success: true,
+            data: [{ userId: 'user-1', username: 'janedoe' }],
+            total: 1
+        });
+    });
+
+    test('admin page requires login for /admin', async function() {
+        var res = await request.get('/admin');
+
+        expect(res.status).toBe(302);
+        expect(res.headers.location).toBe('/login');
+    });
+
+    test('admin page rejects non-admin sessions', async function() {
+        authService.getSession.mockResolvedValueOnce({
+            user: { userId: 'user-1', isAdmin: 0 }
+        });
+
+        var res = await request.get('/admin').set('Cookie', signedSessionCookie('session-1'));
+
+        expect(res.status).toBe(403);
+        expect(res.text).toBe('Forbidden');
+    });
+
+    test('admin page renders for admins and legacy approvals route redirects', async function() {
+        authService.getSession
+            .mockResolvedValueOnce({ user: { userId: 'admin-1', isAdmin: 1 } })
+            .mockResolvedValueOnce({ user: { userId: 'admin-1', isAdmin: 1 } });
+
+        var adminRes = await request.get('/admin').set('Cookie', signedSessionCookie('session-1'));
+        var legacyRes = await request.get('/admin/approvals').set('Cookie', signedSessionCookie('session-1'));
+
+        expect(adminRes.status).toBe(200);
+        expect(adminRes.text).toContain('<title>Platillos - Admin</title>');
+        expect(adminRes.text).toContain('id="tab-users"');
+        expect(legacyRes.status).toBe(302);
+        expect(legacyRes.headers.location).toBe('/admin');
     });
 });

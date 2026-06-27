@@ -52,6 +52,19 @@ router.get('/shelves', async function(req, res) {
     }
 });
 
+router.get('/:dishId/photos', async function(req, res) {
+    try {
+        var params = Object.assign({}, req.allParams || {}, { dishId: req.params.dishId });
+        var result = await dishService.getDishPhotos(params);
+        res.json({ success: true, data: result.rows, total: result.total });
+    } catch (err) {
+        if (err.status) {
+            return res.status(err.status).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 router.get('/:dishId', async function(req, res) {
     try {
         var dish = await dishService.getDish(req.allParams);

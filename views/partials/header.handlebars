@@ -5,7 +5,7 @@
         <nav class="header-nav">
             {{#if user}}
                 {{#if user.isAdmin}}
-                    <a href="/admin/approvals" class="btn btn-turquoise">Approvals</a>
+                    <a href="/admin" class="btn btn-turquoise">Admin</a>
                 {{/if}}
                 {{#if user.username}}
                     <a href="/users/{{user.username}}" class="header-profile-link" title="Profile">

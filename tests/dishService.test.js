@@ -89,6 +89,72 @@ describe('dishService location WKT', function() {
     });
 });
 
+describe('dishService dish photos', function() {
+    beforeEach(function() {
+        jest.clearAllMocks();
+        db.query.mockReset();
+    });
+
+    test('getDishPhotos returns approved dish review photos with capped pagination and S3 URLs', async function() {
+        db.query
+            .mockResolvedValueOnce([{ total: 2 }])
+            .mockResolvedValueOnce([
+                {
+                    reviewPhotoId: 11,
+                    reviewId: 101,
+                    fileId: 'reviews/photo-one.jpg',
+                    reviewContent: 'Crispy edges.',
+                    rating: 9,
+                    submitted: 1717200000000,
+                    firstName: 'Ada',
+                    lastName: 'Lovelace',
+                    username: 'ada',
+                    avatarFileId: 'avatars/ada.jpg'
+                },
+                {
+                    reviewPhotoId: 12,
+                    reviewId: 102,
+                    fileId: 'reviews/photo-two.jpg',
+                    reviewContent: 'Great sauce.',
+                    rating: 8,
+                    submitted: 1717100000000,
+                    firstName: null,
+                    lastName: null,
+                    username: 'grace',
+                    avatarFileId: null
+                }
+            ]);
+
+        var result = await dishService.getDishPhotos({
+            dishId: 'dish-1',
+            page: '2',
+            pageSize: '500'
+        });
+
+        expect(result.total).toBe(2);
+        expect(result.rows[0].url).toBe('https://platillos-test.s3.amazonaws.com/reviews/photo-one.jpg');
+        expect(result.rows[0].avatarUrl).toBe('https://platillos-test.s3.amazonaws.com/avatars/ada.jpg');
+        expect(result.rows[1].url).toBe('https://platillos-test.s3.amazonaws.com/reviews/photo-two.jpg');
+        expect(result.rows[1].avatarUrl).toBeUndefined();
+
+        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(d.status, 'pending')) = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(r.status, 'pending')) = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(rv.status, 'pending')) = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(rp.status, 'pending')) = 'approved'");
+        expect(db.query.mock.calls[0][1]).toEqual(['dish-1']);
+        expect(db.query.mock.calls[1][0]).toContain('ORDER BY rv.submitted DESC, rp.reviewPhotoId ASC');
+        expect(db.query.mock.calls[1][1]).toEqual(['dish-1', 100, 100]);
+    });
+
+    test('getDishPhotos requires a dishId', async function() {
+        await expect(dishService.getDishPhotos({})).rejects.toMatchObject({
+            status: 400,
+            message: 'dishId is required'
+        });
+        expect(db.query).not.toHaveBeenCalled();
+    });
+});
+
 describe('dishService dish score calculation', function() {
     test('calculateDishScore applies the stored dish score recency weights', function() {
         var now = Date.UTC(2026, 5, 1);

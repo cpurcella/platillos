@@ -26,11 +26,30 @@ if (!process.env.env) {
 
 router.use(function(req, res, next) {
     var extras = {};
+    var serverOnlyParams = { auth: true };
     var getBody = function() {
         return (req.body && typeof req.body === 'object') ? req.body : {};
     };
+    var copyClientParams = function(source) {
+        var copy = {};
+        if (!source || typeof source !== 'object') {
+            return copy;
+        }
+        Object.keys(source).forEach(function(key) {
+            if (!serverOnlyParams[key]) {
+                copy[key] = source[key];
+            }
+        });
+        return copy;
+    };
     var buildSnapshot = function() {
-        return Object.assign({}, req.query || {}, getBody(), req.params || {}, extras);
+        return Object.assign(
+            {},
+            copyClientParams(req.query),
+            copyClientParams(getBody()),
+            copyClientParams(req.params),
+            extras
+        );
     };
 
     req.allParams = new Proxy(extras, {
@@ -49,6 +68,9 @@ router.use(function(req, res, next) {
             }
             if (Object.prototype.hasOwnProperty.call(extras, prop)) {
                 return extras[prop];
+            }
+            if (serverOnlyParams[prop]) {
+                return target[prop];
             }
             if (req.params && Object.prototype.hasOwnProperty.call(req.params, prop)) {
                 return req.params[prop];
@@ -124,8 +146,8 @@ router.get('/logout', async function(req, res) {
     res.redirect('/');
 });
 
-// Gate all /admin/* pages behind authentication + admin check
-router.get('/admin/*', function(req, res, next) {
+// Gate all /admin pages behind authentication + admin check
+function requireAdminPage(req, res, next) {
     if (!req.allParams.auth || !req.allParams.auth.user) {
         return res.redirect('/login');
     }
@@ -133,6 +155,16 @@ router.get('/admin/*', function(req, res, next) {
         return res.status(403).send('Forbidden');
     }
     next();
+}
+
+router.get(['/admin', '/admin/*'], requireAdminPage);
+
+router.get('/admin', async function(req, res) {
+    await templates.renderTemplate('admin/approvals', req, res);
+});
+
+router.get('/admin/approvals', function(req, res) {
+    res.redirect('/admin');
 });
 
 router.get('*', async function(req, res, next) {

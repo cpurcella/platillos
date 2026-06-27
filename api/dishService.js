@@ -604,6 +604,64 @@ async function getDish(params) {
     return dish;
 }
 
+async function getDishPhotos(params) {
+    params = params || {};
+    if (!params.dishId) {
+        var err = new Error('dishId is required');
+        err.status = 400;
+        throw err;
+    }
+
+    var pagination = paginationHelper.normalizePagination(params, 20);
+    var pageSize = pagination.pageSize;
+    var offset = pagination.offset;
+    var whereSql = `
+        FROM reviews_photos rp
+        JOIN reviews rv ON rp.reviewId = rv.reviewId
+        JOIN dishes d ON rv.dishId = d.dishId
+        JOIN restaurants r ON d.restaurantId = r.restaurantId
+        JOIN users u ON rv.submittedBy = u.userId
+        WHERE d.dishId = ?
+            AND LOWER(COALESCE(d.status, 'pending')) = 'approved'
+            AND LOWER(COALESCE(r.status, 'pending')) = 'approved'
+            AND LOWER(COALESCE(rv.status, 'pending')) = 'approved'
+            AND LOWER(COALESCE(rp.status, 'pending')) = 'approved'
+    `;
+
+    var countRows = await db.query('SELECT COUNT(*) AS total ' + whereSql, [params.dishId]) || [];
+    var total = countRows.length ? countRows[0].total : 0;
+
+    var rows = await db.query(`
+        SELECT
+            rp.reviewPhotoId,
+            rp.reviewId,
+            rp.fileId,
+            rv.review AS reviewContent,
+            rv.rating,
+            rv.submitted,
+            u.firstName,
+            u.lastName,
+            u.username,
+            u.avatarFileId
+        ` + whereSql + `
+        ORDER BY rv.submitted DESC, rp.reviewPhotoId ASC
+        LIMIT ? OFFSET ?
+    `, [params.dishId, pageSize, offset]) || [];
+
+    rows = rows.map(function(row) {
+        row.url = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.fileId;
+        if (row.avatarFileId) {
+            row.avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.avatarFileId;
+        }
+        return row;
+    });
+
+    return {
+        rows: rows,
+        total: total
+    };
+}
+
 async function setDishScores(dishId) {
     var connection = await db.getConnection();
     try {
@@ -946,6 +1004,7 @@ async function getHomeShelves(params) {
 module.exports = {
     getDishes: getDishes,
     getDish: getDish,
+    getDishPhotos: getDishPhotos,
     getDishMetadataOptions: getDishMetadataOptions,
     normalizeItemType: normalizeItemType,
     addDishMetadata: addDishMetadata,

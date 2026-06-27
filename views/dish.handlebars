@@ -59,6 +59,10 @@
                 </div>
             </div>
             <h2 class="section-title">Reviews</h2>
+            <div id="dish-photo-gallery" class="dish-photo-gallery hidden" aria-label="Dish photos">
+                <div id="dish-photo-track" class="dish-photo-track"></div>
+                <div id="dish-photo-loading" class="dish-photo-loading hidden">Loading photos...</div>
+            </div>
             <div id="reviews-list" class="reviews-list"></div>
             <div class="reviews-pagination">
                 <button id="reviews-prev" class="reviews-page-btn" disabled>Previous</button>
@@ -66,6 +70,16 @@
                 <button id="reviews-next" class="reviews-page-btn" disabled>Next</button>
             </div>
         </section>
+    </div>
+
+    <div id="dish-photo-lightbox" class="dish-photo-lightbox hidden" role="dialog" aria-modal="true" aria-label="Dish photo">
+        <button type="button" class="dish-lightbox-close" id="dish-lightbox-close" aria-label="Close">&times;</button>
+        <button type="button" class="dish-lightbox-nav dish-lightbox-prev" id="dish-lightbox-prev" aria-label="Previous photo">&lsaquo;</button>
+        <div class="dish-lightbox-content">
+            <img id="dish-lightbox-image" class="dish-lightbox-image" src="" alt="">
+            <div class="dish-lightbox-review" id="dish-lightbox-review"></div>
+        </div>
+        <button type="button" class="dish-lightbox-nav dish-lightbox-next" id="dish-lightbox-next" aria-label="Next photo">&rsaquo;</button>
     </div>
 
     {{> footer}}

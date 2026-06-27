@@ -66,8 +66,19 @@ function mapPhotoRow(row) {
     });
 }
 
+function stripPublicPhotoFields(photo) {
+    delete photo.reviewerEmail;
+    delete photo.uploadedBy;
+    delete photo.statusUpdated;
+    delete photo.statusUpdatedBy;
+    delete photo.aiReasoning;
+    return photo;
+}
+
 async function getReviewPhotos(params) {
     params = params || {};
+    var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
+    var reviewerEmailSelect = isAdmin ? ', u.email AS reviewerEmail' : '';
 
     var selectClause = `
         SELECT
@@ -90,8 +101,8 @@ async function getReviewPhotos(params) {
             f.uploaded,
             f.uploadedBy,
             u.firstName AS reviewerFirstName,
-            u.lastName AS reviewerLastName,
-            u.email AS reviewerEmail
+            u.lastName AS reviewerLastName
+            ${reviewerEmailSelect}
     `;
 
     var fromClause = `
@@ -106,7 +117,6 @@ async function getReviewPhotos(params) {
     var whereClauses = ['1=1'];
     var whereValues = [];
 
-    var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilterRaw = params.status;
     var normalizedFilter;
     if (statusFilterRaw !== undefined && statusFilterRaw !== null) {
@@ -159,7 +169,9 @@ async function getReviewPhotos(params) {
     var rows = await db.query(dataSql, dataValues) || [];
 
     return {
-        rows: rows.map(mapPhotoRow),
+        rows: rows.map(mapPhotoRow).map(function(row) {
+            return isAdmin ? row : stripPublicPhotoFields(row);
+        }),
         total: total
     };
 }

@@ -55,7 +55,11 @@ function fetchPendingRestaurants(limit) {
 }
 
 function buildUserPrompt(restaurants) {
-    var lines = ['Here are newly submitted restaurants that need verification:', ''];
+    var lines = [
+        'Here are newly submitted restaurants that need verification:',
+        'Platillos is currently limited to restaurants in Albuquerque, New Mexico. For every restaurant, search for the restaurant in Albuquerque, NM first and only approve a restaurant whose verified location is in Albuquerque, NM.',
+        ''
+    ];
     restaurants.forEach(function (restaurant, index) {
         lines.push((index + 1) + '. ' + restaurant.name);
         lines.push('   Restaurant ID: ' + restaurant.restaurantId);
@@ -84,11 +88,32 @@ function buildUserPrompt(restaurants) {
         }
         lines.push('');
     });
-    lines.push('Use trusted sources to confirm the restaurant exists and is legitimate.');
+    lines.push('Use trusted sources to confirm the restaurant exists and is legitimate in Albuquerque, New Mexico, including local directories, maps, delivery/menu pages, social listings, and official sites when available.');
+    lines.push('Search for alternate spellings, capitalization, Spanish terms, and the name with Albuquerque, NM, city, address, phone, menu, restaurant, taqueria, food truck, or Mexican.');
     lines.push('Fill in any MISSING fields with the correct information in the verifiedAddress.');
     lines.push('If the submitted name has typos or is not the official name, provide the correct name in verifiedName.');
     lines.push('Return a JSON object with a "decisions" array describing the verdict for each restaurant.');
     return lines.join('\n');
+}
+
+function buildRestaurantInstructions() {
+    return [
+        'You are a compliance reviewer that decides whether newly submitted restaurants are real and safe to list.',
+        'Platillos currently lists restaurants in Albuquerque, New Mexico only. Always look for the submitted restaurant in Albuquerque, NM, not another city or state with a matching name.',
+        'Always base conclusions on up-to-date sources and cite the sources you used.',
+        'Return JSON that matches the provided schema.',
+        'When a restaurant is missing information (address, city, zip, or coordinates), use web search to find the correct details and include them in the verifiedAddress.',
+        'Search flexibly before deciding: try the exact submitted name with Albuquerque, NM, city, address, zip, and phone when available; try alternate capitalization, punctuation, accents, and spacing; try variants such as "de" versus "De"; and search with local food terms like restaurant, menu, Mexican, taqueria, food truck, and the city name.',
+        'Small local restaurants, food trucks, informal stands, and family-run businesses may not have an official website. Do not require an official website when credible third-party evidence verifies the business.',
+        'Credible third-party evidence can include delivery platforms, map or local directories, menu sites, gift-card or listing pages, local press, and active social listings.',
+        'Approve when at least two credible independent third-party listings corroborate the restaurant, or when one credible listing is supported by matching address, phone, menu, or delivery evidence.',
+        'If evidence is sparse but plausible, or if only one weak source is available and details are incomplete or conflicting, set verdict to manual_review instead of reject.',
+        'Reject only when searches find no credible evidence, contradictory evidence, clear closure or nonexistence, an unsafe listing, or a location that does not match the submitted service area.',
+        'If the best evidence points to a restaurant outside Albuquerque, NM, treat that as a location mismatch and do not approve it.',
+        'If the submitted name has typos, abbreviations, casing differences, minor preposition differences, or is not the official business name, provide the correct corroborated name in verifiedName. If the name is already correct, set verifiedName to an empty string. Do not reject for minor casing or "de" versus "De" differences.',
+        'The verifiedAddress must always include lat and lng coordinates for the restaurant location.',
+        'If coordinates are 0 or missing in the input, look them up.'
+    ].join(' ');
 }
 
 function toPromptPayload(restaurants) {
@@ -232,15 +257,7 @@ async function evaluateSingleRestaurant(client, restaurant) {
 
         response = await client.responses.create({
             model: config.aiModel,
-            instructions:
-                "You are a compliance reviewer that decides whether newly submitted restaurants are real and safe to list. " +
-                "Always base conclusions on up-to-date sources and cite the sources you used. " +
-                "Return JSON that matches the provided schema. " +
-                "When a restaurant is missing information (address, city, zip, or coordinates), use web search to find the correct details and include them in the verifiedAddress. " +
-                "If the submitted name has typos, abbreviations, or is not the official business name, provide the correct name in verifiedName. If the name is already correct, set verifiedName to an empty string. " +
-                "The verifiedAddress must always include lat and lng coordinates for the restaurant location. " +
-                "If coordinates are 0 or missing in the input, look them up. " +
-                "If you cannot verify the restaurant exists, set verdict to reject.",
+            instructions: buildRestaurantInstructions(),
             input: [
                 {
                     role: "user",
@@ -418,5 +435,7 @@ module.exports = {
     evaluatePendingRestaurants: evaluatePendingRestaurants,
     applyAiDecisions: applyAiDecisions,
     evaluateSingleRestaurant: evaluateSingleRestaurant,
-    fetchPendingRestaurants: fetchPendingRestaurants
+    fetchPendingRestaurants: fetchPendingRestaurants,
+    buildRestaurantInstructions: buildRestaurantInstructions,
+    buildUserPrompt: buildUserPrompt
 };
