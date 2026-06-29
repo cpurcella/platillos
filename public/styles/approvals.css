@@ -94,23 +94,23 @@
 }
 
 #reviews-grid .gridjs-table {
-    min-width: 980px;
+    min-width: 1680px;
 }
 
 #dishes-grid .gridjs-table {
-    min-width: 640px;
+    min-width: 900px;
 }
 
 #restaurants-grid .gridjs-table {
-    min-width: 820px;
+    min-width: 1100px;
 }
 
 #photos-grid .gridjs-table {
-    min-width: 920px;
+    min-width: 1530px;
 }
 
 #users-grid .gridjs-table {
-    min-width: 1220px;
+    min-width: 1915px;
 }
 
 .approvals-page .gridjs-search {
@@ -133,9 +133,10 @@
 #reviews-grid .gridjs-table {
     table-layout: fixed;
 }
-#reviews-grid .gridjs-th,
-#reviews-grid .gridjs-td,
-#reviews-grid .nowrap-cell {
+
+.approvals-page .gridjs-th,
+.approvals-page .gridjs-td,
+.approvals-page .nowrap-cell {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -684,15 +685,6 @@
     .approvals-page .gridjs-td .btn {
         min-height: 38px;
         padding: 0.45rem 0.8rem;
-    }
-
-    #reviews-grid .gridjs-table,
-    #reviews-grid .gridjs-th,
-    #reviews-grid .gridjs-td,
-    #reviews-grid .nowrap-cell {
-        white-space: nowrap;
-        overflow: visible;
-        text-overflow: clip;
     }
 
     .modal {

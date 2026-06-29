@@ -112,14 +112,14 @@ var approvalsModule = {
         } else {
             approvalsModule.reviewGrid = new gridjs.Grid({
                 columns: [
-                    'Dish',
-                    'Restaurant',
-                    'Reviewer',
-                    'Rating',
-                    'Review',
-                    'Submitted',
-                    'Photos',
-                    'Actions'
+                    { name: 'Dish', width: '260px' },
+                    { name: 'Restaurant', width: '260px' },
+                    { name: 'Reviewer', width: '210px' },
+                    { name: 'Rating', width: '95px' },
+                    { name: 'Review', width: '420px' },
+                    { name: 'Submitted', width: '210px' },
+                    { name: 'Photos', width: '95px' },
+                    { name: 'Actions', width: '130px' }
                 ],
                 search: true,
                 sort: true,
@@ -160,7 +160,12 @@ var approvalsModule = {
             }).forceRender();
         } else {
             approvalsModule.dishGrid = new gridjs.Grid({
-                columns: ['Dish', 'Restaurant', 'Submitted', 'Actions'],
+                columns: [
+                    { name: 'Dish', width: '280px' },
+                    { name: 'Restaurant', width: '280px' },
+                    { name: 'Submitted', width: '210px' },
+                    { name: 'Actions', width: '130px' }
+                ],
                 search: true,
                 sort: true,
                 server: serverConfig,
@@ -201,7 +206,13 @@ var approvalsModule = {
             }).forceRender();
         } else {
             approvalsModule.restaurantGrid = new gridjs.Grid({
-                columns: ['Restaurant', 'City', 'Address', 'Submitted', 'Actions'],
+                columns: [
+                    { name: 'Restaurant', width: '260px' },
+                    { name: 'City', width: '180px' },
+                    { name: 'Address', width: '320px' },
+                    { name: 'Submitted', width: '210px' },
+                    { name: 'Actions', width: '130px' }
+                ],
                 search: true,
                 sort: true,
                 server: serverConfig,
@@ -255,7 +266,15 @@ var approvalsModule = {
             }).forceRender();
         } else {
             approvalsModule.photoGrid = new gridjs.Grid({
-                columns: ['Photo', 'Dish', 'Restaurant', 'Reviewer', 'Review', 'Submitted', 'Actions'],
+                columns: [
+                    { name: 'Photo', width: '100px' },
+                    { name: 'Dish', width: '250px' },
+                    { name: 'Restaurant', width: '250px' },
+                    { name: 'Reviewer', width: '210px' },
+                    { name: 'Review', width: '380px' },
+                    { name: 'Submitted', width: '210px' },
+                    { name: 'Actions', width: '130px' }
+                ],
                 search: true,
                 sort: true,
                 server: serverConfig,
@@ -319,7 +338,19 @@ var approvalsModule = {
             }).forceRender();
         } else {
             approvalsModule.userGrid = new gridjs.Grid({
-                columns: ['Name', 'Username', 'Email', 'Phone', 'Location', 'Admin', 'Email Verified', 'Phone Verified', 'Created', 'Last Login', 'Profile'],
+                columns: [
+                    { name: 'Name', width: '190px' },
+                    { name: 'Username', width: '170px' },
+                    { name: 'Email', width: '260px' },
+                    { name: 'Phone', width: '160px' },
+                    { name: 'Location', width: '190px' },
+                    { name: 'Admin', width: '95px' },
+                    { name: 'Email Verified', width: '150px' },
+                    { name: 'Phone Verified', width: '150px' },
+                    { name: 'Created', width: '210px' },
+                    { name: 'Last Login', width: '210px' },
+                    { name: 'Profile', width: '130px' }
+                ],
                 search: false,
                 sort: true,
                 server: serverConfig,
