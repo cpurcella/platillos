@@ -12,7 +12,7 @@
     {{> header}}
     <div id="approvals-container" class="approvals-page">
 
-        <div class="tabs">
+        <div class="tabs admin-tabs">
             <a href="javascript:void(0)">Reviews <span id="badge-reviews" class="tab-badge" style="display:none;"></span></a>
             <a href="javascript:void(0)">Dishes <span id="badge-dishes" class="tab-badge" style="display:none;"></span></a>
             <a href="javascript:void(0)">Restaurants <span id="badge-restaurants" class="tab-badge" style="display:none;"></span></a>
@@ -22,9 +22,9 @@
 
         <div class="tab-panels">
             <div class="tab-content" id="tab-reviews">
-                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-                    <label for="reviews-status-filter" style="font-weight:600;">Show</label>
-                    <select id="reviews-status-filter" style="padding:6px 8px;">
+                <div class="grid-filter">
+                    <label for="reviews-status-filter">Show</label>
+                    <select id="reviews-status-filter">
                         <option value="pending" selected>Pending</option>
                         <option value="needs_review">Needs Review</option>
                         <option value="out_of_area">Out of Area</option>
@@ -36,9 +36,9 @@
                 <div id="reviews-grid"></div>
             </div>
             <div class="tab-content" id="tab-dishes">
-                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-                    <label for="dishes-status-filter" style="font-weight:600;">Show</label>
-                    <select id="dishes-status-filter" style="padding:6px 8px;">
+                <div class="grid-filter">
+                    <label for="dishes-status-filter">Show</label>
+                    <select id="dishes-status-filter">
                         <option value="pending" selected>Pending</option>
                         <option value="needs_review">Needs Review</option>
                         <option value="out_of_area">Out of Area</option>
@@ -50,9 +50,9 @@
                 <div id="dishes-grid"></div>
             </div>
             <div class="tab-content" id="tab-restaurants">
-                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-                    <label for="restaurants-status-filter" style="font-weight:600;">Show</label>
-                    <select id="restaurants-status-filter" style="padding:6px 8px;">
+                <div class="grid-filter">
+                    <label for="restaurants-status-filter">Show</label>
+                    <select id="restaurants-status-filter">
                         <option value="pending" selected>Pending</option>
                         <option value="needs_review">Needs Review</option>
                         <option value="out_of_area">Out of Area</option>
@@ -64,9 +64,9 @@
                 <div id="restaurants-grid"></div>
             </div>
             <div class="tab-content" id="tab-images">
-                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-                    <label for="photos-status-filter" style="font-weight:600;">Show</label>
-                    <select id="photos-status-filter" style="padding:6px 8px;">
+                <div class="grid-filter">
+                    <label for="photos-status-filter">Show</label>
+                    <select id="photos-status-filter">
                         <option value="pending" selected>Pending</option>
                         <option value="needs_review">Needs Review</option>
                         <option value="out_of_area">Out of Area</option>
@@ -78,9 +78,9 @@
                 <div id="photos-grid"></div>
             </div>
             <div class="tab-content" id="tab-users">
-                <div class="grid-filter" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-                    <label for="users-search-filter" style="font-weight:600;">Search</label>
-                    <input id="users-search-filter" type="search" placeholder="Name, username, or email" style="padding:6px 8px;min-width:260px;">
+                <div class="grid-filter">
+                    <label for="users-search-filter">Search</label>
+                    <input id="users-search-filter" type="search" placeholder="Name, username, or email">
                 </div>
                 <div id="users-grid"></div>
             </div>

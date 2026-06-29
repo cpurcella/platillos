@@ -18,6 +18,7 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    overflow-x: hidden;
 }
 
 #pending-reviews, #pending-dishes, #pending-restaurants, #pending-images {
@@ -30,6 +31,103 @@
 #pending-reviews h2, #pending-dishes h2, #pending-restaurants h2, #pending-images h2 {
     margin-top: 0;
     color: var(--color-turquoise-dark);
+}
+
+.approvals-page,
+.approvals-page * {
+    box-sizing: border-box;
+}
+
+.admin-tabs {
+    max-width: 100%;
+}
+
+.admin-tabs > a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.grid-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.grid-filter label {
+    font-weight: 600;
+}
+
+.grid-filter select,
+.grid-filter input {
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    font: inherit;
+}
+
+.grid-filter input[type="search"] {
+    width: min(360px, 100%);
+}
+
+#reviews-grid,
+#dishes-grid,
+#restaurants-grid,
+#photos-grid,
+#users-grid {
+    max-width: 100%;
+    min-width: 0;
+}
+
+#reviews-grid .gridjs-wrapper,
+#dishes-grid .gridjs-wrapper,
+#restaurants-grid .gridjs-wrapper,
+#photos-grid .gridjs-wrapper,
+#users-grid .gridjs-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#reviews-grid .gridjs-table {
+    min-width: 980px;
+}
+
+#dishes-grid .gridjs-table {
+    min-width: 640px;
+}
+
+#restaurants-grid .gridjs-table {
+    min-width: 820px;
+}
+
+#photos-grid .gridjs-table {
+    min-width: 920px;
+}
+
+#users-grid .gridjs-table {
+    min-width: 1220px;
+}
+
+.approvals-page .gridjs-search {
+    width: 100%;
+}
+
+.approvals-page .gridjs-search-input {
+    max-width: 100%;
+}
+
+.approvals-page .gridjs-td .btn,
+.approvals-page .gridjs-td .btn:visited {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    white-space: nowrap;
 }
 
 #reviews-grid .gridjs-table {
@@ -354,6 +452,86 @@
     gap: 8px;
 }
 
+.approval-actions .btn,
+.approve-dish-actions .btn {
+    white-space: nowrap;
+}
+
+.approve-photo-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.approve-photo-main {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.approve-photo-preview-column {
+    flex: 0 0 220px;
+    max-width: 220px;
+}
+
+.approve-photo-label {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.approve-photo-preview {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fafafa;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.approve-photo-preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.approve-photo-empty {
+    padding: 16px;
+    text-align: center;
+}
+
+.approve-photo-rotate-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.approve-photo-file-meta {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+    overflow-wrap: anywhere;
+}
+
+.approve-photo-details {
+    flex: 1;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.approve-photo-field-label {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.approve-photo-review {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 /* Shared AI result box */
 .ai-result-box {
     margin-top: 12px;
@@ -420,4 +598,179 @@
     font-size: 0.9rem;
     color: #555;
     white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+    #approvals-container {
+        gap: 1rem;
+        padding: 1rem 0.75rem 1.5rem;
+    }
+
+    .admin-tabs {
+        gap: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 2px;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-tabs > a {
+        flex: 0 0 auto;
+        min-height: 42px;
+        padding: 0.55rem 0.7rem;
+        scroll-snap-align: start;
+    }
+
+    .tab-badge {
+        flex: 0 0 auto;
+        margin-left: 2px;
+    }
+
+    .grid-filter {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .grid-filter select,
+    .grid-filter input,
+    .grid-filter input[type="search"] {
+        width: 100%;
+    }
+
+    .approvals-page .gridjs-head {
+        margin-bottom: 8px;
+    }
+
+    .approvals-page .gridjs-search-input {
+        width: 100%;
+    }
+
+    .approvals-page .gridjs-wrapper {
+        border-radius: 8px;
+    }
+
+    .approvals-page .gridjs-table {
+        font-size: 0.88rem;
+    }
+
+    .approvals-page .gridjs-th,
+    .approvals-page .gridjs-td {
+        padding: 10px 12px;
+    }
+
+    .approvals-page .gridjs-footer {
+        padding: 10px 8px;
+    }
+
+    .approvals-page .gridjs-pagination {
+        gap: 8px;
+    }
+
+    .approvals-page .gridjs-pages {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 8px;
+    }
+
+    .approvals-page .gridjs-pages button {
+        min-width: 36px;
+        min-height: 34px;
+    }
+
+    .approvals-page .gridjs-td .btn {
+        min-height: 38px;
+        padding: 0.45rem 0.8rem;
+    }
+
+    #reviews-grid .gridjs-table,
+    #reviews-grid .gridjs-th,
+    #reviews-grid .gridjs-td,
+    #reviews-grid .nowrap-cell {
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .modal {
+        width: 100vw;
+        max-width: none;
+        height: 92vh;
+        padding: 18px 12px 24px;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .modal-content h2 {
+        padding-right: 34px;
+        font-size: 1.2rem;
+    }
+
+    .form-field input,
+    .form-field textarea,
+    .form-field select,
+    .approval-status-row select,
+    .approve-dish-name-input,
+    .approve-dish-status-select,
+    #approve-dish-content .metadata-filter-input {
+        max-width: 100%;
+        font-size: 16px;
+    }
+
+    .review-summary {
+        padding: 10px;
+    }
+
+    .review-summary-item {
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .review-summary-item .label {
+        min-width: 0;
+    }
+
+    .review-summary-item .value {
+        overflow-wrap: anywhere;
+    }
+
+    .approval-actions,
+    .approve-dish-actions,
+    .approve-photo-rotate-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .approval-actions .btn,
+    .approve-dish-actions .btn,
+    .approve-photo-rotate-actions .btn {
+        width: 100%;
+    }
+
+    #approve-dish-content .metadata-chip-list {
+        max-height: 150px;
+    }
+
+    #approve-dish-content .metadata-chip {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .approve-photo-main {
+        flex-direction: column;
+    }
+
+    .approve-photo-preview-column,
+    .approve-photo-details {
+        flex-basis: auto;
+        max-width: none;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .approve-photo-preview {
+        min-height: 160px;
+    }
 }

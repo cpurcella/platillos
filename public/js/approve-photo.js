@@ -55,42 +55,42 @@ var approvePhotoModule = {
             var photoUrl = photo.photoUrl ? photo.photoUrl + '?v=' + Date.now() : '';
 
             var html = `
-                <div style="display:flex;flex-direction:column;gap:12px;">
-                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-                        <div style="flex:0 0 220px;max-width:220px;">
-                            <div style="font-weight:600;margin-bottom:6px;">Photo</div>
-                            <div style="border:1px solid #ccc;border-radius:6px;overflow:hidden;background:#fafafa;min-height:200px;display:flex;align-items:center;justify-content:center;">
-                                ${photo.photoUrl ? '<img src="' + photoUrl + '" alt="Review photo" style="display:block;width:100%;height:auto;" />' : '<div style="padding:16px;text-align:center;">No preview</div>'}
+                <div class="approve-photo-layout">
+                    <div class="approve-photo-main">
+                        <div class="approve-photo-preview-column">
+                            <div class="approve-photo-label">Photo</div>
+                            <div class="approve-photo-preview">
+                                ${photo.photoUrl ? '<img src="' + photoUrl + '" alt="Review photo" />' : '<div class="approve-photo-empty">No preview</div>'}
                             </div>
-                            ${photo.photoUrl ? '<div style="display:flex;gap:8px;margin-top:8px;"><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="270">Rotate Left</button><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="90">Rotate Right</button></div>' : ''}
-                            ${fileMeta ? '<div style="font-size:12px;color:#666;margin-top:6px;">' + fileMeta + '</div>' : ''}
+                            ${photo.photoUrl ? '<div class="approve-photo-rotate-actions"><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="270">Rotate Left</button><button type="button" class="btn btn-outline photo-rotate-admin-btn" data-rotation="90">Rotate Right</button></div>' : ''}
+                            ${fileMeta ? '<div class="approve-photo-file-meta">' + fileMeta + '</div>' : ''}
                         </div>
-                        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;">
+                        <div class="approve-photo-details">
                             <div>
-                                <div style="font-weight:600;margin-bottom:4px;">Dish</div>
+                                <div class="approve-photo-field-label">Dish</div>
                                 <div>${photo.dishName || ''}</div>
                             </div>
                             <div>
-                                <div style="font-weight:600;margin-bottom:4px;">Restaurant</div>
+                                <div class="approve-photo-field-label">Restaurant</div>
                                 <div>${photo.restaurantName || ''}</div>
                             </div>
                             <div>
-                                <div style="font-weight:600;margin-bottom:4px;">Reviewer</div>
+                                <div class="approve-photo-field-label">Reviewer</div>
                                 <div>${reviewer || ''}</div>
                             </div>
                             <div>
-                                <div style="font-weight:600;margin-bottom:4px;">Submitted</div>
+                                <div class="approve-photo-field-label">Submitted</div>
                                 <div>${submitted}</div>
                             </div>
                             <div>
-                                <div style="font-weight:600;margin-bottom:4px;">Last Status Update</div>
+                                <div class="approve-photo-field-label">Last Status Update</div>
                                 <div>${updated || 'Not set'}</div>
                             </div>
                         </div>
                     </div>
                     <div>
-                        <div style="font-weight:600;margin-bottom:4px;">Review</div>
-                        <div style="white-space:pre-wrap;">${photo.reviewContent || ''}</div>
+                        <div class="approve-photo-field-label">Review</div>
+                        <div class="approve-photo-review">${photo.reviewContent || ''}</div>
                     </div>
                 </div>
             `;
