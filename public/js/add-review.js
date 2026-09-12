@@ -281,7 +281,7 @@ var addReviewModule = {
         data.photos = JSON.stringify(data.photos);
 
         try {
-            var response = await $.ajax({
+            var response = await common.secureAjax({
                 url: '/api/reviews',
                 method: 'POST',
                 data: data,
@@ -290,7 +290,7 @@ var addReviewModule = {
             if (response.success) {
                 var favDishId = (isNewDish && response.data && response.data.dishId) ? response.data.dishId : selectedDishId;
                 if ($('#add-to-favorites').prop('checked') && favDishId && favDishId !== 'new') {
-                    try { await $.ajax({ url: '/api/watchlist/' + favDishId, method: 'POST' }); } catch (e) { /* silent */ }
+                    try { await common.secureAjax({ url: '/api/watchlist/' + favDishId, method: 'POST' }); } catch (e) { /* silent */ }
                 }
                 common.showAlert(
                     response.message || 'Review submitted successfully!',
@@ -314,7 +314,7 @@ var addReviewModule = {
         formData.append('file', file);
 
         try {
-            var response = await $.ajax({
+            var response = await common.secureAjax({
                 url: '/api/files/upload',
                 method: 'POST',
                 data: formData,
@@ -323,7 +323,8 @@ var addReviewModule = {
             });
             return response.data;
         } catch (err) {
-            common.showAlert('Failed to upload photo. Please try again.', 'error');
+            var message = (err.responseJSON && err.responseJSON.message) || 'Failed to upload photo. Please try again.';
+            common.showAlert(message, 'error');
             return null;
         }
     },

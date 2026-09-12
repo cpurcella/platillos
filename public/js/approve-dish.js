@@ -256,7 +256,7 @@ var approveDishModule = {
         $btn.prop('disabled', true);
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/dishes/' + encodeURIComponent(dishId),
                 method: 'PATCH',
                 dataType: 'json',
@@ -300,7 +300,7 @@ var approveDishModule = {
         $('#ai-dish-result').hide();
         $('#ai-dish-metadata-suggestions').empty();
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/approvals/ai/dish/' + encodeURIComponent(dishId),
                 method: 'POST',
                 dataType: 'json'

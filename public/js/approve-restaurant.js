@@ -107,7 +107,7 @@ var approveRestaurantModule = {
         $btn.prop('disabled', true).text('Saving...');
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/restaurants/' + encodeURIComponent(restaurantId),
                 method: 'PATCH',
                 dataType: 'json',
@@ -149,7 +149,7 @@ var approveRestaurantModule = {
         $btn.prop('disabled', true).text('Evaluating...');
         $('#ai-restaurant-result').hide();
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/approvals/ai/restaurant/' + encodeURIComponent(restaurantId),
                 method: 'POST',
                 dataType: 'json'

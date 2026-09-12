@@ -33,6 +33,17 @@
     gap: 1.2rem;
 }
 
+.header-auth-group {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+}
+
+.header-auth-group[hidden],
+.header-nav [hidden] {
+    display: none !important;
+}
+
 .header-welcome {
     font-size: 1.05rem;
     margin-right: 0.7rem;

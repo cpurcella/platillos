@@ -141,9 +141,9 @@ var profilePage = (function() {
         try {
             var res;
             if (isFollowing) {
-                res = await $.ajax({ url: '/api/users/follow/' + profileData.userId, method: 'DELETE' });
+                res = await common.secureAjax({ url: '/api/users/follow/' + profileData.userId, method: 'DELETE' });
             } else {
-                res = await $.ajax({ url: '/api/users/follow/' + profileData.userId, method: 'POST' });
+                res = await common.secureAjax({ url: '/api/users/follow/' + profileData.userId, method: 'POST' });
             }
             if (res.success) {
                 if (res.following) {
@@ -538,7 +538,7 @@ var profilePage = (function() {
     async function uploadAvatar(blob) {
         var formData = new FormData();
         formData.append('file', blob, 'avatar.jpg');
-        var res = await $.ajax({
+        var res = await common.secureAjax({
             url: '/api/files/upload',
             method: 'POST',
             data: formData,
@@ -580,7 +580,7 @@ var profilePage = (function() {
         }
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/users/profile',
                 method: 'PATCH',
                 data: JSON.stringify(data),

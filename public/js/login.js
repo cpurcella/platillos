@@ -7,7 +7,7 @@ async function onLoginSubmit(e) {
     var form = e.target;
     var data = $(form).serializeObject();
     try {
-        var res = await $.ajax({
+        var res = await common.secureAjax({
             url: '/api/auth/authenticate',
             method: 'POST',
             dataType: 'json',

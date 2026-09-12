@@ -16,6 +16,14 @@ var common = (function() {
         return $('meta[name="csrf-token"]').attr('content') || '';
     }
 
+    function setCsrfToken(token) {
+        if (!token) return;
+        var $meta = $('meta[name="csrf-token"]');
+        if ($meta.length) {
+            $meta.attr('content', token);
+        }
+    }
+
     $.ajaxPrefilter(function(options, originalOptions, jqXHR) {
         if (isUnsafeMethod(options.type || options.method) && isSameOrigin(options.url)) {
             var token = getCsrfToken();
@@ -24,6 +32,55 @@ var common = (function() {
             }
         }
     });
+
+    $(document).ajaxComplete(function(event, jqXHR, options) {
+        if (!isSameOrigin(options && options.url)) return;
+        setCsrfToken(jqXHR.getResponseHeader('X-CSRF-Token'));
+    });
+
+    function responseCode(err) {
+        return err && err.responseJSON && err.responseJSON.code;
+    }
+
+    async function secureAjax(settings) {
+        if (window.session && typeof window.session.ready === 'function') {
+            await window.session.ready();
+            if (typeof window.session.getState === 'function' &&
+                ['checking', 'unavailable'].indexOf(window.session.getState()) !== -1) {
+                await window.session.bootstrap({ force: true });
+            }
+        }
+
+        try {
+            return await $.ajax($.extend({}, settings));
+        } catch (err) {
+            if (responseCode(err) !== 'CSRF_INVALID') {
+                if (responseCode(err) === 'AUTH_REQUIRED' && window.session) {
+                    window.session.handleAuthRequired();
+                }
+                throw err;
+            }
+
+            if (!window.session || typeof window.session.bootstrap !== 'function') {
+                throw err;
+            }
+
+            try {
+                await window.session.bootstrap({ force: true });
+            } catch (bootstrapErr) {
+                throw err;
+            }
+
+            try {
+                return await $.ajax($.extend({}, settings));
+            } catch (retryErr) {
+                if (responseCode(retryErr) === 'AUTH_REQUIRED' && window.session) {
+                    window.session.handleAuthRequired();
+                }
+                throw retryErr;
+            }
+        }
+    }
 
     function showAlert(message, type) {
         var $alert = $('<div class="alert"></div>').addClass(type || 'info').text(message);
@@ -154,6 +211,11 @@ var common = (function() {
         showAlert: showAlert,
         tooltip: tooltip,
         showModal: showModal,
-        setHandlers: setHandlers
+        setHandlers: setHandlers,
+        getCsrfToken: getCsrfToken,
+        setCsrfToken: setCsrfToken,
+        secureAjax: secureAjax
     };
 })();
+
+window.common = common;

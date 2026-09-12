@@ -3,14 +3,22 @@ var authService = require('./authService');
 
 function requireAuth(req, res, next) {
     if (!req.allParams.auth || !req.allParams.auth.user) {
-        return res.status(401).json({ success: false, message: 'Unauthorized. Please log in.' });
+        return res.status(401).json({
+            success: false,
+            code: 'AUTH_REQUIRED',
+            message: 'Unauthorized. Please log in.'
+        });
     }
     next();
 }
 
 function requireAdmin(req, res, next) {
     if (!req.allParams.auth || !req.allParams.auth.user) {
-        return res.status(401).json({ success: false, message: 'Unauthorized. Please log in.' });
+        return res.status(401).json({
+            success: false,
+            code: 'AUTH_REQUIRED',
+            message: 'Unauthorized. Please log in.'
+        });
     }
     if (req.allParams.auth.user.isAdmin !== 1) {
         return res.status(403).json({ success: false, message: 'Forbidden.' });

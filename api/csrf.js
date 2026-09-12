@@ -15,8 +15,18 @@ function safeCompare(a, b) {
     return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-function sendInvalid(req, res) {
-    return res.status(403).json({ success: false, message: 'Invalid CSRF token.' });
+function sendInvalid(req, res, reason) {
+    console.warn('[security]', JSON.stringify({
+        event: 'csrf_rejected',
+        reason: reason,
+        method: req.method,
+        path: req.originalUrl || req.path
+    }));
+    return res.status(403).json({
+        success: false,
+        code: 'CSRF_INVALID',
+        message: 'Invalid CSRF token.'
+    });
 }
 
 function middleware(req, res, next) {
@@ -26,12 +36,19 @@ function middleware(req, res, next) {
         if (!cookieToken) {
             res.cookie(CSRF_COOKIE, req.csrfToken, cookieOptions.csrfCookieOptions());
         }
+        res.set(CSRF_HEADER, req.csrfToken);
         return next();
     }
 
     var headerToken = req.get(CSRF_HEADER);
-    if (!cookieToken || !headerToken || !safeCompare(cookieToken, headerToken)) {
-        return sendInvalid(req, res);
+    if (!cookieToken) {
+        return sendInvalid(req, res, 'missing_cookie');
+    }
+    if (!headerToken) {
+        return sendInvalid(req, res, 'missing_header');
+    }
+    if (!safeCompare(cookieToken, headerToken)) {
+        return sendInvalid(req, res, 'mismatch');
     }
     req.csrfToken = cookieToken;
     next();

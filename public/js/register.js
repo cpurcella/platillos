@@ -37,7 +37,7 @@ async function onGoToHome() {
             email: $("#email").val(),
             password: $("#password").val()
         };
-        var res = await $.ajax({
+        var res = await common.secureAjax({
             url: '/api/auth/authenticate',
             method: 'POST',
             dataType: 'json',
@@ -98,7 +98,7 @@ async function onRegisterSubmit(e) {
     var recaptcha = $(form).find('.g-recaptcha-response').val();
     if (recaptcha) data.recaptcha = recaptcha;
     try {
-        var response = await $.ajax({
+        var response = await common.secureAjax({
             url: '/api/users/register',
             method: 'POST',
             data: data,
@@ -106,7 +106,7 @@ async function onRegisterSubmit(e) {
         });
         if (response.success) {
             try {
-                var loginResponse = await $.ajax({
+                var loginResponse = await common.secureAjax({
                     url: '/api/auth/authenticate',
                     method: 'POST',
                     dataType: 'json',

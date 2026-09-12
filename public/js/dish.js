@@ -169,10 +169,10 @@ var dishPage = {
             var res;
             if (currentVote === direction) {
                 // Toggle off — remove vote
-                res = await $.ajax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
             } else {
                 // Cast or switch vote
-                res = await $.ajax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
             }
             if (res.success) {
                 $card.attr('data-user-vote', res.userVote);
@@ -213,10 +213,10 @@ var dishPage = {
         $btn.prop('disabled', true);
         try {
             if (dishPage.isOnWatchlist) {
-                await $.ajax({ url: '/api/watchlist/' + dishPage.dishId, method: 'DELETE' });
+                await common.secureAjax({ url: '/api/watchlist/' + dishPage.dishId, method: 'DELETE' });
                 dishPage.isOnWatchlist = false;
             } else {
-                await $.ajax({ url: '/api/watchlist/' + dishPage.dishId, method: 'POST' });
+                await common.secureAjax({ url: '/api/watchlist/' + dishPage.dishId, method: 'POST' });
                 dishPage.isOnWatchlist = true;
             }
             dishPage.updateWatchlistButton();
@@ -244,10 +244,10 @@ var dishPage = {
         $btn.prop('disabled', true);
         try {
             if (dishPage.isFavorite) {
-                await $.ajax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'DELETE' });
+                await common.secureAjax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'DELETE' });
                 dishPage.isFavorite = false;
             } else {
-                await $.ajax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'POST' });
+                await common.secureAjax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'POST' });
                 dishPage.isFavorite = true;
             }
             dishPage.updateFavoriteButton();
@@ -318,7 +318,7 @@ var dishPage = {
 
         $('#tried-it-save').prop('disabled', true);
         try {
-            var res = await $.ajax({ url: '/api/users/diary', method: 'POST', data: payload });
+            var res = await common.secureAjax({ url: '/api/users/diary', method: 'POST', data: payload });
             if (res.success) {
                 dishPage.hasTried = true;
                 dishPage.updateTriedButton();

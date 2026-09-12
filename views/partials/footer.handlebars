@@ -8,34 +8,25 @@
                     <line x1="15.5" y1="15.5" x2="20.5" y2="20.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
                 </svg>
             </a>
-            <a href="javascript:void(0)" class="footer-plus-btn logged-in-only" aria-label="Add">
+            <a href="javascript:void(0)" class="footer-plus-btn logged-in-only" aria-label="Add" aria-disabled="true">
                 <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="22" cy="22" r="22" fill="#15D3C9"/>
                     <rect x="20" y="12" width="4" height="20" rx="2" fill="#fff"/>
                     <rect x="12" y="20" width="20" height="4" rx="2" fill="#fff"/>
                 </svg>
             </a>
-            {{#if user}}
-            <a href="/users/{{user.username}}" class="footer-nav-btn" aria-label="Profile">
-                {{#if user.avatarUrl}}
-                <img src="{{user.avatarUrl}}" alt="Profile" class="footer-avatar">
-                {{else}}
-                <span class="footer-avatar footer-avatar-initial">{{initial user.firstName}}</span>
-                {{/if}}
+            <a href="{{#if user.username}}/users/{{user.username}}{{else}}#{{/if}}" class="footer-nav-btn auth-only js-user-profile-link" aria-label="Profile" {{#unless user}}hidden{{/unless}}>
+                <img class="footer-avatar js-user-avatar-image" {{#if user.avatarUrl}}src="{{user.avatarUrl}}"{{else}}hidden{{/if}} alt="Profile">
+                <span class="footer-avatar footer-avatar-initial js-user-avatar-initial js-user-initial" {{#if user.avatarUrl}}hidden{{/if}}>{{initial user.firstName}}</span>
             </a>
-            {{else}}
-            <a href="javascript:void(0)" class="footer-nav-btn" aria-label="Log in" onclick="window.showLoginPopup && window.showLoginPopup()">
+            <a href="javascript:void(0)" class="footer-nav-btn guest-only" aria-label="Log in" onclick="window.showLoginPopup && window.showLoginPopup()" {{#if user}}hidden{{/if}}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="8" r="4.5" stroke="#fff" stroke-width="2" fill="none"/>
                     <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/>
                 </svg>
             </a>
-            {{/if}}
         </nav>
     </div>
 </footer>
-{{#unless user}}
 {{> login-popup}}
-{{/unless}}
 <script src="/js/footer.js"></script>
-

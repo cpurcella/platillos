@@ -111,9 +111,9 @@ var dishListModule = {
         try {
             var res;
             if (currentVote === direction) {
-                res = await $.ajax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
             } else {
-                res = await $.ajax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
             }
             if (res.success) {
                 $card.attr('data-user-vote', res.userVote);
@@ -578,12 +578,12 @@ var dishListModule = {
         var isActive = $btn.hasClass('active');
         try {
             if (isActive) {
-                await $.ajax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'DELETE' });
+                await common.secureAjax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'DELETE' });
                 $btn.removeClass('active').text('Want to Try');
                 var idx = dishListModule.watchlistIds.indexOf(dishId);
                 if (idx !== -1) dishListModule.watchlistIds.splice(idx, 1);
             } else {
-                await $.ajax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'POST' });
+                await common.secureAjax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'POST' });
                 $btn.addClass('active').text('On Your List');
                 dishListModule.watchlistIds.push(dishId);
             }

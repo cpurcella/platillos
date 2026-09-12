@@ -3,24 +3,18 @@
     <div class="header-content">
         <a href="/" class="header-logo">Platillos</a>
         <nav class="header-nav">
-            {{#if user}}
-                {{#if user.isAdmin}}
-                    <a href="/admin" class="btn btn-turquoise">Admin</a>
-                {{/if}}
-                {{#if user.username}}
-                    <a href="/users/{{user.username}}" class="header-profile-link" title="Profile">
-                        {{#if user.avatarUrl}}
-                            <img src="{{user.avatarUrl}}" alt="Profile" class="header-avatar">
-                        {{else}}
-                            <span class="header-avatar header-avatar-initial">{{initial user.firstName}}</span>
-                        {{/if}}
-                        <span class="header-profile-text">Profile</span>
-                    </a>
-                {{/if}}
-            {{else}}
+            <span class="header-auth-group auth-only" {{#unless user}}hidden{{/unless}}>
+                <a href="/admin" class="btn btn-turquoise js-admin-link" {{#unless user.isAdmin}}hidden{{/unless}}>Admin</a>
+                <a href="{{#if user.username}}/users/{{user.username}}{{else}}#{{/if}}" class="header-profile-link js-user-profile-link" title="Profile">
+                    <img class="header-avatar js-user-avatar-image" {{#if user.avatarUrl}}src="{{user.avatarUrl}}"{{else}}hidden{{/if}} alt="Profile">
+                    <span class="header-avatar header-avatar-initial js-user-avatar-initial js-user-initial" {{#if user.avatarUrl}}hidden{{/if}}>{{initial user.firstName}}</span>
+                    <span class="header-profile-text">Profile</span>
+                </a>
+            </span>
+            <span class="header-auth-group guest-only" {{#if user}}hidden{{/if}}>
                 <a href="/login" class="btn btn-turquoise">Login</a>
                 <a href="/register" class="btn btn-turquoise">Register</a>
-            {{/if}}
+            </span>
         </nav>
     </div>
 </header>

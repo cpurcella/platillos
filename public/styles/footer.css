@@ -41,6 +41,15 @@
     transition: opacity 0.15s, transform 0.15s;
 }
 
+.footer-nav [hidden] {
+    display: none !important;
+}
+
+.logged-in-only.auth-unavailable {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 .footer-nav-btn:hover, .footer-nav-btn:focus {
     opacity: 1;
     transform: scale(1.1);

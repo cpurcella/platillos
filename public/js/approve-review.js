@@ -105,7 +105,7 @@ var approveReviewModule = {
         $btn.prop('disabled', true).text('Saving...');
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/reviews/' + encodeURIComponent(reviewId),
                 method: 'PATCH',
                 dataType: 'json',
@@ -147,7 +147,7 @@ var approveReviewModule = {
         $btn.prop('disabled', true).text('Evaluating...');
         $('#ai-review-result').hide();
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/approvals/ai/review/' + encodeURIComponent(reviewId),
                 method: 'POST',
                 dataType: 'json'

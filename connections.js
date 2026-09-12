@@ -1,4 +1,6 @@
 var mysql = require('mysql2');
+var fs = require('fs');
+var path = require('path');
 var config = require('./config');
 
 function castField(field, useDefaultTypeCasting) {
@@ -14,6 +16,33 @@ function castField(field, useDefaultTypeCasting) {
     return useDefaultTypeCasting();
 }
 
+function isEnabled(value) {
+    return ['1', 'true', 'yes', 'required'].indexOf(String(value || '').toLowerCase()) !== -1;
+}
+
+function buildSslConfig() {
+    if (!isEnabled(config.dbSsl)) {
+        return undefined;
+    }
+
+    var ssl = {
+        rejectUnauthorized: String(config.dbSslRejectUnauthorized || '').toLowerCase() !== 'false'
+    };
+
+    if (config.dbSslCaBase64) {
+        ssl.ca = Buffer.from(config.dbSslCaBase64, 'base64').toString('utf8');
+    } else if (config.dbSslCaFile) {
+        var caPath = path.isAbsolute(config.dbSslCaFile)
+            ? config.dbSslCaFile
+            : path.join(__dirname, config.dbSslCaFile);
+        ssl.ca = fs.readFileSync(caPath, 'utf8');
+    } else if (config.dbSslCa) {
+        ssl.ca = config.dbSslCa;
+    }
+
+    return ssl;
+}
+
 var poolConfig = {
     host: config.dbUrl,
     user: config.dbUser,
@@ -25,6 +54,10 @@ var poolConfig = {
     typeCast: castField
 };
 
+var sslConfig = buildSslConfig();
+if (sslConfig) {
+    poolConfig.ssl = sslConfig;
+}
 
 var _pool = mysql.createPool(poolConfig);
 

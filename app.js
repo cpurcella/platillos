@@ -126,9 +126,18 @@ router.use(async function(req, res, next) {
         try {
             req.allParams.auth = await authService.getSession(req.signedCookies.sessionId)
         } catch(e) {
-            console.log("Couldn't find session " + req.signedCookies.sessionId)
+            console.warn('[security]', JSON.stringify({
+                event: 'session_rejected',
+                reason: e && e.message ? e.message : 'invalid_session'
+            }))
             res.clearCookie('sessionId', cookieOptions.sessionCookieOptions())
         }
+    } else if (req.signedCookies.sessionId === false) {
+        console.warn('[security]', JSON.stringify({
+            event: 'session_rejected',
+            reason: 'invalid_signature'
+        }))
+        res.clearCookie('sessionId', cookieOptions.sessionCookieOptions())
     }
     next()
 })

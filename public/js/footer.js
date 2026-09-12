@@ -3,6 +3,10 @@
 var footerModule = {
     setHandlers: function() {
         $('.footer-plus-btn').on('click', async function(event) {
+            event.preventDefault();
+            if (!await session.requireAuth()) {
+                return;
+            }
             if (window.dishPage && window.dishPage.dishData) {
                 var d = window.dishPage.dishData;
                 window._addReviewPreselect = {

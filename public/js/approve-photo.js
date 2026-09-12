@@ -131,7 +131,7 @@ var approvePhotoModule = {
         $btn.prop('disabled', true).text('Saving...');
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/review-photos/' + encodeURIComponent(photoId),
                 method: 'PATCH',
                 dataType: 'json',
@@ -179,7 +179,7 @@ var approvePhotoModule = {
         $buttons.prop('disabled', true);
 
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/review-photos/' + encodeURIComponent(photoId),
                 method: 'PATCH',
                 dataType: 'json',
@@ -211,7 +211,7 @@ var approvePhotoModule = {
         $btn.prop('disabled', true).text('Evaluating...');
         $('#ai-photo-result').hide();
         try {
-            var res = await $.ajax({
+            var res = await common.secureAjax({
                 url: '/api/approvals/ai/photo/' + encodeURIComponent(photoId),
                 method: 'POST',
                 dataType: 'json'

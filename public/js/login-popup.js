@@ -18,15 +18,6 @@ $(document).ready(function() {
         popup.attr('aria-hidden', 'true');
     }
 
-    $('.logged-in-only').on('click', function(event) {
-        if (!window.isLoggedIn) {
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
-            openPopup();
-        }
-    });
-
     closeBtn.on('click', closePopup);
     overlay.on('click', closePopup);
 
