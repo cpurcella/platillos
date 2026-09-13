@@ -8,6 +8,10 @@ var dishPage = {
     pageSize: 10,
     hasNextPage: false,
     ratingTrendChart: null,
+    trendRatings: [],
+    trendMeta: null,
+    coverPhotoUrl: null,
+    lightboxOpener: null,
     galleryPhotos: [],
     galleryPage: 1,
     galleryPageSize: 20,
@@ -39,7 +43,7 @@ var dishPage = {
 
     syncAuth: function() {
         var authenticated = Boolean(window._platillosUser);
-        $('#quick-log-btn, #watchlist-btn, #tried-it-btn, #favorite-btn').toggleClass('hidden', !authenticated);
+        $('#watchlist-btn, #tried-it-btn, #favorite-btn').toggleClass('hidden', !authenticated);
         if (authenticated) {
             dishPage.loadTriedState();
             dishPage.loadFavoriteState();
@@ -73,8 +77,12 @@ var dishPage = {
         });
 
         // Review button
-        $('#quick-log-btn').on('click', function() {
+        $(document).on('click', '.js-add-review', function() {
             if (!dishPage.dishData) return;
+            if (!window._platillosUser) {
+                if (window.showLoginPopup) window.showLoginPopup();
+                return;
+            }
             var d = dishPage.dishData;
             window._addReviewPreselect = {
                 restaurant: {
@@ -118,15 +126,17 @@ var dishPage = {
             dishPage.toggleVote($(this));
         });
 
-        $('#dish-photo-track').on('scroll', function() {
-            dishPage.handleGalleryScroll();
+        $('#view-dish-photos').on('click', function() {
+            dishPage.openGalleryLightbox(0);
         });
 
-        $('#dish-photo-track').on('click', '.dish-gallery-thumb', function() {
-            var index = parseInt($(this).attr('data-gallery-index'), 10);
-            if (!isNaN(index)) {
-                dishPage.openGalleryLightbox(index);
-            }
+        $('#dish-cover-container').on('click', function() {
+            var index = dishPage.galleryPhotos.findIndex(function(photo) { return photo.url === dishPage.coverPhotoUrl; });
+            dishPage.openGalleryLightbox(index);
+        });
+
+        $('#rating-trend').on('toggle', function() {
+            if (this.open) dishPage.renderRatingTrend(dishPage.trendRatings, dishPage.trendMeta);
         });
 
         $('#dish-lightbox-close').on('click', function() {
@@ -155,6 +165,17 @@ var dishPage = {
                 dishPage.showPreviousGalleryPhoto();
             } else if (e.key === 'ArrowRight') {
                 dishPage.showNextGalleryPhoto();
+            } else if (e.key === 'Tab') {
+                var buttons = $('#dish-photo-lightbox button:enabled').toArray();
+                var first = buttons[0];
+                var last = buttons[buttons.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
             }
         });
     },
@@ -346,7 +367,6 @@ var dishPage = {
                 return;
             }
             dishPage.renderDish(res.data);
-            dishPage.dishData = res.data;
             if (res.data.isOnWatchlist !== undefined) {
                 dishPage.isOnWatchlist = res.data.isOnWatchlist;
                 dishPage.updateWatchlistButton();
@@ -361,6 +381,8 @@ var dishPage = {
         $('#dish-header').removeClass('has-cover');
         $('#dish-restaurant').text('');
         $('#dish-score').text('');
+        $('#dish-review-count, #reviews-count-label').text('');
+        $('#quick-log-btn').prop('disabled', true);
         $('#dish-cover-container').empty().hide();
     },
 
@@ -371,9 +393,14 @@ var dishPage = {
         $('#dish-score').text('');
         $('#dish-cover-container').empty().hide();
         $('#dish-actions').addClass('hidden');
+        $('#rating-trend, #view-dish-photos').addClass('hidden');
+        dishPage.dishData = null;
     },
 
     renderDish: function(dish) {
+        dishPage.dishData = dish;
+        $('#dish-actions').removeClass('hidden');
+        $('#quick-log-btn').prop('disabled', false).text(Number(dish.reviewCount) === 0 ? 'Be the first to review' : 'Add my review');
         $('#dish-name').text(dish.name || 'Dish');
         document.title = (dish.name || 'Dish') + (dish.restaurantName ? ' — ' + dish.restaurantName : '') + ' | Platillos';
 
@@ -391,22 +418,33 @@ var dishPage = {
             var formatted = typeof scoreValue === 'number' ? scoreValue.toFixed(1) : scoreValue;
             scoreText = formatted + ' / 10';
         }
-        $('#dish-score').text(scoreText);
+        $('#dish-score').text(scoreText).toggleClass('is-unrated', scoreValue === null || scoreValue === undefined);
+        var count = Number(dish.reviewCount) || 0;
+        $('#dish-review-count').text(count + (count === 1 ? ' review' : ' reviews'));
+        $('#reviews-count-label').text('(' + count + ')');
+        dishPage.renderCoverPhoto();
+    },
 
+    renderCoverPhoto: function() {
+        if (!dishPage.dishData) return;
+        // The gallery endpoint returns only approved photos on approved reviews.
+        // An explicitly selected cover always takes priority over the fallback.
+        var dish = dishPage.dishData;
+        var url = dish.coverPhoto || (dishPage.galleryPhotos[0] && dishPage.galleryPhotos[0].url);
+        dishPage.coverPhotoUrl = url || null;
         var $cover = $('#dish-cover-container');
         $cover.empty();
-        $('#dish-header').toggleClass('has-cover', Boolean(dish.coverPhoto));
+        $('#dish-header').toggleClass('has-cover', Boolean(url));
 
-        if (dish.coverPhoto) {
-            var $image = $('<img>').attr({ src: dish.coverPhoto + '_m', alt: (dish.name || 'Dish') + ' cover photo' });
+        if (url) {
+            var $image = $('<img>').attr({ src: url, alt: (dish.name || 'Dish') + ' cover photo' });
             $image.one('error', function() {
-                // Older uploads may not have a medium variant.
                 $(this).one('error', function() {
                     $cover.hide();
                     $('#dish-header').removeClass('has-cover');
-                }).attr('src', dish.coverPhoto);
+                }).attr('src', url + '_m');
             });
-            $cover.append($image).show();
+            $cover.append($image, $('<span>').addClass('dish-photo-hint').text('View full photo')).show();
         } else {
             $cover.hide();
         }
@@ -418,7 +456,6 @@ var dishPage = {
         }
 
         dishPage.galleryLoading = true;
-        $('#dish-photo-loading').removeClass('hidden');
 
         try {
             var res = await $.get('/api/dishes/' + encodeURIComponent(dishPage.dishId) + '/photos', {
@@ -436,16 +473,15 @@ var dishPage = {
             dishPage.galleryPage += 1;
             dishPage.galleryHasMore = dishPage.galleryPhotos.length < dishPage.galleryTotal;
 
-            if (dishPage.galleryPhotos.length) {
-                $('#dish-photo-gallery').removeClass('hidden');
-            } else if (!dishPage.galleryHasMore) {
-                $('#dish-photo-gallery').addClass('hidden');
-            }
+            $('#view-dish-photos').toggleClass('hidden', !dishPage.galleryPhotos.length)
+                .text('View all photos (' + dishPage.galleryTotal + ')');
+            if (dishPage.dishData && !dishPage.dishData.coverPhoto) dishPage.renderCoverPhoto();
+            if (dishPage.activeGalleryIndex !== null) dishPage.updateGalleryLightboxControls();
         } catch (err) {
             dishPage.galleryHasMore = false;
         } finally {
             dishPage.galleryLoading = false;
-            $('#dish-photo-loading').addClass('hidden');
+            if (dishPage.activeGalleryIndex !== null) dishPage.updateGalleryLightboxControls();
         }
     },
 
@@ -454,39 +490,21 @@ var dishPage = {
             return;
         }
 
-        var $track = $('#dish-photo-track');
         photos.forEach(function(photo) {
-            var index = dishPage.galleryPhotos.length;
             dishPage.galleryPhotos.push(photo);
-            var safeUrl = $('<div>').text((photo.url || '') + '_s').html();
-            var reviewer = (photo.firstName || photo.lastName) ? ((photo.firstName || '') + ' ' + (photo.lastName || '')).trim() : (photo.username || 'Anonymous');
-            var safeAlt = $('<div>').text('Photo from ' + reviewer).html();
-            var thumbHtml = '<button type="button" class="dish-gallery-thumb" data-gallery-index="' + index + '">' +
-                '<img src="' + safeUrl + '" alt="' + safeAlt + '" loading="lazy">' +
-            '</button>';
-            $track.append(thumbHtml);
         });
     },
 
-    handleGalleryScroll: function() {
-        var track = document.getElementById('dish-photo-track');
-        if (!track || dishPage.galleryLoading || !dishPage.galleryHasMore) {
-            return;
-        }
-        var remaining = track.scrollWidth - track.scrollLeft - track.clientWidth;
-        if (remaining < 260) {
-            dishPage.loadGalleryPhotos();
-        }
-    },
-
     openGalleryLightbox: function(index) {
-        if (index < 0 || index >= dishPage.galleryPhotos.length) {
+        if ((index < 0 && !dishPage.coverPhotoUrl) || index >= dishPage.galleryPhotos.length) {
             return;
         }
+        dishPage.lightboxOpener = document.activeElement;
         dishPage.activeGalleryIndex = index;
         dishPage.renderGalleryLightbox();
         $('#dish-photo-lightbox').removeClass('hidden');
         $('body').addClass('dish-lightbox-open');
+        $('#dish-lightbox-close').trigger('focus');
         if (dishPage.galleryHasMore && index >= dishPage.galleryPhotos.length - 3) {
             dishPage.loadGalleryPhotos();
         }
@@ -496,12 +514,13 @@ var dishPage = {
         $('#dish-photo-lightbox').addClass('hidden');
         $('body').removeClass('dish-lightbox-open');
         dishPage.activeGalleryIndex = null;
-        $('#dish-lightbox-image').attr('src', '');
+        $('#dish-lightbox-image').off('error').removeAttr('src');
+        if (dishPage.lightboxOpener && dishPage.lightboxOpener.isConnected) dishPage.lightboxOpener.focus();
     },
 
     renderGalleryLightbox: function() {
         var index = dishPage.activeGalleryIndex;
-        var photo = dishPage.galleryPhotos[index];
+        var photo = index === -1 ? { url: dishPage.coverPhotoUrl, firstName: 'Dish photo' } : dishPage.galleryPhotos[index];
         if (!photo) {
             return;
         }
@@ -517,7 +536,8 @@ var dishPage = {
         if (submittedSafe) metaParts.push(submittedSafe);
 
         $('#dish-lightbox-image')
-            .attr('src', (photo.url || '') + '_m')
+            .off('error').one('error', function() { $(this).attr('src', photo.url + '_m'); })
+            .attr('src', photo.url || '')
             .attr('alt', 'Photo from ' + reviewer);
         $('#dish-lightbox-review').html(
             '<div class="dish-lightbox-review-meta">' +
@@ -532,7 +552,7 @@ var dishPage = {
     updateGalleryLightboxControls: function() {
         var index = dishPage.activeGalleryIndex;
         $('#dish-lightbox-prev').prop('disabled', !index || index <= 0);
-        $('#dish-lightbox-next').prop('disabled', index >= dishPage.galleryPhotos.length - 1 && !dishPage.galleryHasMore);
+        $('#dish-lightbox-next').prop('disabled', index < 0 || (index >= dishPage.galleryPhotos.length - 1 && (!dishPage.galleryHasMore || dishPage.galleryLoading)));
     },
 
     showPreviousGalleryPhoto: function() {
@@ -544,7 +564,7 @@ var dishPage = {
     },
 
     showNextGalleryPhoto: async function() {
-        if (dishPage.activeGalleryIndex === null) {
+        if (dishPage.activeGalleryIndex === null || dishPage.activeGalleryIndex < 0) {
             return;
         }
 
@@ -559,6 +579,7 @@ var dishPage = {
 
         if (dishPage.galleryHasMore) {
             await dishPage.loadGalleryPhotos();
+            if (dishPage.activeGalleryIndex === null) return;
             if (dishPage.activeGalleryIndex < dishPage.galleryPhotos.length - 1) {
                 dishPage.activeGalleryIndex += 1;
                 dishPage.renderGalleryLightbox();
@@ -584,7 +605,7 @@ var dishPage = {
                 dishPage.renderReviewsError((res && res.message) || 'Failed to load reviews');
                 return;
             }
-            dishPage.renderReviews(res.data || []);
+            dishPage.renderReviews(res.data || [], res.total);
         } catch (err) {
             dishPage.renderReviewsError('Failed to load reviews.');
         }
@@ -595,15 +616,16 @@ var dishPage = {
         $('#reviews-list').html('<div class="reviews-error">' + safeMessage + '</div>');
         $('#reviews-prev').prop('disabled', dishPage.currentPage <= 1);
         $('#reviews-next').prop('disabled', true);
+        $('.reviews-pagination').toggleClass('hidden', dishPage.currentPage <= 1);
     },
 
-    renderReviews: function(reviews) {
+    renderReviews: function(reviews, total) {
         var $reviewsList = $('#reviews-list');
         $reviewsList.empty();
 
         if (!reviews.length) {
             if (dishPage.currentPage === 1) {
-                $reviewsList.html('<div class="reviews-empty">No reviews yet.</div>');
+                $reviewsList.html('<div class="reviews-empty"><strong>Tried this dish?</strong><p>Share your first impression. Your review can help someone find their next favorite.</p><button type="button" class="btn btn-turquoise js-add-review">Be the first to review</button></div>');
             } else {
                 $reviewsList.html('<div class="reviews-empty">No more reviews.</div>');
             }
@@ -684,22 +706,28 @@ var dishPage = {
                 $reviewsList.append($card);
             });
 
-            dishPage.hasNextPage = reviews.length === dishPage.pageSize;
+            dishPage.hasNextPage = reviews.length === dishPage.pageSize && (total == null || dishPage.currentPage * dishPage.pageSize < Number(total));
         }
 
         $('#reviews-prev').prop('disabled', dishPage.currentPage <= 1);
         $('#reviews-next').prop('disabled', !dishPage.hasNextPage);
         $('#reviews-page').text('Page ' + dishPage.currentPage);
+        $('.reviews-pagination').toggleClass('hidden', dishPage.currentPage === 1 && !dishPage.hasNextPage);
     },
 
     loadRatingTrend: function() {
         $.get('/api/reviews/dish/' + encodeURIComponent(dishPage.dishId) + '/ratings')
             .done(function(res) {
-                if (res.success && res.data && res.data.length) {
-                    dishPage.renderRatingTrend(res.data, {
+                if (res.success && res.data) {
+                    dishPage.trendRatings = res.data;
+                    dishPage.trendMeta = {
                         currentScore: res.currentScore,
                         scoreCalculatedAt: res.scoreCalculatedAt
-                    });
+                    };
+                    var dates = new Set(res.data.filter(function(row) {
+                        return dishPage.parseTrendNumber(row.rating) !== null && dishPage.parseTrendNumber(row.submitted) !== null;
+                    }).map(function(row) { return dishPage.parseTrendNumber(row.submitted); }));
+                    $('#rating-trend').toggleClass('hidden', dates.size < 2);
                 }
             });
     },
@@ -774,7 +802,8 @@ var dishPage = {
             }
         }
 
-        if (!reviewPoints.length) {
+        if (reviewPoints.length < 2 || new Set(reviewPoints.map(function(point) { return point.x; })).size < 2) {
+            $('#rating-trend').addClass('hidden').prop('open', false);
             return;
         }
 
@@ -827,6 +856,7 @@ var dishPage = {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 scales: {
                     y: {
                         min: 0,

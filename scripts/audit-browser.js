@@ -72,6 +72,7 @@ module.exports = async function auditBrowser(fixture) {
         }
         assert.deepEqual(errors, [], 'No browser JavaScript exceptions');
         console.log('BROWSER PASS: 390/768/1440px layout, photo/no-photo, escaped names, drink preselection, pending picker, navigation pages');
+        await require('./audit-dish-layout')(context, base, fixture, output);
     } finally {
         await browser.close();
         await authService.endSession(session.sessionId);

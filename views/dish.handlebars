@@ -3,74 +3,77 @@
 <head>
     <title>Platillos - Dish</title>
     {{> head}}
-    <link rel="stylesheet" href="/styles/index.css">
     <link rel="stylesheet" href="/styles/dish.css">
 </head>
-<body class="bg-mint">
+<body class="dish-body">
     {{> header}}
-    <div class="main-container dish-page">
-        <section class="dish-header" id="dish-header">
+    <main class="dish-page">
+        <section class="dish-header" id="dish-header" aria-labelledby="dish-name">
+            <button type="button" class="dish-header-photo" id="dish-cover-container" aria-label="View full dish photo"></button>
             <div class="dish-header-info">
                 <h1 id="dish-name" class="platillos-title"></h1>
                 <div class="dish-meta">
                     <div id="dish-restaurant" class="dish-restaurant"></div>
-                    <div id="dish-score" class="dish-score"></div>
+                    <div class="dish-rating-summary">
+                        <span id="dish-score" class="dish-score"></span>
+                        <a id="dish-review-count" href="#dish-reviews"></a>
+                    </div>
                 </div>
-            </div>
-            <div class="dish-header-photo" id="dish-cover-container"></div>
-            <div class="dish-rating-trend hidden" id="rating-trend">
-                <div class="rating-trend-label">Rating Trend</div>
-                <div class="rating-trend-chart-wrap">
-                    <canvas id="rating-trend-chart"></canvas>
-                </div>
-            </div>
-        </section>
-        <section class="dish-reviews" id="dish-reviews">
-            <div class="dish-actions" id="dish-actions">
-                <button class="btn btn-turquoise btn-sm hidden" id="quick-log-btn">Add My Review</button>
-                <button class="tried-it-btn hidden" id="tried-it-btn" title="Tried It">
-                    <span class="tried-it-icon">✓</span>
-                    <span class="tried-it-label">Tried It</span>
-                </button>
-                <button class="favorite-btn hidden" id="favorite-btn" title="Favorite">
-                    <span class="favorite-icon">♡</span>
-                    <span class="favorite-label">Favorite</span>
-                </button>
-                <button class="want-to-try-btn hidden" id="watchlist-btn" title="Want to Try">
-                    <span class="want-to-try-icon">☆</span>
-                    <span class="want-to-try-label">Want to Try</span>
-                </button>
-            </div>
-            <div class="tried-it-popup hidden" id="tried-it-popup">
-                <div class="tried-it-popup-content">
-                    <div class="tried-it-popup-title">Quick Log</div>
-                    <label class="tried-it-field">
-                        <span>Date tried</span>
-                        <input type="date" id="tried-it-date" class="form-input">
-                    </label>
-                    <label class="tried-it-field">
-                        <span>Rating (optional, 1–10)</span>
-                        <input type="number" id="tried-it-rating" class="form-input" min="1" max="10" placeholder="—">
-                    </label>
-                    <div class="tried-it-popup-actions">
-                        <button class="btn btn-turquoise btn-sm" id="tried-it-save">Save</button>
-                        <button class="btn btn-sm" id="tried-it-cancel">Cancel</button>
+                <div class="dish-actions" id="dish-actions">
+                    <button type="button" class="btn btn-turquoise js-add-review" id="quick-log-btn" disabled>Add my review</button>
+                    <div class="dish-secondary-actions">
+                        <button type="button" class="tried-it-btn hidden" id="tried-it-btn" title="Tried It">
+                            <span class="tried-it-icon">✓</span>
+                            <span class="tried-it-label">Tried It</span>
+                        </button>
+                        <button type="button" class="favorite-btn hidden" id="favorite-btn" title="Favorite">
+                            <span class="favorite-icon">♡</span>
+                            <span class="favorite-label">Favorite</span>
+                        </button>
+                        <button type="button" class="want-to-try-btn hidden" id="watchlist-btn" title="Want to Try">
+                            <span class="want-to-try-icon">☆</span>
+                            <span class="want-to-try-label">Want to Try</span>
+                        </button>
                     </div>
                 </div>
             </div>
-            <h2 class="section-title">Reviews</h2>
-            <div id="dish-photo-gallery" class="dish-photo-gallery hidden" aria-label="Dish photos">
-                <div id="dish-photo-track" class="dish-photo-track"></div>
-                <div id="dish-photo-loading" class="dish-photo-loading hidden">Loading photos...</div>
+        </section>
+        <div class="tried-it-popup hidden" id="tried-it-popup">
+            <div class="tried-it-popup-content">
+                <div class="tried-it-popup-title">Quick Log</div>
+                <label class="tried-it-field">
+                    <span>Date tried</span>
+                    <input type="date" id="tried-it-date" class="form-input">
+                </label>
+                <label class="tried-it-field">
+                    <span>Rating (optional, 1–10)</span>
+                    <input type="number" id="tried-it-rating" class="form-input" min="1" max="10" placeholder="—">
+                </label>
+                <div class="tried-it-popup-actions">
+                    <button class="btn btn-turquoise btn-sm" id="tried-it-save">Save</button>
+                    <button class="btn btn-sm" id="tried-it-cancel">Cancel</button>
+                </div>
             </div>
+        </div>
+        <section class="dish-reviews" id="dish-reviews" aria-labelledby="reviews-heading">
+            <div class="dish-reviews-heading">
+                <h2 class="section-title" id="reviews-heading">Reviews <span id="reviews-count-label"></span></h2>
+                <button type="button" class="dish-photos-link hidden" id="view-dish-photos">View all photos</button>
+            </div>
+            <details class="dish-rating-trend hidden" id="rating-trend">
+                <summary>Rating history <span>See how the score has changed</span></summary>
+                <div class="rating-trend-chart-wrap">
+                    <canvas id="rating-trend-chart" role="img" aria-label="Review ratings and rolling dish score over time"></canvas>
+                </div>
+            </details>
             <div id="reviews-list" class="reviews-list"></div>
-            <div class="reviews-pagination">
+            <div class="reviews-pagination hidden">
                 <button id="reviews-prev" class="reviews-page-btn" disabled>Previous</button>
                 <span id="reviews-page" class="reviews-page-label">Page 1</span>
                 <button id="reviews-next" class="reviews-page-btn" disabled>Next</button>
             </div>
         </section>
-    </div>
+    </main>
 
     <div id="dish-photo-lightbox" class="dish-photo-lightbox hidden" role="dialog" aria-modal="true" aria-label="Dish photo">
         <button type="button" class="dish-lightbox-close" id="dish-lightbox-close" aria-label="Close">&times;</button>
