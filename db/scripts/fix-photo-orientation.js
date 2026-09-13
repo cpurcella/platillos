@@ -13,15 +13,10 @@ require('dotenv').config();
 var Jimp = require('jimp');
 var { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 var config = require('../../config');
+var buildAwsClientConfig = require('../../awsClientConfig');
 var db = require('../../connections');
 
-var s3 = new S3Client({
-    credentials: {
-        accessKeyId: config.awsAccessKey,
-        secretAccessKey: config.awsSecretKey
-    },
-    region: config.awsRegion
-});
+var s3 = new S3Client(buildAwsClientConfig());
 
 async function downloadFromS3(key) {
     var response = await s3.send(new GetObjectCommand({

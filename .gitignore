@@ -15,6 +15,7 @@ pids/
 env/
 .env
 .env.*
+!.env.example
 
 # Build output
 dist/

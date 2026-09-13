@@ -4,17 +4,12 @@ var Jimp = require('jimp');
 var { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 var { randomUUID } = require('crypto');
 var config = require('../config');
+var buildAwsClientConfig = require('../awsClientConfig');
 var fileService = require('./fileService');
 var router = express.Router();
 
 // Configure AWS S3 Client
-var s3 = new S3Client({
-    credentials: {
-        accessKeyId: config.awsAccessKey,
-        secretAccessKey: config.awsSecretKey
-    },
-    region: config.awsRegion
-});
+var s3 = new S3Client(buildAwsClientConfig());
 
 var upload = multer({
     storage: multer.memoryStorage(),

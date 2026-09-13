@@ -244,11 +244,11 @@ app.use(function(err, req, res, next) {
     res.status(err.status || 500).json({ success: false, message: 'Internal Server Error' });
 });
 
-if(!process.env.env || process.env.local == "true") {
+module.exports = app;
+
+if (require.main === module) {
     var port = process.env.PORT || 3000;
     app.listen(port, function() {
         console.log('Platillos server running on http://localhost:' + port);
     });
-} else {
-    module.exports = app;
 }

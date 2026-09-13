@@ -2,16 +2,11 @@ var db = require('../connections');
 var Jimp = require('jimp');
 var { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 var config = require('../config');
+var buildAwsClientConfig = require('../awsClientConfig');
 var { getOpenAiClient, clampLimit } = require('./client');
 var { extractJsonResult, resolveAiStatus } = require('./utils');
 
-var s3 = new S3Client({
-    credentials: {
-        accessKeyId: config.awsAccessKey,
-        secretAccessKey: config.awsSecretKey
-    },
-    region: config.awsRegion
-});
+var s3 = new S3Client(buildAwsClientConfig());
 
 function buildPublicFileUrl(fileId) {
     if (!fileId) {
