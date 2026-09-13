@@ -15,8 +15,8 @@
                 <div class="dish-meta">
                     <div id="dish-restaurant" class="dish-restaurant"></div>
                     <div class="dish-rating-summary">
-                        <span id="dish-score" class="dish-score"></span>
-                        <a id="dish-review-count" href="#dish-reviews"></a>
+                        <div id="dish-score" class="dish-rating-averages" aria-live="polite"></div>
+                        <p id="dish-rating-note" class="dish-rating-note hidden"></p>
                     </div>
                 </div>
                 <div class="dish-actions" id="dish-actions">
@@ -61,9 +61,9 @@
                 <button type="button" class="dish-photos-link hidden" id="view-dish-photos">View all photos</button>
             </div>
             <details class="dish-rating-trend hidden" id="rating-trend">
-                <summary>Rating history <span>See how the score has changed</span></summary>
+                <summary>View rating history <span>Individual ratings and the overall average over time</span></summary>
                 <div class="rating-trend-chart-wrap">
-                    <canvas id="rating-trend-chart" role="img" aria-label="Review ratings and rolling dish score over time"></canvas>
+                    <canvas id="rating-trend-chart" role="img" aria-label="Individual review ratings and cumulative overall average over time"></canvas>
                 </div>
             </details>
             <div id="reviews-list" class="reviews-list"></div>
@@ -81,12 +81,29 @@
         <div class="dish-lightbox-content">
             <img id="dish-lightbox-image" class="dish-lightbox-image" src="" alt="">
             <div class="dish-lightbox-review" id="dish-lightbox-review"></div>
+            <button type="button" id="adjust-photo-framing" class="btn hidden">Adjust framing</button>
+            <div id="photo-framing-editor" class="photo-framing-editor hidden">
+                <p>Drag around the whole dish in the photo, or adjust the boundaries below. The preview shows the thumbnail; the full photo is always preserved.</p>
+                <canvas id="framing-preview" width="120" height="120" role="img" aria-label="Framing preview"></canvas>
+                <div class="framing-fields">
+                    <label>Left (%) <input id="framing-left" type="number" min="0" max="99" value="0"></label>
+                    <label>Top (%) <input id="framing-top" type="number" min="0" max="99" value="0"></label>
+                    <label>Right (%) <input id="framing-right" type="number" min="1" max="100" value="100"></label>
+                    <label>Bottom (%) <input id="framing-bottom" type="number" min="1" max="100" value="100"></label>
+                </div>
+                <p id="framing-status" role="status"></p>
+                <button type="button" id="framing-full" class="btn">Use full photo</button>
+                <button type="button" id="framing-save" class="btn btn-turquoise">Save framing</button>
+                <button type="button" id="framing-cancel" class="btn">Cancel</button>
+            </div>
         </div>
+        <div id="framing-selection" class="framing-selection hidden"></div>
         <button type="button" class="dish-lightbox-nav dish-lightbox-next" id="dish-lightbox-next" aria-label="Next photo">&rsaquo;</button>
     </div>
 
     {{> footer}}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="/js/photo-framing.js"></script>
     <script src="/js/dish.js"></script>
 </body>
 </html>

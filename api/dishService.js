@@ -114,6 +114,30 @@ function buildDishScoreWeightSql(submittedColumn) {
                         END)`;
 }
 
+function buildDishRatingSummary(reviews, referenceMs) {
+    var reference = normalizeTimestamp(referenceMs);
+    if (reference === null) reference = Date.now();
+    var recentSince = subtractCalendarMonths(reference, 6);
+    var overall = { average: null, count: 0 };
+    var recent = { average: null, count: 0 };
+    var overallTotal = 0;
+    var recentTotal = 0;
+    (reviews || []).forEach(function(review) {
+        var rating = Number(review.rating);
+        var submitted = normalizeTimestamp(review.submitted);
+        if (!isFinite(rating) || rating < 1 || rating > 10 || submitted === null || submitted > reference) return;
+        overallTotal += rating;
+        overall.count += 1;
+        if (submitted >= recentSince) {
+            recentTotal += rating;
+            recent.count += 1;
+        }
+    });
+    if (overall.count) overall.average = roundDishScore(overallTotal / overall.count);
+    if (recent.count) recent.average = roundDishScore(recentTotal / recent.count);
+    return { overall: overall, recent: recent, recentSince: recentSince };
+}
+
 function buildDishScoreTrend(rows, referenceMs) {
     var scoreCalculatedAt = normalizeTimestamp(referenceMs);
     if (scoreCalculatedAt === null) {
@@ -127,7 +151,7 @@ function buildDishScoreTrend(rows, referenceMs) {
             submitted: normalizeTimestamp(row.submitted)
         };
     }).filter(function(row) {
-        return row.submitted !== null && isFinite(row.rating);
+        return row.submitted !== null && row.submitted <= scoreCalculatedAt && isFinite(row.rating) && row.rating >= 1 && row.rating <= 10;
     }).sort(function(a, b) {
         if (a.submitted !== b.submitted) {
             return a.submitted - b.submitted;
@@ -136,18 +160,22 @@ function buildDishScoreTrend(rows, referenceMs) {
     });
 
     var includedReviews = [];
+    var ratingTotal = 0;
     var trendReviews = reviews.map(function(review) {
         includedReviews.push(review);
+        ratingTotal += review.rating;
         return {
             reviewId: review.reviewId,
             rating: review.rating,
             submitted: review.submitted,
-            rollingScore: calculateDishScore(includedReviews, review.submitted)
+            rollingScore: calculateDishScore(includedReviews, review.submitted),
+            overallAverage: roundDishScore(ratingTotal / includedReviews.length)
         };
     });
 
     return {
         reviews: trendReviews,
+        summary: buildDishRatingSummary(reviews, scoreCalculatedAt),
         currentScore: calculateDishScore(reviews, scoreCalculatedAt),
         scoreCalculatedAt: scoreCalculatedAt
     };
@@ -571,9 +599,11 @@ async function getDish(params) {
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var sql = `
-        SELECT d.*, r.name AS restaurantName
+        SELECT d.*, r.name AS restaurantName, ff.framing AS coverFraming, f.uploadedBy AS coverUploadedBy
         FROM dishes d
         JOIN restaurants r ON d.restaurantId = r.restaurantId
+        LEFT JOIN files f ON f.fileId = d.coverPhoto
+        LEFT JOIN file_framing ff ON ff.fileId = d.coverPhoto
         WHERE d.dishId = ?
     `;
     var vals = [params.dishId];
@@ -588,6 +618,10 @@ async function getDish(params) {
     }
 
     var dish = rows[0];
+    dish.coverFraming = require('../ai/photoFraming').parseFraming(dish.coverFraming);
+    dish.coverFileId = dish.coverPhoto || null;
+    dish.canAdjustCover = isAdmin || Boolean(params.auth?.user?.userId && params.auth.user.userId === dish.coverUploadedBy);
+    delete dish.coverUploadedBy;
     if (dish.coverPhoto) {
         dish.coverPhoto = 'https://' + config.bucket + '.s3.amazonaws.com/' + dish.coverPhoto;
     }
@@ -627,6 +661,8 @@ async function getDishPhotos(params) {
         JOIN dishes d ON rv.dishId = d.dishId
         JOIN restaurants r ON d.restaurantId = r.restaurantId
         JOIN users u ON rv.submittedBy = u.userId
+        JOIN files f ON f.fileId = rp.fileId
+        LEFT JOIN file_framing ff ON ff.fileId = rp.fileId
         WHERE d.dishId = ?
             AND LOWER(COALESCE(d.status, 'pending')) = 'approved'
             AND LOWER(COALESCE(r.status, 'pending')) = 'approved'
@@ -642,6 +678,8 @@ async function getDishPhotos(params) {
             rp.reviewPhotoId,
             rp.reviewId,
             rp.fileId,
+            ff.framing,
+            f.uploadedBy,
             rv.review AS reviewContent,
             rv.rating,
             rv.submitted,
@@ -655,6 +693,9 @@ async function getDishPhotos(params) {
     `, [params.dishId, pageSize, offset]) || [];
 
     rows = rows.map(function(row) {
+        row.framing = require('../ai/photoFraming').parseFraming(row.framing);
+        row.canAdjust = String(params.auth?.user?.isAdmin) === '1' || Boolean(params.auth?.user?.userId && params.auth.user.userId === row.uploadedBy);
+        delete row.uploadedBy;
         row.url = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.fileId;
         if (row.avatarFileId) {
             row.avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.avatarFileId;
@@ -1019,5 +1060,6 @@ module.exports = {
     getHomeShelves: getHomeShelves,
     getDishScoreWeight: getDishScoreWeight,
     calculateDishScore: calculateDishScore,
-    buildDishScoreTrend: buildDishScoreTrend
+    buildDishScoreTrend: buildDishScoreTrend,
+    buildDishRatingSummary: buildDishRatingSummary
 };

@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const config = require('../config');
+const dishService = require('../api/dishService');
 
 module.exports = async function auditDishLayout(context, base, fixture, output) {
     const page = await context.newPage();
@@ -10,7 +11,7 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
     const photoUrl = 'https://' + config.bucket + '.s3.amazonaws.com/layout-photo';
     const reviews = Array.from({ length: 11 }, (_, index) => ({
         reviewId: index + 1, firstName: 'Alex', lastName: 'R.', rating: 8,
-        submitted: 1788000000000 + index * 86400000,
+        submitted: Date.now() - (11 - index) * 86400000,
         reviewContent: 'Rich espresso with silky milk and a lovely, balanced finish. A favorite for a slow morning.',
         photos: [], likeCount: 0
     }));
@@ -42,7 +43,7 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
         const url = new URL(route.request().url());
         const offset = ((Number(url.searchParams.get('page')) || 1) - 1) * 10;
         return route.fulfill({ json: url.pathname.endsWith('/ratings')
-            ? { success: true, data: reviews.slice(0, state.count).map(row => ({ ...row, rollingScore: 8.3 })), currentScore: state.count ? 8.3 : null }
+            ? { success: true, data: dishService.buildDishScoreTrend(reviews.slice(0, state.count)).reviews, summary: dishService.buildDishRatingSummary(reviews.slice(0, state.count)) }
             : { success: true, data: reviews.slice(offset, Math.min(state.count, offset + 10)).map((row, index) => ({ ...row, photos: state.gallery && index === 0 ? [photos[0]] : [] })), total: state.count }
         });
     });
@@ -84,10 +85,15 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
             assert.equal(await page.locator('#view-dish-photos').isVisible(), Boolean(state.gallery));
             assert.equal(await page.locator('#dish-header #rating-trend').count(), 0);
             if (state.count > 1) {
+                assert.equal(await page.locator('#rating-trend').evaluate(el => el.open), false, 'History is opt-in');
                 await page.locator('#rating-trend summary').click();
                 await page.waitForFunction(() => Boolean(dishPage.ratingTrendChart));
                 assert.equal(await page.locator('#rating-trend-chart').isVisible(), true);
+                assert.equal(await page.evaluate(() => dishPage.ratingTrendChart.data.datasets[1].data.at(-1).y), 8, 'Graph uses the same arithmetic average');
                 await page.screenshot({ path: path.join(output, state.name + '-history.png'), fullPage: true });
+                await page.setViewportSize({ width: 320, height: 1000 });
+                await page.waitForFunction(() => dishPage.ratingTrendChart.width <= document.querySelector('.rating-trend-chart-wrap').clientWidth);
+                assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'Expanded graph resizes to phone width');
             }
             if (state.cover || state.gallery) {
                 await page.setViewportSize({ width: 320, height: 568 });
@@ -128,6 +134,94 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
                 assert.equal(await page.evaluate(() => window.qaLoginRequested), true, 'Guest empty CTA asks for login');
             }
         }
+        // The summary is independent of the weighted discovery score and of
+        // request completion order. Exercise the comparison thresholds directly.
+        await page.locator('#rating-trend').evaluate(el => { el.open = false; });
+        const summaryCases = [
+            { name: 'empty', recent: [], old: [], cards: 0, note: '' },
+            { name: 'one-review', recent: [9], old: [], cards: 1, note: '' },
+            { name: 'two-reviews', recent: [7, 9], old: [], cards: 1, note: '' },
+            { name: 'same-period', recent: [7, 8, 9], old: [], cards: 1, note: '' },
+            { name: 'few-recent', recent: [8, 10], old: [4, 6], cards: 1, note: 'Only 2 reviews in the last 6 months; showing the overall average.' },
+            { name: 'one-recent', recent: [8], old: [4, 6], cards: 1, note: 'Only 1 review in the last 6 months; showing the overall average.' },
+            { name: 'no-recent', recent: [], old: [4, 6], cards: 1, note: 'No reviews in the last 6 months.' },
+            { name: 'comparison', recent: [8, 9, 10], old: [4, 6], cards: 2, note: '' },
+            { name: 'equal-averages', recent: [8, 8, 8], old: [8], cards: 2, note: '' }
+        ];
+        for (const test of summaryCases) {
+            const now = Date.now();
+            const rows = test.recent.map(rating => ({ rating, submitted: now })).concat(test.old.map(rating => ({ rating, submitted: now - 900 * 86400000 })));
+            const summary = dishService.buildDishRatingSummary(rows, now);
+            await page.evaluate(({ summary, photoUrl }) => {
+                dishPage.renderRatingSummary(summary);
+                dishPage.renderDish({ ...dishPage.dishData, name: 'Latte', coverPhoto: photoUrl, score: 1.2 });
+            }, { summary, photoUrl });
+            assert.equal(await page.locator('.dish-rating-average').count(), test.cards, test.name);
+            assert.equal(await page.locator('#dish-rating-note').innerText(), test.note);
+            if (test.cards) {
+                assert.equal(await page.locator('.dish-rating-average').last().locator('.dish-score').innerText(), summary.overall.average.toFixed(1) + ' / 10');
+                assert.match(await page.locator('.dish-rating-average').last().innerText(), new RegExp('Based on ' + summary.overall.count + ' review'));
+            }
+            if (test.cards === 2) assert.equal(await page.locator('.dish-rating-average').first().locator('.dish-score').innerText(), summary.recent.average.toFixed(1) + ' / 10');
+            for (const width of [320, 390, 600, 768, 960, 1440]) {
+                await page.setViewportSize({ width, height: 1000 });
+                assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, test.name + ' at ' + width);
+                assert.equal(await page.locator('#dish-score').evaluate(el => el.scrollWidth > el.clientWidth), false, 'Summary fits');
+                if (['comparison', 'two-reviews', 'no-recent'].includes(test.name) && [390, 1440].includes(width)) {
+                    await page.screenshot({ path: path.join(output, 'averages-' + test.name + '-' + width + '.png'), fullPage: true });
+                }
+            }
+        }
+        await page.evaluate(url => dishPage.renderDish({ ...dishPage.dishData, coverPhoto: url, coverFileId: 'qa-framing', canAdjustCover: true, coverFraming: { box: { x: 0.55, y: 0.2, width: 0.4, height: 0.5 } } }), photoUrl);
+        await page.setViewportSize({ width: 390, height: 1000 });
+        await page.locator('#dish-cover-container').click();
+        await page.waitForFunction(() => document.getElementById('dish-lightbox-image').naturalWidth > 0);
+        await page.locator('#adjust-photo-framing').click();
+        const framingImage = await page.locator('#dish-lightbox-image').boundingBox();
+        await page.mouse.move(framingImage.x + framingImage.width * 0.2, framingImage.y + framingImage.height * 0.2);
+        await page.mouse.down();
+        await page.mouse.move(framingImage.x + framingImage.width * 0.8, framingImage.y + framingImage.height * 0.8, { steps: 5 });
+        await page.mouse.up();
+        assert.ok(Math.abs(Number(await page.locator('#framing-left').inputValue()) - 20) <= 1, 'Drag selects subject bounds');
+        await page.locator('#framing-left').focus();
+        await page.keyboard.press('ArrowLeft');
+        assert.equal(await page.locator('#photo-framing-editor').isVisible(), true, 'Editing fields does not navigate gallery');
+        await page.locator('#framing-left').fill('10');
+        await page.locator('#framing-right').fill('90');
+        await page.locator('#framing-top').fill('5');
+        await page.locator('#framing-bottom').fill('95');
+        assert.equal(await page.locator('#framing-save').isEnabled(), true);
+        await page.screenshot({ path: path.join(output, 'framing-editor-390.png') });
+        await page.route('**/api/files/qa-framing/framing', async route => {
+            const body = route.request().postDataJSON();
+            assert.equal(route.request().method(), 'PATCH');
+            assert.equal(body.box.x, 0.1);
+            await route.fulfill({ json: { success: true, data: { box: body.box, source: 'manual' } } });
+        });
+        await page.locator('#framing-save').click();
+        await page.locator('#photo-framing-editor').waitFor({ state: 'hidden' });
+        assert.equal(await page.evaluate(() => dishPage.dishData.coverFraming.source), 'manual');
+        await page.keyboard.press('Escape');
+        await page.evaluate(() => {
+            dishPage.dishData.canAdjustCover = false;
+            dishPage.dishData.coverFraming = { box: { x: 0, y: 0, width: 1, height: 1 } };
+            dishPage.applyCoverFraming();
+        });
+        for (const width of [320, 390, 768, 960, 1440]) {
+            await page.setViewportSize({ width, height: 1000 });
+            await page.evaluate(() => dishPage.applyCoverFraming());
+            assert.equal(await page.locator('#dish-cover-container img').evaluate(el => getComputedStyle(el).objectFit), 'contain', 'Complete subject preserved at ' + width);
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        }
+        await page.locator('#dish-cover-container').click();
+        assert.equal(await page.locator('#adjust-photo-framing').isVisible(), false, 'Visitors cannot adjust another user photo');
+        await page.keyboard.press('Escape');
+        console.log('FRAMING UI PASS: responsive subject preservation, owner editor and preview, manual save, and visitor control visibility');
+        await page.route('**/api/reviews/dish/' + fixture.dishId + '/ratings', route => route.fulfill({ status: 503, json: { success: false } }));
+        await page.evaluate(() => dishPage.loadRatingTrend());
+        await page.waitForFunction(() => document.getElementById('dish-score').textContent === 'Ratings unavailable');
+        assert.equal(await page.locator('#rating-trend').isVisible(), false, 'Failed ratings never show a weighted or stale average');
+        console.log('RATING SUMMARY PASS: nine sparse/comparison states at six widths, arithmetic values/counts, late dish response, and failed ratings request');
         rejectPhotos = true;
         await page.evaluate(url => dishPage.renderDish({ ...dishPage.dishData, coverPhoto: url + '-broken' }), photoUrl);
         await page.waitForFunction(() => !document.querySelector('#dish-header').classList.contains('has-cover'));

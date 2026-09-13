@@ -53,6 +53,7 @@ router.get('/dish/:dishId/ratings', async function(req, res) {
         res.json({
             success: true,
             data: trend.reviews || [],
+            summary: trend.summary,
             currentScore: trend.currentScore,
             scoreCalculatedAt: trend.scoreCalculatedAt
         });

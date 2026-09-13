@@ -178,7 +178,68 @@ describe('dishService dish score calculation', function() {
         expect(trend.reviews.map(function(review) { return review.reviewId; })).toEqual([1, 2]);
         expect(trend.reviews[0].rollingScore).toBe(6);
         expect(trend.reviews[1].rollingScore).toBe(8.7);
+        expect(trend.reviews[1].overallAverage).toBe(8);
+        expect(trend.summary.overall).toEqual({ average: 8, count: 2 });
         expect(trend.currentScore).toBe(8);
         expect(trend.scoreCalculatedAt).toBe(Date.UTC(2026, 5, 1));
+    });
+});
+
+describe('dishService arithmetic rating summaries', function() {
+    var now = Date.UTC(2026, 8, 12, 12);
+    test('returns no averages for no ratings', function() {
+        var summary = dishService.buildDishRatingSummary([], now);
+        expect(summary.overall).toEqual({ average: null, count: 0 });
+        expect(summary.recent).toEqual({ average: null, count: 0 });
+    });
+
+    test('includes old ratings in overall and weights every rating equally', function() {
+        var summary = dishService.buildDishRatingSummary([
+            { rating: 2, submitted: Date.UTC(2020, 0, 1) },
+            { rating: 6, submitted: Date.UTC(2026, 6, 1) },
+            { rating: 8, submitted: Date.UTC(2026, 7, 1) },
+            { rating: '10', submitted: now }
+        ], now);
+        expect(summary.overall).toEqual({ average: 6.5, count: 4 });
+        expect(summary.recent).toEqual({ average: 8, count: 3 });
+    });
+
+    test('includes the exact six-calendar-month boundary, not the millisecond before', function() {
+        var cutoff = dishService.buildDishRatingSummary([], now).recentSince;
+        var summary = dishService.buildDishRatingSummary([
+            { rating: 10, submitted: cutoff },
+            { rating: 2, submitted: cutoff - 1 }
+        ], now);
+        expect(summary.recent).toEqual({ average: 10, count: 1 });
+        expect(summary.overall).toEqual({ average: 6, count: 2 });
+    });
+
+    test('clamps the six-month boundary to February at month-end', function() {
+        var summary = dishService.buildDishRatingSummary([], new Date(2026, 7, 31, 12).getTime());
+        expect(summary.recentSince).toBe(new Date(2026, 1, 28, 12).getTime());
+    });
+
+    test('does not fabricate recent scores from old reviews', function() {
+        var summary = dishService.buildDishRatingSummary([{ rating: 9, submitted: Date.UTC(2020, 0, 1) }], now);
+        expect(summary.overall).toEqual({ average: 9, count: 1 });
+        expect(summary.recent).toEqual({ average: null, count: 0 });
+    });
+
+    test('excludes invalid ratings, invalid dates, and future reviews', function() {
+        var rows = [null, '', 0, 11, 'bad', Infinity].map(function(rating) { return { rating: rating, submitted: now }; });
+        rows.push({ rating: 9, submitted: null }, { rating: 9, submitted: 'bad' }, { rating: 9, submitted: now + 1 }, { rating: 7, submitted: now });
+        var trend = dishService.buildDishScoreTrend(rows, now);
+        expect(trend.summary.overall).toEqual({ average: 7, count: 1 });
+        expect(trend.reviews).toHaveLength(1);
+        expect(trend.reviews[0].overallAverage).toBe(7);
+    });
+
+    test('rounds once at the end and keeps the graph consistent with the summary', function() {
+        var trend = dishService.buildDishScoreTrend([8, 9, 9].map(function(rating, index) {
+            return { reviewId: index, rating: rating, submitted: now - index * 86400000 };
+        }), now);
+        expect(trend.summary.overall).toEqual({ average: 8.7, count: 3 });
+        expect(trend.summary.recent).toEqual(trend.summary.overall);
+        expect(trend.reviews[2].overallAverage).toBe(8.7);
     });
 });

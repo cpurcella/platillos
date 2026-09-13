@@ -4,8 +4,15 @@ var restaurantAi = require('./ai/restaurants');
 var dishAi = require('./ai/dishes');
 var reviewAi = require('./ai/reviews');
 var photoAi = require('./ai/reviewPhotos');
+var photoFraming = require('./ai/photoFraming');
 
 var JOB_HANDLERS = {
+    frame_photo: {
+        fetch: photoFraming.fetchFiles,
+        evaluate: photoFraming.evaluate,
+        apply: photoFraming.apply,
+        idField: 'fileId'
+    },
     evaluate_restaurant: {
         fetch: restaurantAi.fetchPendingRestaurants,
         evaluate: restaurantAi.evaluateSingleRestaurant,
@@ -153,6 +160,11 @@ async function processJobs(batchSize, options) {
 
 async function reconcileOrphans() {
     var enqueued = 0;
+    var unframed = await db.query("SELECT f.fileId FROM files f LEFT JOIN file_framing ff ON ff.fileId = f.fileId WHERE ff.fileId IS NULL AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'frame_photo' AND aj.targetId = f.fileId AND aj.status IN ('pending', 'processing', 'failed')) LIMIT 20");
+    for (var file of unframed) {
+        await enqueueJob('frame_photo', file.fileId);
+        enqueued++;
+    }
 
     // Find pending photos with no pending/processing job
     var orphanPhotos = await db.query(

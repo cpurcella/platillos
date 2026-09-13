@@ -106,6 +106,8 @@ router.post('/upload', async function(req, res, next) {
         };
 
         await fileService.saveFile(fileData);
+        try { await require('../aiJobQueue').enqueueJob('frame_photo', fileId); }
+        catch (err) { console.error('[files] Framing enqueue failed; reconciliation will retry', fileId); }
 
         res.json({
             success: true,
@@ -119,6 +121,23 @@ router.post('/upload', async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'File size exceeds the 2.1 MB limit.' });
         }
         res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.patch('/:fileId/framing', async function(req, res) {
+    try {
+        var user = req.allParams?.auth?.user;
+        if (!user) return res.status(401).json({ success: false, message: 'Please sign in.' });
+        var rows = await require('../connections').query('SELECT fileId, uploadedBy FROM files WHERE fileId = ?', [req.params.fileId]);
+        if (!rows.length) return res.status(404).json({ success: false, message: 'Photo not found.' });
+        if (rows[0].uploadedBy !== user.userId && String(user.isAdmin) !== '1') return res.status(403).json({ success: false, message: 'You can only adjust your own photos.' });
+        var box = req.body.box;
+        if (!require('../public/js/photo-framing').validBox(box)) return res.status(400).json({ success: false, message: 'Choose a valid subject area.' });
+        var framing = await require('../ai/photoFraming').apply({ fileId: req.params.fileId, box: box, source: 'manual', confidence: 1 });
+        res.json({ success: true, data: framing });
+    } catch (err) {
+        console.error('[files] Framing update failed', err.code || err.name);
+        res.status(500).json({ success: false, message: 'Unable to save framing. Please try again.' });
     }
 });
 

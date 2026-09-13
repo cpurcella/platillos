@@ -76,6 +76,25 @@ async function getObjectBuffer(key) {
 }
 
 async function rotateStoredPhoto(fileId, fileType, rotateDegreesClockwise) {
+    if (!getValidRotationDegrees(rotateDegreesClockwise) || !fileId) return false;
+    var connection = await db.getConnection();
+    var lockName = 'photo-frame:' + fileId;
+    try {
+        var locked = await connection.query('SELECT GET_LOCK(?, 10) AS acquired', [lockName]);
+        if (locked[0][0].acquired !== 1) throw new Error('Photo is being updated; retry later');
+        var result = await rotateStoredPhotoUnlocked(fileId, fileType, rotateDegreesClockwise);
+        await connection.query('DELETE FROM file_framing WHERE fileId = ?', [fileId]);
+    } finally {
+        try { await connection.query('SELECT RELEASE_LOCK(?)', [lockName]); } finally { connection.release(); }
+    }
+    // Only a successful rotation invalidates coordinates. Reconciliation can
+    // recover a failed enqueue without making a completed rotation look failed.
+    try { await require('../aiJobQueue').enqueueJob('frame_photo', fileId); }
+    catch (err) { console.warn('[photo-framing] Rotation enqueue deferred', fileId); }
+    return result;
+}
+
+async function rotateStoredPhotoUnlocked(fileId, fileType, rotateDegreesClockwise) {
     var rotationDegrees = getValidRotationDegrees(rotateDegreesClockwise);
     if (!rotationDegrees || !fileId) {
         return false;

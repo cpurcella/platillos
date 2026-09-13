@@ -41,6 +41,9 @@ async function run() {
         await db.query("UPDATE restaurants SET status = 'approved' WHERE restaurantId = ?", [first.restaurantId]);
         await db.query("UPDATE dishes SET status = 'approved' WHERE dishId = ?", [first.dishId]);
         assert.equal((await reviewService.getReviews({ dishId: first.dishId })).total, 1);
+        const ratingSummary = (await reviewService.getRatingsForDish(first.dishId)).summary;
+        assert.deepEqual(ratingSummary.overall, { average: 9, count: 1 });
+        assert.deepEqual(ratingSummary.recent, { average: 9, count: 1 });
         assert.equal((await dishService.getDish({ dishId: first.dishId })).name, 'QA First Dish');
         if (process.argv.includes('--browser')) {
             pending = await reviewService.saveReview({ auth, rating: 8, review: 'Pending QA review', modifications: '', newRestaurant: true, newRestaurantData: { name: fixture + ' Pending', address: '2 QA Test Street', city: 'Albuquerque', state: 'NM' }, newDish: true, newDishData: { name: 'Pending QA Dish' } });

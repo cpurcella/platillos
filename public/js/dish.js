@@ -9,7 +9,6 @@ var dishPage = {
     hasNextPage: false,
     ratingTrendChart: null,
     trendRatings: [],
-    trendMeta: null,
     coverPhotoUrl: null,
     lightboxOpener: null,
     galleryPhotos: [],
@@ -33,6 +32,8 @@ var dishPage = {
         }
 
         dishPage.bindEvents();
+        dishPage.coverResizeObserver = new ResizeObserver(dishPage.applyCoverFraming);
+        dishPage.coverResizeObserver.observe(document.getElementById('dish-cover-container'));
         dishPage.loadDish();
         dishPage.loadGalleryPhotos();
         dishPage.loadReviews();
@@ -136,12 +137,40 @@ var dishPage = {
         });
 
         $('#rating-trend').on('toggle', function() {
-            if (this.open) dishPage.renderRatingTrend(dishPage.trendRatings, dishPage.trendMeta);
+            if (this.open) dishPage.renderRatingTrend(dishPage.trendRatings);
         });
 
         $('#dish-lightbox-close').on('click', function() {
             dishPage.closeGalleryLightbox();
         });
+        $('#adjust-photo-framing').on('click', dishPage.openFramingEditor);
+        $('#photo-framing-editor input').on('input', dishPage.previewFraming);
+        $('#framing-full').on('click', function() { dishPage.setFramingFields({ x: 0, y: 0, width: 1, height: 1 }); });
+        $('#framing-cancel').on('click', dishPage.closeFramingEditor);
+        $('#framing-save').on('click', dishPage.saveFraming);
+        $('#dish-lightbox-image').on('pointerdown', function(e) {
+            if ($('#photo-framing-editor').hasClass('hidden')) return;
+            e.preventDefault();
+            dishPage.framingDrag = { x: e.clientX, y: e.clientY, rect: this.getBoundingClientRect() };
+            this.setPointerCapture(e.originalEvent.pointerId);
+        }).on('pointermove', function(e) {
+            var drag = dishPage.framingDrag;
+            if (!drag) return;
+            var x = Math.max(drag.rect.left, Math.min(drag.rect.right, e.clientX));
+            var y = Math.max(drag.rect.top, Math.min(drag.rect.bottom, e.clientY));
+            $('#framing-selection').removeClass('hidden').css({ left: Math.min(x, drag.x), top: Math.min(y, drag.y), width: Math.abs(x - drag.x), height: Math.abs(y - drag.y) });
+        }).on('pointerup', function(e) {
+            var drag = dishPage.framingDrag;
+            if (!drag) return;
+            var x1 = (drag.x - drag.rect.left) / drag.rect.width;
+            var y1 = (drag.y - drag.rect.top) / drag.rect.height;
+            var x2 = Math.max(0, Math.min(1, (e.clientX - drag.rect.left) / drag.rect.width));
+            var y2 = Math.max(0, Math.min(1, (e.clientY - drag.rect.top) / drag.rect.height));
+            var box = { x: Math.min(x1, x2), y: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) };
+            if (photoFraming.validBox(box) && box.width > 0.02 && box.height > 0.02) dishPage.setFramingFields(box);
+            dishPage.framingDrag = null;
+            $('#framing-selection').addClass('hidden');
+        }).on('pointercancel', function() { dishPage.framingDrag = null; $('#framing-selection').addClass('hidden'); });
 
         $('#dish-photo-lightbox').on('click', function(e) {
             if (e.target === this) {
@@ -161,12 +190,12 @@ var dishPage = {
             if ($('#dish-photo-lightbox').hasClass('hidden')) return;
             if (e.key === 'Escape') {
                 dishPage.closeGalleryLightbox();
-            } else if (e.key === 'ArrowLeft') {
+            } else if (e.key === 'ArrowLeft' && $('#photo-framing-editor').hasClass('hidden')) {
                 dishPage.showPreviousGalleryPhoto();
-            } else if (e.key === 'ArrowRight') {
+            } else if (e.key === 'ArrowRight' && $('#photo-framing-editor').hasClass('hidden')) {
                 dishPage.showNextGalleryPhoto();
             } else if (e.key === 'Tab') {
-                var buttons = $('#dish-photo-lightbox button:enabled').toArray();
+                var buttons = $('#dish-photo-lightbox button:enabled, #dish-photo-lightbox input:enabled').filter(':visible').toArray();
                 var first = buttons[0];
                 var last = buttons[buttons.length - 1];
                 if (e.shiftKey && document.activeElement === first) {
@@ -380,7 +409,8 @@ var dishPage = {
         $('#dish-name').text('Loading dish…');
         $('#dish-header').removeClass('has-cover');
         $('#dish-restaurant').text('');
-        $('#dish-score').text('');
+        $('#dish-score').text('Loading ratings…');
+        $('#dish-rating-note').addClass('hidden');
         $('#dish-review-count, #reviews-count-label').text('');
         $('#quick-log-btn').prop('disabled', true);
         $('#dish-cover-container').empty().hide();
@@ -391,6 +421,7 @@ var dishPage = {
         $('#dish-name').text('Dish');
         $('#dish-restaurant').text(message || 'Unavailable');
         $('#dish-score').text('');
+        $('#dish-rating-note').addClass('hidden');
         $('#dish-cover-container').empty().hide();
         $('#dish-actions').addClass('hidden');
         $('#rating-trend, #view-dish-photos').addClass('hidden');
@@ -412,15 +443,7 @@ var dishPage = {
             $restaurant.text(dish.restaurantName || '');
         }
 
-        var scoreValue = dish.score;
-        var scoreText = 'No ratings yet';
-        if (scoreValue !== null && scoreValue !== undefined) {
-            var formatted = typeof scoreValue === 'number' ? scoreValue.toFixed(1) : scoreValue;
-            scoreText = formatted + ' / 10';
-        }
-        $('#dish-score').text(scoreText).toggleClass('is-unrated', scoreValue === null || scoreValue === undefined);
         var count = Number(dish.reviewCount) || 0;
-        $('#dish-review-count').text(count + (count === 1 ? ' review' : ' reviews'));
         $('#reviews-count-label').text('(' + count + ')');
         dishPage.renderCoverPhoto();
     },
@@ -437,17 +460,96 @@ var dishPage = {
         $('#dish-header').toggleClass('has-cover', Boolean(url));
 
         if (url) {
-            var $image = $('<img>').attr({ src: url, alt: (dish.name || 'Dish') + ' cover photo' });
+            var framing = dish.coverPhoto ? dish.coverFraming : dishPage.galleryPhotos[0]?.framing;
+            var $image = $('<img>').attr({ src: framing?.displayUrl || url, alt: (dish.name || 'Dish') + ' cover photo' });
+            $image.on('load', dishPage.applyCoverFraming);
             $image.one('error', function() {
                 $(this).one('error', function() {
                     $cover.hide();
                     $('#dish-header').removeClass('has-cover');
-                }).attr('src', url + '_m');
+                }).attr('src', framing?.displayUrl ? url : url + '_m');
             });
             $cover.append($image, $('<span>').addClass('dish-photo-hint').text('View full photo')).show();
+            dishPage.applyCoverFraming();
         } else {
             $cover.hide();
         }
+    },
+
+    applyCoverFraming: function() {
+        var img = document.querySelector('#dish-cover-container img');
+        var container = document.getElementById('dish-cover-container');
+        if (!img || !img.naturalWidth || !container.clientHeight || !dishPage.dishData) return;
+        var data = dishPage.dishData.coverPhoto ? dishPage.dishData.coverFraming : dishPage.galleryPhotos[0]?.framing;
+        var box = data?.displayUrl === img.getAttribute('src') ? data.displayBox : data?.box;
+        // A medium fallback has already been framed; original coordinates no longer apply.
+        if (img.getAttribute('src') !== dishPage.coverPhotoUrl && img.getAttribute('src') !== data?.displayUrl) box = null;
+        var result = box ? photoFraming.frame(img.naturalWidth, img.naturalHeight, container.clientWidth / container.clientHeight, box) : { fit: 'contain', position: '50% 50%' };
+        $(img).css({ objectFit: result.fit, objectPosition: result.position });
+    },
+
+    activePhoto: function() {
+        if (dishPage.activeGalleryIndex === -1) return { url: dishPage.coverPhotoUrl, fileId: dishPage.dishData.coverFileId, framing: dishPage.dishData.coverFraming, canAdjust: dishPage.dishData.canAdjustCover, firstName: 'Dish photo' };
+        return dishPage.galleryPhotos[dishPage.activeGalleryIndex];
+    },
+    openFramingEditor: function() {
+        var photo = dishPage.activePhoto();
+        if (!photo?.canAdjust) return;
+        $('#photo-framing-editor').removeClass('hidden');
+        $('#dish-photo-lightbox').addClass('is-adjusting');
+        $('#framing-status').text('');
+        dishPage.setFramingFields(photo.framing?.box || { x: 0, y: 0, width: 1, height: 1 });
+        $('#framing-left').trigger('focus');
+    },
+    closeFramingEditor: function() {
+        dishPage.framingDrag = null;
+        $('#framing-selection').addClass('hidden');
+        $('#photo-framing-editor').addClass('hidden');
+        $('#dish-photo-lightbox').removeClass('is-adjusting');
+        $('#adjust-photo-framing').trigger('focus');
+    },
+    setFramingFields: function(box) {
+        $('#framing-left').val(Math.floor(box.x * 100));
+        $('#framing-top').val(Math.floor(box.y * 100));
+        $('#framing-right').val(Math.ceil((box.x + box.width) * 100));
+        $('#framing-bottom').val(Math.ceil((box.y + box.height) * 100));
+        dishPage.previewFraming();
+    },
+    framingFields: function() {
+        var left = Number($('#framing-left').val()) / 100;
+        var top = Number($('#framing-top').val()) / 100;
+        return { x: left, y: top, width: Number($('#framing-right').val()) / 100 - left, height: Number($('#framing-bottom').val()) / 100 - top };
+    },
+    previewFraming: function() {
+        var img = document.getElementById('dish-lightbox-image');
+        var box = dishPage.framingFields();
+        var valid = photoFraming.validBox(box);
+        $('#framing-save').prop('disabled', !valid);
+        $('#framing-status').text(valid ? '' : 'Right and bottom must be beyond left and top.');
+        if (valid) {
+            var rect = photoFraming.subjectRect(img.naturalWidth, img.naturalHeight, box);
+            var canvas = document.getElementById('framing-preview');
+            var context = canvas.getContext('2d');
+            var scale = Math.min(canvas.width / rect.width, canvas.height / rect.height);
+            context.fillStyle = '#f5f9f8';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            if (img.naturalWidth) context.drawImage(img, rect.x, rect.y, rect.width, rect.height, (canvas.width - rect.width * scale) / 2, (canvas.height - rect.height * scale) / 2, rect.width * scale, rect.height * scale);
+        }
+    },
+    saveFraming: async function() {
+        var photo = dishPage.activePhoto();
+        var box = dishPage.framingFields();
+        if (!photo?.canAdjust || !photoFraming.validBox(box)) return;
+        $('#framing-save').prop('disabled', true);
+        try {
+            var result = await common.secureAjax({ url: '/api/files/' + encodeURIComponent(photo.fileId) + '/framing', method: 'PATCH', data: JSON.stringify({ box: box }), contentType: 'application/json' });
+            if (!result.success) throw new Error('Unable to save framing.');
+            photo.framing = result.data;
+            if (photo.url === dishPage.dishData.coverPhoto) dishPage.dishData.coverFraming = result.data;
+            dishPage.renderCoverPhoto();
+            dishPage.closeFramingEditor();
+        } catch (err) { $('#framing-status').text('Unable to save framing. Please try again.'); }
+        finally { $('#framing-save').prop('disabled', false); }
     },
 
     loadGalleryPhotos: async function() {
@@ -511,6 +613,7 @@ var dishPage = {
     },
 
     closeGalleryLightbox: function() {
+        dishPage.closeFramingEditor();
         $('#dish-photo-lightbox').addClass('hidden');
         $('body').removeClass('dish-lightbox-open');
         dishPage.activeGalleryIndex = null;
@@ -520,10 +623,12 @@ var dishPage = {
 
     renderGalleryLightbox: function() {
         var index = dishPage.activeGalleryIndex;
-        var photo = index === -1 ? { url: dishPage.coverPhotoUrl, firstName: 'Dish photo' } : dishPage.galleryPhotos[index];
+        var photo = dishPage.activePhoto();
         if (!photo) {
             return;
         }
+        dishPage.closeFramingEditor();
+        $('#adjust-photo-framing').toggleClass('hidden', !photo.canAdjust);
 
         var reviewer = (photo.firstName || photo.lastName) ? ((photo.firstName || '') + ' ' + (photo.lastName || '')).trim() : (photo.username || 'Anonymous');
         var reviewerSafe = $('<div>').text(reviewer).html();
@@ -718,18 +823,51 @@ var dishPage = {
     loadRatingTrend: function() {
         $.get('/api/reviews/dish/' + encodeURIComponent(dishPage.dishId) + '/ratings')
             .done(function(res) {
-                if (res.success && res.data) {
+                if (res.success && res.data && res.summary) {
+                    dishPage.renderRatingSummary(res.summary);
                     dishPage.trendRatings = res.data;
-                    dishPage.trendMeta = {
-                        currentScore: res.currentScore,
-                        scoreCalculatedAt: res.scoreCalculatedAt
-                    };
                     var dates = new Set(res.data.filter(function(row) {
                         return dishPage.parseTrendNumber(row.rating) !== null && dishPage.parseTrendNumber(row.submitted) !== null;
                     }).map(function(row) { return dishPage.parseTrendNumber(row.submitted); }));
                     $('#rating-trend').toggleClass('hidden', dates.size < 2);
+                } else {
+                    dishPage.renderRatingSummaryError();
                 }
-            });
+            }).fail(dishPage.renderRatingSummaryError);
+    },
+
+    renderRatingSummaryError: function() {
+        $('#dish-score').text('Ratings unavailable');
+        $('#dish-rating-note').addClass('hidden');
+        $('#rating-trend').addClass('hidden').prop('open', false);
+    },
+
+    renderRatingSummary: function(summary) {
+        var $scores = $('#dish-score').empty();
+        var overall = summary.overall;
+        var recent = summary.recent;
+        var showComparison = recent.count >= 3 && recent.count < overall.count;
+        var note = '';
+        function addAverage(label, period, value) {
+            var $card = $('<div>').addClass('dish-rating-average');
+            $card.append($('<span>').addClass('dish-rating-label').text(label));
+            $card.append($('<span>').addClass('dish-score').text(Number(value.average).toFixed(1) + ' / 10'));
+            var $count = label === 'Overall average' ? $('<a>').attr({ id: 'dish-review-count', href: '#dish-reviews' }) : $('<span>');
+            $card.append($count.addClass('dish-rating-count').text(period + ' · Based on ' + value.count + (value.count === 1 ? ' review' : ' reviews')));
+            $scores.append($card);
+        }
+        if (!overall.count) {
+            $scores.append($('<span>').addClass('dish-score is-unrated').text('No ratings yet'));
+        } else {
+            if (showComparison) addAverage('Recent average', 'Last 6 months', recent);
+            addAverage('Overall average', 'All time', overall);
+            if (!recent.count) {
+                note = 'No reviews in the last 6 months.';
+            } else if (!showComparison && recent.count < overall.count) {
+                note = 'Only ' + recent.count + (recent.count === 1 ? ' review' : ' reviews') + ' in the last 6 months; showing the overall average.';
+            }
+        }
+        $('#dish-rating-note').text(note).toggleClass('hidden', !note);
     },
 
     parseTrendNumber: function(value) {
@@ -759,9 +897,7 @@ var dishPage = {
         return score.toFixed(1);
     },
 
-    renderRatingTrend: function(ratings, trendMeta) {
-        trendMeta = trendMeta || {};
-
+    renderRatingTrend: function(ratings) {
         var reviewPoints = [];
         var scorePoints = [];
         var xValues = [];
@@ -780,24 +916,11 @@ var dishPage = {
             });
             xValues.push(submitted);
 
-            var rollingScore = dishPage.parseTrendNumber(ratings[i].rollingScore);
-            if (rollingScore !== null) {
+            var overallAverage = dishPage.parseTrendNumber(ratings[i].overallAverage);
+            if (overallAverage !== null) {
                 scorePoints.push({
                     x: submitted,
-                    y: rollingScore
-                });
-            }
-        }
-
-        var calculatedAt = dishPage.parseTrendNumber(trendMeta.scoreCalculatedAt);
-        var currentScore = dishPage.parseTrendNumber(trendMeta.currentScore);
-        if (calculatedAt !== null) {
-            xValues.push(calculatedAt);
-            if (currentScore !== null) {
-                scorePoints.push({
-                    x: calculatedAt,
-                    y: currentScore,
-                    isCurrentScore: true
+                    y: overallAverage
                 });
             }
         }
@@ -841,7 +964,7 @@ var dishPage = {
                         showLine: false
                     },
                     {
-                        label: 'Rolling Score',
+                        label: 'Overall average',
                         data: scorePoints,
                         borderColor: '#007C87',
                         backgroundColor: 'rgba(0, 124, 135, 0.08)',
@@ -849,7 +972,7 @@ var dishPage = {
                         pointHitRadius: 8,
                         borderWidth: 2.5,
                         fill: true,
-                        tension: 0.3
+                        tension: 0
                     }
                 ]
             },
@@ -878,7 +1001,7 @@ var dishPage = {
                     }
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
                     tooltip: {
                         callbacks: {
                             title: function(items) {
