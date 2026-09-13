@@ -54,9 +54,16 @@ async function enqueueJob(jobType, targetId) {
     return { enqueued: true, jobId: result.insertId };
 }
 
-async function processJobs(batchSize) {
+async function processJobs(batchSize, options) {
+    options = options || {};
     batchSize = batchSize || 10;
     var now = Date.now();
+    // Lambda has a maximum lifetime of 15 minutes. Recover abandoned claims
+    // only after that window, without allowing an unbounded retry loop.
+    await db.query(
+        "UPDATE ai_jobs SET status = CASE WHEN attempts >= maxAttempts THEN 'failed' ELSE 'pending' END, error = 'Worker timed out; claim recovered', updatedAt = ? WHERE status = 'processing' AND updatedAt < ?",
+        [now, now - 20 * 60 * 1000]
+    );
 
     // Claim pending jobs (oldest first), skip ones that exceeded max attempts
     var jobs = await db.query(
@@ -71,8 +78,10 @@ async function processJobs(batchSize) {
     var client = getOpenAiClient();
     var succeeded = 0;
     var failed = 0;
+    var processed = 0;
 
     for (var i = 0; i < jobs.length; i++) {
+        if (options.getRemainingTimeInMillis && options.getRemainingTimeInMillis() < 90000) break;
         var job = jobs[i];
         var handler = JOB_HANDLERS[job.jobType];
 
@@ -86,14 +95,16 @@ async function processJobs(batchSize) {
         }
 
         // Mark as processing
-        await db.query(
-            "UPDATE ai_jobs SET status = 'processing', attempts = attempts + 1, updatedAt = ? WHERE jobId = ?",
-            [now, job.jobId]
+        var claim = await db.query(
+            "UPDATE ai_jobs SET status = 'processing', attempts = attempts + 1, updatedAt = ? WHERE jobId = ? AND status = 'pending' AND attempts < maxAttempts",
+            [Date.now(), job.jobId]
         );
+        if (!claim.affectedRows) continue;
+        processed++;
 
         try {
             // Fetch the pending item from its source table
-            var items = await handler.fetch(50);
+            var items = await handler.fetch(1, job.targetId);
             var item = items.find(function(r) {
                 return String(r[handler.idField]) === String(job.targetId);
             });
@@ -109,6 +120,7 @@ async function processJobs(batchSize) {
             }
 
             var evaluation = await handler.evaluate(client, item);
+            if (!evaluation || !evaluation.decision) throw new Error('No moderation decision returned; retry required');
 
             // Ensure the decision carries the correct target ID
             if (evaluation.decision && handler.idField) {
@@ -136,7 +148,7 @@ async function processJobs(batchSize) {
         }
     }
 
-    return { processed: jobs.length, succeeded: succeeded, failed: failed };
+    return { processed: processed, succeeded: succeeded, failed: failed };
 }
 
 async function reconcileOrphans() {
@@ -146,7 +158,7 @@ async function reconcileOrphans() {
     var orphanPhotos = await db.query(
         "SELECT rp.reviewPhotoId FROM reviews_photos rp " +
         "WHERE LOWER(COALESCE(rp.status, 'pending')) = 'pending' " +
-        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_photo' AND aj.targetId = CAST(rp.reviewPhotoId AS CHAR) AND aj.status IN ('pending', 'processing')) " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_photo' AND aj.targetId = CAST(rp.reviewPhotoId AS CHAR) AND aj.status IN ('pending', 'processing', 'failed')) " +
         "LIMIT 20"
     );
     for (var i = 0; i < orphanPhotos.length; i++) {
@@ -158,7 +170,7 @@ async function reconcileOrphans() {
     var orphanRestaurants = await db.query(
         "SELECT r.restaurantId FROM restaurants r " +
         "WHERE LOWER(COALESCE(r.status, 'pending')) = 'pending' " +
-        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_restaurant' AND aj.targetId = r.restaurantId AND aj.status IN ('pending', 'processing')) " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_restaurant' AND aj.targetId = r.restaurantId AND aj.status IN ('pending', 'processing', 'failed')) " +
         "LIMIT 20"
     );
     for (var j = 0; j < orphanRestaurants.length; j++) {
@@ -170,7 +182,7 @@ async function reconcileOrphans() {
     var orphanDishes = await db.query(
         "SELECT d.dishId FROM dishes d " +
         "WHERE LOWER(COALESCE(d.status, 'pending')) = 'pending' " +
-        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_dish' AND aj.targetId = d.dishId AND aj.status IN ('pending', 'processing')) " +
+        "AND NOT EXISTS (SELECT 1 FROM ai_jobs aj WHERE aj.jobType = 'evaluate_dish' AND aj.targetId = d.dishId AND aj.status IN ('pending', 'processing', 'failed')) " +
         "LIMIT 20"
     );
     for (var k = 0; k < orphanDishes.length; k++) {

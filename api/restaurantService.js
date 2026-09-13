@@ -93,7 +93,7 @@ async function getOrCreateCityId(connection, cityName) {
         return rows[0].cityId;
     }
 
-    var insertResult = await connection.query('INSERT INTO cities (city) VALUES (?)', [name]);
+    var insertResult = await connection.query("INSERT INTO cities (city, state, lat, lng) VALUES (?, '', 0, 0)", [name]);
     var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
     return header && header.insertId;
 }
@@ -171,8 +171,12 @@ async function getRestaurants(params) {
 
     var isAdmin = String(params?.auth?.user?.isAdmin) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
+    var forSubmission = String(params.forSubmission) === '1' && Boolean(params.auth && params.auth.user);
 
-    if (statusFilter === 'pending') {
+    if (forSubmission) {
+        selectClause = 'r.restaurantId, r.name, r.address, r.zip, r.status, c.city as cityName';
+        whereClauses.push("r.status IN ('approved', 'pending', 'needs_review')");
+    } else if (statusFilter === 'pending') {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;
@@ -193,6 +197,10 @@ async function getRestaurants(params) {
             throw outOfAreaErr;
         }
         whereClauses.push("r.status = 'out_of_area'");
+    } else if (statusFilter === 'rejected' && !isAdmin) {
+        var rejectedErr = new Error('Forbidden');
+        rejectedErr.status = 403;
+        throw rejectedErr;
     } else if (statusFilter === 'approved' || statusFilter === 'rejected') {
         whereClauses.push('r.status = ?');
         whereValues.push(statusFilter);
@@ -207,7 +215,7 @@ async function getRestaurants(params) {
 
     if (params.prefix) {
         whereClauses.push('r.name LIKE ?');
-        whereValues.push(params.prefix + '%');
+        whereValues.push('%' + String(params.prefix).replace(/[\\%_]/g, '\\$&') + '%');
     }
 
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
@@ -231,9 +239,9 @@ async function getRestaurants(params) {
         }
     }
 
-    var orderClause = '';
+    var orderClause = ' ORDER BY r.name ASC, r.restaurantId ASC';
     if (useLocation && lat && lng) {
-        orderClause = ' ORDER BY distance ASC';
+        orderClause = ' ORDER BY distance ASC, r.name ASC, r.restaurantId ASC';
     }
 
     var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';

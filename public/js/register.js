@@ -52,6 +52,7 @@ async function onGoToHome() {
 async function onRegisterSubmit(e) {
     e.preventDefault();
     var form = e.target;
+    if (form.dataset.submitting === 'true') return;
     if (!validate.validateForm(form)) return;
     var data = $(form).serializeObject();
     var email = data.email;
@@ -97,6 +98,8 @@ async function onRegisterSubmit(e) {
     }
     var recaptcha = $(form).find('.g-recaptcha-response').val();
     if (recaptcha) data.recaptcha = recaptcha;
+    form.dataset.submitting = 'true';
+    var $submit = $(form).find('[type="submit"]').prop('disabled', true);
     try {
         var response = await common.secureAjax({
             url: '/api/users/register',
@@ -127,11 +130,14 @@ async function onRegisterSubmit(e) {
             $('#register-success-message').attr('tabindex', '-1').focus();
         } else {
             common.showAlert(response.message || 'Registration failed.', 'error');
-            window.grecaptcha.reset();
+            if (window.grecaptcha) window.grecaptcha.reset();
         }
     } catch (err) {
         var msg = (err.responseJSON && err.responseJSON.message) || 'Registration failed. Please try again.';
         common.showAlert(msg, 'error');
-        window.grecaptcha.reset();
+        if (window.grecaptcha) window.grecaptcha.reset();
+    } finally {
+        form.dataset.submitting = 'false';
+        $submit.prop('disabled', false);
     }
 }

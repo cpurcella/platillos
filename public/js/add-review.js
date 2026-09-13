@@ -6,9 +6,11 @@ var addReviewModule = {
     dishes: [],
     metadataOptions: null,
     isSubmitting: false,
+    restaurantRequest: 0,
     drinkCategoryLabels: ['Cocktail', 'Beer', 'Wine', 'Spirits', 'Non-Alcoholic'],
     drinkTypeLabels: ['Margarita', 'Old Fashioned', 'Martini', 'Negroni', 'Daiquiri', 'Mojito', 'Manhattan', 'Paloma', 'Moscow Mule', 'Espresso Martini', 'Aperol Spritz', 'House Cocktail', 'Lager', 'Pilsner', 'IPA', 'Pale Ale', 'Hazy IPA', 'Wheat Beer', 'Amber Ale', 'Saison', 'Porter', 'Stout', 'Gose', 'Sour', 'Cider', 'Mocktail'],
     setHandlers: function() {
+        $('#add-review-form').on('submit', function(e) { e.preventDefault(); });
         $('#review-type-section').on('click', '.review-type-option', addReviewModule.chooseItemType);
         $('#submit-review').on('click', addReviewModule.handleSubmit);
         $('#restaurant-list').on('click', '.restaurant-item', addReviewModule.selectRestaurant);
@@ -264,14 +266,20 @@ var addReviewModule = {
         }
 
         addReviewModule.setSubmitState(true);
+        try {
         var $photoWrappers = $('#photo-upload-preview .photo-preview-item');
         if ($photoWrappers.length) {
             for (var i = 0; i < $photoWrappers.length; i++) {
                 var $photoWrapper = $($photoWrappers[i]);
                 var originalFile = $photoWrapper.data('file');
                 var rotationDegrees = $photoWrapper.data('rotation') || 0;
-                var compressedImage = await addReviewModule.compressImage(originalFile, rotationDegrees);
-                var uploadedPhoto = await addReviewModule.uploadPhoto(compressedImage);
+                var uploadedPhoto = $photoWrapper.data('uploadedPhoto');
+                if (!uploadedPhoto || $photoWrapper.data('uploadedRotation') !== rotationDegrees) {
+                    var compressedImage = await addReviewModule.compressImage(originalFile, rotationDegrees);
+                    uploadedPhoto = await addReviewModule.uploadPhoto(compressedImage);
+                    if (!uploadedPhoto || !uploadedPhoto.fileId) throw new Error('A photo could not be uploaded. Please retry or remove that photo.');
+                    $photoWrapper.data('uploadedPhoto', uploadedPhoto).data('uploadedRotation', rotationDegrees);
+                }
                 if (uploadedPhoto && uploadedPhoto.fileId) {
                     data.photos.push(uploadedPhoto.fileId);
                 }
@@ -280,7 +288,6 @@ var addReviewModule = {
 
         data.photos = JSON.stringify(data.photos);
 
-        try {
             var response = await common.secureAjax({
                 url: '/api/reviews',
                 method: 'POST',
@@ -290,7 +297,8 @@ var addReviewModule = {
             if (response.success) {
                 var favDishId = (isNewDish && response.data && response.data.dishId) ? response.data.dishId : selectedDishId;
                 if ($('#add-to-favorites').prop('checked') && favDishId && favDishId !== 'new') {
-                    try { await common.secureAjax({ url: '/api/watchlist/' + favDishId, method: 'POST' }); } catch (e) { /* silent */ }
+                    try { await common.secureAjax({ url: '/api/users/favorites/' + encodeURIComponent(favDishId), method: 'POST' }); }
+                    catch (e) { common.showAlert('Your review was saved, but the favorite could not be saved. You can favorite the dish from its page.', 'warning'); }
                 }
                 common.showAlert(
                     response.message || 'Review submitted successfully!',
@@ -303,7 +311,7 @@ var addReviewModule = {
                 common.showAlert(response.message || 'Failed to submit review.', 'error');
             }
         } catch (err) {
-            var message = (err.responseJSON && err.responseJSON.message) || 'Failed to submit review. Please try again.';
+            var message = (err.responseJSON && err.responseJSON.message) || err.message || 'Failed to submit review. Please try again.';
             common.showAlert(message, 'error');
         } finally {
             addReviewModule.setSubmitState(false);
@@ -332,6 +340,7 @@ var addReviewModule = {
         var options = {
             maxSizeMB: 2,
             maxWidthOrHeight: 1920,
+            fileType: 'image/jpeg',
             useWebWorker: true
         };
 
@@ -507,25 +516,29 @@ var addReviewModule = {
         };
     },
     getRestaurantCard: function(restaurant) {
-        var cityParts = [];
-        if (restaurant.city) cityParts.push(restaurant.city);
-        if (restaurant.state) cityParts.push(restaurant.state);
-        if (restaurant.zip) cityParts.push(restaurant.zip);
-        var cityLine = cityParts.join(', ');
-        return `
-            <div class="restaurant-item card" data-id="${restaurant.restaurantId}" data-name="${restaurant.name}" data-address="${restaurant.address || ''}" data-city="${restaurant.city || ''}" data-state="${restaurant.state || ''}" data-zip="${restaurant.zip || ''}">
-                <div class="restaurant-name">${restaurant.name}</div>
-                ${restaurant.address ? `<div class="restaurant-address">${restaurant.address}</div>` : ''}
-                ${cityLine ? `<div class="restaurant-city">${cityLine}</div>` : ''}
-            </div>
-        `;
+        var city = restaurant.city || restaurant.cityName || '';
+        var $card = $('<button type="button" class="restaurant-item card">').attr({
+            'data-id': restaurant.restaurantId, 'data-name': restaurant.name || '',
+            'data-address': restaurant.address || '', 'data-city': city,
+            'data-state': restaurant.state || '', 'data-zip': restaurant.zip || '',
+            'data-status': restaurant.status || ''
+        });
+        $card.append($('<span class="restaurant-name">').text(restaurant.name));
+        if (restaurant.address) $card.append($('<span class="restaurant-address">').text(restaurant.address));
+        var cityLine = [city, restaurant.state, restaurant.zip].filter(Boolean).join(', ');
+        if (cityLine) $card.append($('<span class="restaurant-city">').text(cityLine));
+        if (['pending', 'needs_review'].includes(restaurant.status)) {
+            $card.append($('<span class="submission-status">').text('Awaiting approval · You can add a dish here'));
+        }
+        return $card;
     },
     getDishCard: function(dish) {
-        return `
-            <div class="dish-item card" data-id="${dish.dishId}">
-                <div class="dish-name">${dish.name}</div>
-            </div>
-        `;
+        var $card = $('<button type="button" class="dish-item card">').attr('data-id', dish.dishId)
+            .append($('<span class="dish-name">').text(dish.name));
+        if (['pending', 'needs_review'].includes(dish.status)) {
+            $card.append($('<span class="submission-status">').text('Awaiting approval · You can review this item'));
+        }
+        return $card;
     },
     renderRestaurantList: function(restaurants) {
         addReviewModule.populateRestaurantList(restaurants);
@@ -689,7 +702,7 @@ var addReviewModule = {
         }
 
         try {
-            var response = await $.get('/api/dishes', { restaurantId: restaurantId, itemType: addReviewModule.itemType });
+            var response = await $.get('/api/dishes', { restaurantId: restaurantId, itemType: addReviewModule.itemType, forSubmission: 1, pageSize: 100 });
             addReviewModule.populateDishList(response.data || []);
         } catch (err) {
             addReviewModule.renderEmptyState($('#dish-list'), 'We ran into a problem loading ' + addReviewModule.itemPlural() + '.',
@@ -709,19 +722,12 @@ var addReviewModule = {
                 restaurant.zip || ''
             ].filter(Boolean).join(', ');
         }
-        var $selectedCard = $(
-            `<div class="restaurant-item card selected-restaurant"
-                  data-id="${restaurant.restaurantId}"
-                  data-name="${restaurant.name || ''}"
-                  data-address="${restaurant.address || ''}"
-                  data-city="${restaurant.city || ''}"
-                  data-state="${restaurant.state || ''}"
-                  data-zip="${restaurant.zip || ''}">
-                <div class="restaurant-name">${restaurant.name}</div>
-                ${addressLine ? `<div class="restaurant-address">${addressLine}</div>` : ''}
-                ${cityLine ? `<div class="restaurant-city">${cityLine}</div>` : ''}
-            </div>`
-        );
+        var $source = addReviewModule.getRestaurantCard(restaurant);
+        var $selectedCard = $('<div class="restaurant-item card selected-restaurant">');
+        Array.from($source[0].attributes).forEach(function(attr) {
+            if (attr.name.indexOf('data-') === 0) $selectedCard.attr(attr.name, attr.value);
+        });
+        $selectedCard.append($source.contents());
         $selectedCard.append('<a href="javascript:void(0)" class="btn btn-gray cancel-btn" id="cancel-selection-btn">Go Back</a>');
         $('#selected-restaurant-container').html($selectedCard);
         $('#restaurant-search-section').addClass('hidden');
@@ -739,11 +745,9 @@ var addReviewModule = {
     },
 
     setSelectedDish: function(dish) {
-        var $selectedCard = $(
-            `<div class="dish-item card selected-dish" data-id="${dish.dishId}" data-name="${dish.name || ''}">
-                <div class="dish-name">${dish.name}</div>
-            </div>`
-        );
+        var $selectedCard = $('<div class="dish-item card selected-dish">')
+            .attr({ 'data-id': dish.dishId, 'data-name': dish.name || '' })
+            .append($('<div class="dish-name">').text(dish.name));
         $selectedCard.append('<a href="javascript:void(0)" class="btn btn-gray cancel-btn" id="cancel-dish-selection-btn">Go Back</a>');
         $('#selected-dish-container').html($selectedCard);
         $('#dish-search-section').addClass('hidden');
@@ -756,11 +760,14 @@ var addReviewModule = {
         addReviewModule.populateDishList(dishes);
     },
     loadRestaurants: async function(lat, lng, prefix) {
+        var requestId = ++addReviewModule.restaurantRequest;
         var $list = $('#restaurant-list');
         addReviewModule.renderLoading($list, prefix ? 'Searching for matching restaurants…' : 'Finding restaurants near you…');
         var fields = ['restaurantId', 'name', 'address', 'city', 'state', 'zip'];
         var query = {
             useLocation: 1,
+            forSubmission: 1,
+            pageSize: 100,
             fields: JSON.stringify(fields)
         };
         if (lat && lng) {
@@ -776,8 +783,10 @@ var addReviewModule = {
                 dataType: 'json',
                 data: query
             });
+            if (requestId !== addReviewModule.restaurantRequest) return;
             addReviewModule.renderRestaurantList(response.data || []);
         } catch (err) {
+            if (requestId !== addReviewModule.restaurantRequest) return;
             addReviewModule.renderEmptyState($list, 'Unable to load restaurants right now.',
                 '<a href="javascript:void(0)" class="btn btn-turquoise" id="add-restaurant-btn">Add a Restaurant</a>');
         }
@@ -808,7 +817,7 @@ function initializeAddReview() {
             addReviewModule.loadRestaurants(addReviewModule.lat, addReviewModule.lng);
         }, function() {
             addReviewModule.loadRestaurants();
-        });
+        }, { timeout: 6000, maximumAge: 300000 });
     } else {
         addReviewModule.loadRestaurants();
     }

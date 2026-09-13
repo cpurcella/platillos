@@ -545,7 +545,7 @@ var dishListModule = {
             return '<span class="dish-score-value">No ratings yet</span>';
         }
         var numericScore = Number(score);
-        var normalizedScore = numericScore > 5 ? numericScore / 2 : numericScore;
+        var normalizedScore = numericScore / 2;
         var clampedScore = Math.max(0, Math.min(5, normalizedScore));
         var fullStars = Math.floor(clampedScore);
         var hasHalf = (clampedScore - fullStars) >= 0.5;
@@ -560,7 +560,7 @@ var dishListModule = {
     renderStarsCompact: function(score) {
         if (score == null || isNaN(score)) return '<span class="shelf-no-rating">—</span>';
         var numericScore = Number(score);
-        var normalizedScore = numericScore > 5 ? numericScore / 2 : numericScore;
+        var normalizedScore = numericScore / 2;
         var clampedScore = Math.max(0, Math.min(5, normalizedScore));
         var fullStars = Math.floor(clampedScore);
         var hasHalf = (clampedScore - fullStars) >= 0.5;

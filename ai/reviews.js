@@ -11,7 +11,7 @@ function buildPublicFileUrl(fileId) {
     return 'https://' + config.bucket + '.s3.amazonaws.com/' + fileId;
 }
 
-async function fetchPendingReviews(limit) {
+async function fetchPendingReviews(limit, targetId) {
     var sql = "SELECT r.reviewId, r.review AS reviewContent, r.modifications, r.rating, r.dishId, r.submitted, " +
         "r.submittedBy, r.status, d.name AS dishName, d.restaurantId, s.name AS restaurantName, " +
         "u.firstName, u.lastName, u.email " +
@@ -20,9 +20,10 @@ async function fetchPendingReviews(limit) {
         "JOIN restaurants s ON d.restaurantId = s.restaurantId " +
         "JOIN users u ON r.submittedBy = u.userId " +
         "WHERE LOWER(COALESCE(r.status, 'pending')) = 'pending' " +
-        "ORDER BY r.submitted DESC, r.reviewId DESC LIMIT ?";
+        (targetId ? 'AND r.reviewId = ? ' : '') +
+        "ORDER BY r.submitted ASC, r.reviewId ASC LIMIT ?";
 
-    var rows = await db.query(sql, [limit]) || [];
+    var rows = await db.query(sql, targetId ? [targetId, limit] : [limit]) || [];
 
     var reviewIds = rows.map(function(row) { return row.reviewId; });
     var photoMap = {};
@@ -63,7 +64,7 @@ function buildReviewPrompt(review) {
         '',
         'Dish: ' + (review.dishName || 'Unknown Dish'),
         'Restaurant: ' + (review.restaurantName || 'Unknown Restaurant'),
-        'Rating: ' + (review.rating !== undefined && review.rating !== null ? review.rating + '/5' : 'Not provided'),
+        'Rating: ' + (review.rating !== undefined && review.rating !== null ? review.rating + '/10' : 'Not provided'),
         'Reviewer: ' + (review.reviewerName || 'Anonymous'),
         ''
     ];

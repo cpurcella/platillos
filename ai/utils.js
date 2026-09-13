@@ -62,8 +62,23 @@ function resolveAiStatus(verdict, confidence) {
     }
 }
 
+// Search results cannot prove that a local business or a seasonal dish does
+// not exist. Negative listing decisions require a person to make that call.
+function resolveListingStatus(decision) {
+    decision = decision || {};
+    var evidence = Array.isArray(decision.evidence) ? decision.evidence : [];
+    var hasSource = evidence.some(function(source) {
+        return typeof source === 'string' && /https?:\/\/[^\s]+/i.test(source);
+    });
+    if (decision.verdict !== 'approve' || !hasSource || !Number.isFinite(decision.confidence)) {
+        return 'needs_review';
+    }
+    return resolveAiStatus(decision.verdict, decision.confidence);
+}
+
 module.exports = {
     formatDate: formatDate,
     extractJsonResult: extractJsonResult,
-    resolveAiStatus: resolveAiStatus
+    resolveAiStatus: resolveAiStatus,
+    resolveListingStatus: resolveListingStatus
 };

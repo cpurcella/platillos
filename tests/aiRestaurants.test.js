@@ -38,7 +38,7 @@ describe('ai/restaurants verification instructions', function() {
 
         expect(instructions).toContain('If evidence is sparse but plausible');
         expect(instructions).toContain('set verdict to manual_review instead of reject');
-        expect(instructions).toContain('Reject only when searches find no credible evidence');
+        expect(instructions).toContain('Never reject because no credible evidence was found');
     });
 
     test('tells the model to search flexible local and Spanish variants', function() {

@@ -3,8 +3,8 @@
 }
 
 .dish-header {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     background: #ffffff;
     border-radius: 12px;
@@ -20,6 +20,15 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.dish-header .platillos-title {
+    margin: 0;
+    font-size: clamp(1.65rem, 4vw, 2.5rem);
+    line-height: 1.15;
+    text-align: left;
 }
 
 .dish-meta {
@@ -50,6 +59,8 @@
 }
 
 .dish-rating-trend {
+    grid-column: 1 / -1;
+    min-width: 0;
     border-top: 1px solid #eee;
     padding-top: 12px;
     margin-top: 4px;
@@ -111,12 +122,11 @@
     border-radius: 10px;
     background: #f2f2f2;
     overflow: hidden;
+    aspect-ratio: 16 / 10;
 }
 
 .dish-header-photo::before {
-    content: '';
-    display: block;
-    padding-bottom: 56.25%;
+    content: none;
 }
 
 .dish-header-photo img {
@@ -651,20 +661,8 @@ a.review-author-link:hover .review-author-name {
         padding: 24px 36px;
     }
 
-    .dish-header {
-        flex-direction: row;
-        align-items: stretch;
-    }
-
-    .dish-header-info {
-        flex: 1;
-    }
-
-    .dish-header-photo {
-        max-width: 320px;
-    }
-
-    .dish-header-photo::before {
-        padding-bottom: 62.5%;
+    .dish-header.has-cover {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: center;
     }
 }

@@ -9,6 +9,7 @@ var searchModule = {
     loading: false,
     hasMore: true,
     browserLocation: null,
+    requestVersion: 0,
 
     init: function() {
         searchModule.bindEvents();
@@ -77,10 +78,13 @@ var searchModule = {
     },
 
     showEmptySearch: function() {
+        searchModule.requestVersion++;
+        searchModule.loading = false;
+        $('#dishes-loading').hide();
         $('#search-tabs').hide();
         $('#dishes-section').hide();
         $('#people-section').hide();
-        $('#search-empty').hide();
+        $('#search-empty').text('No results found. Try another dish or restaurant name.').hide();
         $('#dishes-container').empty();
         $('#people-container').empty();
         $('#results-count').empty();
@@ -169,8 +173,10 @@ var searchModule = {
     },
 
     runSearch: function(term) {
+        searchModule.requestVersion++;
+        searchModule.loading = false;
         $('#search-tabs').show();
-        $('#search-empty').hide();
+        $('#search-empty').text('No results found. Try another dish or restaurant name.').hide();
 
         if (searchModule.currentType === 'people') {
             $('#dishes-section').hide();
@@ -183,8 +189,10 @@ var searchModule = {
     },
 
     loadPeople: async function(term) {
+        var version = searchModule.requestVersion;
         try {
             var res = await $.get('/api/users/search', { q: term, limit: 50 });
+            if (version !== searchModule.requestVersion) return;
             if (res.success && res.data.length) {
                 searchModule.renderPeople(res.data);
                 $('#people-section').show();
@@ -193,8 +201,9 @@ var searchModule = {
             $('#people-section').hide();
             $('#search-empty').show();
         } catch (err) {
+            if (version !== searchModule.requestVersion) return;
             $('#people-section').hide();
-            $('#search-empty').show();
+            $('#search-empty').text('Search could not load. Please try again.').show();
         }
     },
 
@@ -220,7 +229,9 @@ var searchModule = {
     },
 
     loadDishes: async function(term, append) {
-        if (searchModule.loading) return;
+        if (append && searchModule.loading) return;
+        var version = searchModule.requestVersion;
+        var page = searchModule.currentPage;
         searchModule.loading = true;
         $('#dishes-loading').show();
 
@@ -238,6 +249,7 @@ var searchModule = {
                 params.lng = searchModule.browserLocation.lng;
             }
             var res = await $.get('/api/dishes', params);
+            if (version !== searchModule.requestVersion) return;
             if (res.success) {
                 searchModule.totalResults = res.total;
                 $('#results-count').text(res.total + ' result' + (res.total === 1 ? '' : 's'));
@@ -245,25 +257,30 @@ var searchModule = {
                 if (res.data.length) {
                     searchModule.renderDishes(res.data, append);
                     $('#dishes-section').show();
-                    searchModule.hasMore = (searchModule.currentPage * searchModule.pageSize) < res.total;
+                    searchModule.hasMore = (page * searchModule.pageSize) < res.total;
                 } else if (!append) {
                     $('#dishes-section').hide();
-                    $('#search-empty').show();
+                    $('#search-empty').text('No results found. Try another dish or restaurant name.').show();
                     searchModule.hasMore = false;
                 }
             }
         } catch (err) {
+            if (version !== searchModule.requestVersion) return;
+            if (append) searchModule.currentPage = Math.max(1, page - 1);
             if (!append) {
                 $('#dishes-section').hide();
-                $('#search-empty').show();
+                $('#search-empty').text('Search could not load. Please try again.').show();
             }
         }
 
-        searchModule.loading = false;
-        $('#dishes-loading').hide();
+        if (version === searchModule.requestVersion) {
+            searchModule.loading = false;
+            $('#dishes-loading').hide();
+        }
     },
 
     loadMoreDishes: function() {
+        if (searchModule.loading || !searchModule.hasMore) return;
         var term = ($('#searchInput').val() || '').trim();
         if (!term) return;
         searchModule.currentPage++;
@@ -324,7 +341,7 @@ var searchModule = {
             return '<span class="search-dish-no-rating">No ratings yet</span>';
         }
         var numericScore = Number(score);
-        var normalizedScore = numericScore > 5 ? numericScore / 2 : numericScore;
+        var normalizedScore = numericScore / 2;
         var clampedScore = Math.max(0, Math.min(5, normalizedScore));
         var fullStars = Math.floor(clampedScore);
         var hasHalf = (clampedScore - fullStars) >= 0.5;
@@ -334,7 +351,7 @@ var searchModule = {
         if (hasHalf) html += '<span class="star star-half">\u2605</span>';
         for (var j = 0; j < emptyStars; j++) html += '<span class="star star-empty">\u2605</span>';
         return '<span class="stars" aria-label="Rating ' + clampedScore.toFixed(1) + ' out of 5">' + html + '</span>' +
-            '<span class="search-dish-score-num">' + clampedScore.toFixed(1) + '</span>';
+            '<span class="search-dish-score-num">' + (clampedScore * 2).toFixed(1) + '/10</span>';
     }
 };
 

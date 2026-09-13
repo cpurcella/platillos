@@ -367,12 +367,18 @@ async function getDishes(params) {
     var whereValues = [];
 
     var userAdminFlag = params && params.auth && params.auth.user ? params.auth.user.isAdmin : 0;
-    var isAdmin = userAdminFlag === 1;
+    var isAdmin = String(userAdminFlag) === '1';
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
     var shouldApplyLocationFilters = !(isAdmin && statusFilter);
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
 
-    if (shouldFilterPending) {
+    var forSubmission = String(params.forSubmission) === '1' && Boolean(params.auth && params.auth.user) && Boolean(params.restaurantId);
+    if (forSubmission) {
+        shouldApplyLocationFilters = false;
+        selectClause = 'd.dishId, d.restaurantId, d.name, d.itemType, d.status, r.name as restaurantName';
+        whereClauses.push("d.status IN ('approved', 'pending', 'needs_review')");
+        whereClauses.push("r.status IN ('approved', 'pending', 'needs_review')");
+    } else if (shouldFilterPending) {
         if (!isAdmin) {
             var err = new Error('Forbidden');
             err.status = 403;

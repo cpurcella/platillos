@@ -75,7 +75,9 @@ var restaurantPage = {
             maxZoom: 19
         }).addTo(map);
 
-        L.marker([lat, lng]).addTo(map).bindPopup(name || 'Restaurant');
+        var popup = document.createElement('span');
+        popup.textContent = name || 'Restaurant';
+        L.marker([lat, lng]).addTo(map).bindPopup(popup);
         restaurantPage.map = map;
 
         // Fix tile loading when map container resizes
@@ -120,6 +122,8 @@ var restaurantPage = {
                 var dishes = (res.success && res.data) ? res.data : [];
                 restaurantPage.allDishes = dishes;
                 restaurantPage.renderDishes(dishes);
+            }).fail(function() {
+                $('#dishes-empty').text('Dishes could not load. Please refresh to try again.').removeClass('hidden');
             });
     },
 
@@ -151,7 +155,7 @@ var restaurantPage = {
         var href = '/dishes/' + dish.dishId + '/' + slug;
 
         return '<a href="' + href + '" class="dish-card">' +
-            '<div class="dish-card-name">' + (dish.name || 'Dish') + '</div>' +
+            '<div class="dish-card-name">' + $('<span>').text(dish.name || 'Dish').html() + '</div>' +
             '<div class="dish-card-meta">' + score + reviews + '</div>' +
             '</a>';
     },

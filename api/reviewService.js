@@ -103,7 +103,7 @@ async function hasRecentReview(dishId, userId) {
     var sql = `
         SELECT COUNT(*) AS reviewCount
         FROM reviews
-        WHERE dishId = ? AND submittedBy = ? AND submitted >= ?
+        WHERE dishId = ? AND submittedBy = ? AND submitted >= ? AND status != 'rejected'
     `;
     var params = [dishId, userId, thirtyDaysAgo];
     var [result] = await db.query(sql, params);
@@ -120,7 +120,7 @@ async function getOrCreateCityId(connection, cityName) {
     var result = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
     var rows = Array.isArray(result) ? result[0] : result;
     if (rows && rows.length) return rows[0].cityId;
-    var insertResult = await connection.query('INSERT INTO cities (city) VALUES (?)', [name]);
+    var insertResult = await connection.query("INSERT INTO cities (city, state, lat, lng) VALUES (?, '', 0, 0)", [name]);
     var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
     return header && header.insertId;
 }
@@ -170,6 +170,29 @@ async function geocodeRestaurantLocation(restaurantData) {
 
 async function saveReview(allParams) {
     var ratingValue = requireRating(allParams.rating);
+    function invalid(message, status) {
+        var err = new Error(message);
+        err.status = status || 400;
+        throw err;
+    }
+    function submissionName(value, label) {
+        var name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+        if (!name || name.length > 64) invalid(label + ' must be between 1 and 64 characters.');
+        return name;
+    }
+    if (String(allParams.newRestaurant).toLowerCase() === 'true') {
+        if (!allParams.newRestaurantData) invalid('Restaurant details are required.');
+        allParams.newRestaurantData.name = submissionName(allParams.newRestaurantData.name, 'Restaurant name');
+        ['address', 'city', 'zip', 'state'].forEach(function(field) {
+            var limit = field === 'zip' ? 16 : 64;
+            var value = allParams.newRestaurantData[field];
+            if (value !== undefined && (typeof value !== 'string' || value.length > limit)) invalid('Please check the restaurant ' + field + '.');
+        });
+    }
+    if (String(allParams.newDish).toLowerCase() === 'true') {
+        if (!allParams.newDishData) invalid('Dish details are required.');
+        allParams.newDishData.name = submissionName(allParams.newDishData.name, 'Dish name');
+    }
     var connection = await db.getConnection();
     try {
         await connection.beginTransaction();
@@ -198,6 +221,21 @@ async function saveReview(allParams) {
 
         var restaurantId = allParams.restaurantId || null;
         var holdForSoftLaunch = false;
+        var awaitingApproval = false;
+        // Reuse a matching location when a stale picker leads to another submission.
+        if (isNewRestaurant) {
+            var submittedRestaurant = allParams.newRestaurantData;
+            var matches = await connection.query(
+                "SELECT r.restaurantId FROM restaurants r LEFT JOIN cities c ON r.cityId = c.cityId " +
+                "WHERE LOWER(TRIM(r.name)) = LOWER(?) AND LOWER(TRIM(COALESCE(r.address, ''))) = LOWER(?) " +
+                "AND LOWER(TRIM(COALESCE(c.city, ''))) = LOWER(?) AND r.status IN ('approved', 'pending', 'needs_review') LIMIT 1",
+                [submittedRestaurant.name, String(submittedRestaurant.address || '').trim(), String(submittedRestaurant.city || 'Unknown').trim()]
+            );
+            if (matches[0] && matches[0].length) {
+                restaurantId = matches[0][0].restaurantId;
+                isNewRestaurant = false;
+            }
+        }
         if (isNewRestaurant && allParams.newRestaurantData) {
             var cityId = await getOrCreateCityId(connection, allParams.newRestaurantData.city);
             restaurantId = crypto.randomUUID();
@@ -224,6 +262,7 @@ async function saveReview(allParams) {
             });
             holdForSoftLaunch = launchCheck.isOutsideLaunchArea;
             var restaurantStatus = holdForSoftLaunch ? 'out_of_area' : 'pending';
+            awaitingApproval = true;
 
             await connection.query(
                 `
@@ -249,8 +288,27 @@ async function saveReview(allParams) {
             );
         }
 
+        if (!isNewRestaurant && restaurantId) {
+            var parentResult = await connection.query('SELECT restaurantId, status FROM restaurants WHERE restaurantId = ? FOR UPDATE', [restaurantId]);
+            var parent = parentResult[0] && parentResult[0][0];
+            if (!parent || !['approved', 'pending', 'needs_review'].includes(parent.status)) {
+                invalid('This restaurant is unavailable for new submissions. Please choose another restaurant.', 409);
+            }
+            awaitingApproval = parent.status !== 'approved';
+        }
+
         var submissionStatus = holdForSoftLaunch ? 'out_of_area' : 'pending';
         var finalDishId = allParams.dishId || null;
+        if (isNewDish && restaurantId) {
+            var existingDish = await connection.query(
+                "SELECT dishId FROM dishes WHERE restaurantId = ? AND LOWER(TRIM(name)) = LOWER(?) AND itemType = ? AND status IN ('approved', 'pending', 'needs_review') LIMIT 1",
+                [restaurantId, allParams.newDishData.name, dishService.normalizeItemType(allParams.newDishData.itemType || allParams.itemType) || 'food']
+            );
+            if (existingDish[0] && existingDish[0].length) {
+                finalDishId = existingDish[0][0].dishId;
+                isNewDish = false;
+            }
+        }
         if (isNewDish && allParams.newDishData) {
             if (!restaurantId) {
                 throw new Error('Restaurant is required to add a new dish.');
@@ -260,14 +318,15 @@ async function saveReview(allParams) {
             await connection.query(
                 `
                 INSERT INTO dishes
-                    (dishId, restaurantId, name, itemType, submitted, submittedBy, status, statusUpdated, statusUpdatedBy)
+                    (dishId, restaurantId, name, itemType, submitted, submittedBy, status, statusUpdated, statusUpdatedBy, reviewCount)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
                 `,
                 [dishId, restaurantId, allParams.newDishData.name || '', itemType, nowMs, userId, submissionStatus, null, null]
             );
             await dishService.addDishMetadata(connection, dishId, allParams.newDishData);
             finalDishId = dishId;
+            awaitingApproval = true;
         }
 
         if (!finalDishId) {
@@ -275,6 +334,17 @@ async function saveReview(allParams) {
         }
 
         if (!isNewDish) {
+            var dishResult = await connection.query(
+                'SELECT d.restaurantId, d.status, r.status AS restaurantStatus FROM dishes d JOIN restaurants r ON r.restaurantId = d.restaurantId WHERE d.dishId = ? FOR UPDATE',
+                [finalDishId]
+            );
+            var existing = dishResult[0] && dishResult[0][0];
+            if (!existing || !['approved', 'pending', 'needs_review'].includes(existing.status) || !['approved', 'pending', 'needs_review'].includes(existing.restaurantStatus)) {
+                invalid('This dish is unavailable for new reviews. Please choose another dish.', 409);
+            }
+            if (restaurantId && String(restaurantId) !== String(existing.restaurantId)) invalid('The dish does not belong to the selected restaurant.');
+            restaurantId = existing.restaurantId;
+            awaitingApproval = existing.status !== 'approved' || existing.restaurantStatus !== 'approved';
             var hasReview = await hasRecentReview(finalDishId, userId);
             if (hasReview) {
                 var err = new Error('You have already submitted a review for this dish within the last 30 days.');
@@ -357,10 +427,14 @@ async function saveReview(allParams) {
         return {
             reviewId: reviewId,
             dishId: finalDishId,
+            restaurantId: restaurantId,
+            awaitingApproval: awaitingApproval,
             heldForSoftLaunch: holdForSoftLaunch,
             message: holdForSoftLaunch
                 ? 'Review submitted. Because Platillos is currently limited to Albuquerque restaurants, this restaurant and related content were saved for later review and were not sent to AI yet.'
-                : 'Review submitted successfully.'
+                : awaitingApproval
+                    ? 'Review saved. The restaurant or dish is awaiting approval before it appears publicly. You can add another dish at this restaurant now.'
+                    : 'Review submitted successfully.'
         };
     } catch (err) {
         await connection.rollback();
@@ -411,6 +485,7 @@ async function getReviews(params) {
             throw publicStatusErr;
         }
         whereClauses.push(normalizedStatusExpr + " = 'approved'");
+        whereClauses.push("d.status = 'approved'", "s.status = 'approved'");
     } else if (shouldFilterPending) {
         whereClauses.push(normalizedStatusExpr + " = 'pending'");
     } else if (statusFilter === 'needs_review') {
@@ -739,7 +814,7 @@ async function getFeed(params) {
 
 async function getRatingsForDish(dishId) {
     var rows = await db.query(
-        "SELECT reviewId, rating, submitted FROM reviews WHERE dishId = ? AND status = 'approved' ORDER BY submitted ASC, reviewId ASC",
+        "SELECT rv.reviewId, rv.rating, rv.submitted FROM reviews rv JOIN dishes d ON d.dishId = rv.dishId JOIN restaurants r ON r.restaurantId = d.restaurantId WHERE rv.dishId = ? AND rv.status = 'approved' AND d.status = 'approved' AND r.status = 'approved' ORDER BY rv.submitted ASC, rv.reviewId ASC",
         [dishId]
     );
     return dishService.buildDishScoreTrend(rows || []);

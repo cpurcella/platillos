@@ -34,12 +34,13 @@ var dishPage = {
         dishPage.loadReviews();
         dishPage.loadRatingTrend();
 
-        // Show buttons for logged-in users
-        if (window._platillosUser) {
-            $('#quick-log-btn').removeClass('hidden');
-            $('#watchlist-btn').removeClass('hidden');
-            $('#tried-it-btn').removeClass('hidden');
-            $('#favorite-btn').removeClass('hidden');
+        dishPage.syncAuth();
+    },
+
+    syncAuth: function() {
+        var authenticated = Boolean(window._platillosUser);
+        $('#quick-log-btn, #watchlist-btn, #tried-it-btn, #favorite-btn').toggleClass('hidden', !authenticated);
+        if (authenticated) {
             dishPage.loadTriedState();
             dishPage.loadFavoriteState();
         }
@@ -56,6 +57,7 @@ var dishPage = {
     },
 
     bindEvents: function() {
+        $(document).on('platillos:authchange', dishPage.syncAuth);
         $('#reviews-prev').on('click', function() {
             if (dishPage.currentPage > 1) {
                 dishPage.currentPage -= 1;
@@ -81,7 +83,8 @@ var dishPage = {
                 },
                 dish: {
                     dishId: d.dishId,
-                    name: d.name || ''
+                    name: d.name || '',
+                    itemType: d.itemType
                 }
             };
             common.showModal('/add-review');
@@ -354,19 +357,20 @@ var dishPage = {
     },
 
     renderDishLoading: function() {
+        $('#dish-name').text('Loading dish…');
+        $('#dish-header').removeClass('has-cover');
         $('#dish-restaurant').text('');
         $('#dish-score').text('');
         $('#dish-cover-container').empty().hide();
     },
 
     renderDishError: function(message) {
-        var safeMessage = $('<div>').text(message || 'Unavailable').html();
+        $('#dish-header').removeClass('has-cover');
         $('#dish-name').text('Dish');
-        $('#dish-restaurant').text('');
+        $('#dish-restaurant').text(message || 'Unavailable');
         $('#dish-score').text('');
-        $('#dish-cover-container')
-            .html('<div class="dish-cover-placeholder">' + safeMessage + '</div>')
-            .show();
+        $('#dish-cover-container').empty().hide();
+        $('#dish-actions').addClass('hidden');
     },
 
     renderDish: function(dish) {
@@ -376,26 +380,33 @@ var dishPage = {
         var $restaurant = $('#dish-restaurant');
         if (dish.restaurantId && dish.restaurantName) {
             var slug = dish.restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-            $restaurant.html('<a href="/restaurants/' + dish.restaurantId + '/' + slug + '">' + dish.restaurantName + '</a>');
+            $restaurant.empty().append($('<a>').attr('href', '/restaurants/' + encodeURIComponent(dish.restaurantId) + '/' + slug).text(dish.restaurantName));
         } else {
             $restaurant.text(dish.restaurantName || '');
         }
 
         var scoreValue = dish.score;
-        var scoreText = 'Score: N/A';
+        var scoreText = 'No ratings yet';
         if (scoreValue !== null && scoreValue !== undefined) {
             var formatted = typeof scoreValue === 'number' ? scoreValue.toFixed(1) : scoreValue;
-            scoreText = 'Score: ' + formatted;
+            scoreText = formatted + ' / 10';
         }
         $('#dish-score').text(scoreText);
 
         var $cover = $('#dish-cover-container');
         $cover.empty();
+        $('#dish-header').toggleClass('has-cover', Boolean(dish.coverPhoto));
 
         if (dish.coverPhoto) {
-            $cover
-                .html('<img src="' + dish.coverPhoto + '_m" alt="' + (dish.name || 'Dish') + ' cover photo">')
-                .show();
+            var $image = $('<img>').attr({ src: dish.coverPhoto + '_m', alt: (dish.name || 'Dish') + ' cover photo' });
+            $image.one('error', function() {
+                // Older uploads may not have a medium variant.
+                $(this).one('error', function() {
+                    $cover.hide();
+                    $('#dish-header').removeClass('has-cover');
+                }).attr('src', dish.coverPhoto);
+            });
+            $cover.append($image).show();
         } else {
             $cover.hide();
         }

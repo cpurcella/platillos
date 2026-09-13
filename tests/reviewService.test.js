@@ -79,9 +79,10 @@ function buildParams(overrides) {
 }
 
 function createConnection() {
+    var queries = jest.fn();
     return {
         beginTransaction: jest.fn().mockResolvedValue(),
-        query: jest.fn(),
+        query: queries,
         commit: jest.fn().mockResolvedValue(),
         rollback: jest.fn().mockResolvedValue(),
         release: jest.fn()
@@ -99,9 +100,11 @@ describe('reviewService.saveReview soft-launch behavior', function() {
     test('falls back to city/state when geocoding fails for an Albuquerque restaurant', async function() {
         var connection = createConnection();
         connection.query
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([{ insertId: 123 }]);
 
@@ -112,19 +115,20 @@ describe('reviewService.saveReview soft-launch behavior', function() {
         var result = await reviewService.saveReview(buildParams());
 
         expect(result.heldForSoftLaunch).toBe(false);
-        expect(result.message).toBe('Review submitted successfully.');
+        expect(result.awaitingApproval).toBe(true);
+        expect(result.message).toContain('You can add another dish');
 
-        var restaurantInsertParams = connection.query.mock.calls[2][1];
+        var restaurantInsertParams = connection.query.mock.calls.find(c => /INSERT INTO restaurants/.test(c[0]))[1];
         expect(restaurantInsertParams[5]).toBe(0);
         expect(restaurantInsertParams[6]).toBe(0);
         expect(restaurantInsertParams[9]).toBe('pending');
 
-        var dishInsertParams = connection.query.mock.calls[3][1];
+        var dishInsertParams = connection.query.mock.calls.find(c => /INSERT INTO dishes/.test(c[0]))[1];
         expect(dishInsertParams[3]).toBe('food');
         expect(dishInsertParams[6]).toBe('pending');
         expect(dishService.addDishMetadata).toHaveBeenCalledWith(connection, 'dish-1', { name: 'Breakfast Burrito' });
 
-        var reviewInsertParams = connection.query.mock.calls[4][1];
+        var reviewInsertParams = connection.query.mock.calls.find(c => /INSERT INTO reviews /.test(c[0]))[1];
         expect(reviewInsertParams[6]).toBe('approved');
 
         expect(aiJobQueue.enqueueJob).toHaveBeenCalledTimes(2);
@@ -138,9 +142,11 @@ describe('reviewService.saveReview soft-launch behavior', function() {
     test('holds submissions when geocoding returns a valid out-of-area location', async function() {
         var connection = createConnection();
         connection.query
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([{ insertId: 456 }]);
 
@@ -173,14 +179,14 @@ describe('reviewService.saveReview soft-launch behavior', function() {
 
         expect(result.heldForSoftLaunch).toBe(true);
 
-        var restaurantInsertParams = connection.query.mock.calls[2][1];
+        var restaurantInsertParams = connection.query.mock.calls.find(c => /INSERT INTO restaurants/.test(c[0]))[1];
         expect(restaurantInsertParams[9]).toBe('out_of_area');
 
-        var dishInsertParams = connection.query.mock.calls[3][1];
+        var dishInsertParams = connection.query.mock.calls.find(c => /INSERT INTO dishes/.test(c[0]))[1];
         expect(dishInsertParams[3]).toBe('food');
         expect(dishInsertParams[6]).toBe('out_of_area');
 
-        var reviewInsertParams = connection.query.mock.calls[4][1];
+        var reviewInsertParams = connection.query.mock.calls.find(c => /INSERT INTO reviews /.test(c[0]))[1];
         expect(reviewInsertParams[6]).toBe('out_of_area');
 
         expect(aiJobQueue.enqueueJob).not.toHaveBeenCalled();
@@ -192,9 +198,11 @@ describe('reviewService.saveReview soft-launch behavior', function() {
     test('normalizes rating before inserting a review', async function() {
         var connection = createConnection();
         connection.query
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([{ insertId: 789 }]);
 
@@ -204,16 +212,18 @@ describe('reviewService.saveReview soft-launch behavior', function() {
 
         await reviewService.saveReview(buildParams({ rating: '7.46' }));
 
-        var reviewInsertParams = connection.query.mock.calls[4][1];
+        var reviewInsertParams = connection.query.mock.calls.find(c => /INSERT INTO reviews /.test(c[0]))[1];
         expect(reviewInsertParams[0]).toBe(7.5);
     });
 
     test('saves new drink item type and initial metadata', async function() {
         var connection = createConnection();
         connection.query
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([{ insertId: 321 }]);
 
@@ -231,7 +241,7 @@ describe('reviewService.saveReview soft-launch behavior', function() {
             }
         }));
 
-        var dishInsertParams = connection.query.mock.calls[3][1];
+        var dishInsertParams = connection.query.mock.calls.find(c => /INSERT INTO dishes/.test(c[0]))[1];
         expect(dishInsertParams[2]).toBe('House Margarita');
         expect(dishInsertParams[3]).toBe('drink');
         expect(dishService.addDishMetadata).toHaveBeenCalledWith(connection, 'dish-1', {

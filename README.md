@@ -76,6 +76,17 @@ AWS credentials.
 
 ## AI Job Queue
 
+See [the September UX audit](docs/ux-audit-2026-09-12.md) for current behavior,
+verification, and release status. QA integration/browser checks are available as
+`npm run test:qa` and `npm run test:browser`; install Chromium with
+`npx playwright install chromium` before the browser check. Both checks use the
+QA environment and clean up their synthetic submissions afterward.
+
+Restaurant and dish AI recommendations can auto-approve only with a cited source
+and sufficient confidence. Rejection recommendations go to `needs_review` for a
+human decision. Authenticated submission pickers can reuse pending restaurants
+and dishes while public pages continue to require approval.
+
 New submissions (restaurants, dishes, reviews, photos) are automatically enqueued in the `ai_jobs` table for AI evaluation. A CloudWatch EventBridge rule triggers the Lambda every 5 minutes to process pending jobs.
 
 ### Database migration

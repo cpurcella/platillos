@@ -21,7 +21,7 @@ exports.handler = async (event, context) => {
 		// Always process the job queue
 		console.log('[ai-jobs] Scheduled trigger received');
 		try {
-			results.jobs = await aiJobQueue.processJobs(10);
+            results.jobs = await aiJobQueue.processJobs(10, { getRemainingTimeInMillis: context && context.getRemainingTimeInMillis && context.getRemainingTimeInMillis.bind(context) });
 			console.log('[ai-jobs] Done:', JSON.stringify(results.jobs));
 		} catch (err) {
 			console.error('[ai-jobs] Error:', err.message || err);

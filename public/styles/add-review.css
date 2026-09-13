@@ -323,3 +323,26 @@
         bottom: 8px;
     }
 }
+button.restaurant-item,
+button.dish-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.submission-status {
+    display: block;
+    color: #685000;
+    font-size: 0.85rem;
+    margin-top: 6px;
+}
+
+button.restaurant-item:focus-visible,
+button.dish-item:focus-visible {
+    outline: 3px solid #007c87;
+    outline-offset: 2px;
+}

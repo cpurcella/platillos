@@ -9,7 +9,7 @@ router.get('/', async function(req, res) {
         var result = await restaurantService.getRestaurants(data);
         res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(err.status || 500).json({ success: false, message: err.message });
     }
 });
 

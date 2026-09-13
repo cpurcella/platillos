@@ -83,9 +83,9 @@ var common = (function() {
     }
 
     function showAlert(message, type) {
-        var $alert = $('<div class="alert"></div>').addClass(type || 'info').text(message);
+        var $alert = $('<div class="alert" role="status" aria-live="polite"></div>').addClass(type || 'info').text(message);
         $('body').prepend($alert);
-        setTimeout(function() { $alert.fadeOut(400, function() { $alert.remove(); }); }, 3000);
+        setTimeout(function() { $alert.fadeOut(400, function() { $alert.remove(); }); }, type === 'error' || type === 'warning' ? 10000 : 7000);
     }
 
     function tooltip(text) {
@@ -150,7 +150,11 @@ var common = (function() {
             $('.overlay').remove();
             $('body').append(html);
             $('.modal').removeClass('hidden').show();
+            $('.modal').attr({ role: 'dialog', 'aria-modal': 'true', 'aria-label': $('.modal h2').first().text() || 'Dialog' });
             $('.overlay').removeClass('hidden').show();
+            $('.modal').find('input:visible, button:visible, a:visible').first().trigger('focus');
+        }).fail(function() {
+            showAlert('This form could not load. Please try again.', 'error');
         });
     }
 

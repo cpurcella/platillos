@@ -108,7 +108,7 @@ async function rotateStoredPhoto(fileId, fileType, rotateDegreesClockwise) {
     return true;
 }
 
-async function fetchPendingReviewPhotos(limit) {
+async function fetchPendingReviewPhotos(limit, targetId) {
     var sql = "SELECT rp.reviewPhotoId, rp.reviewId, rp.fileId, r.dishId, r.review AS reviewContent, r.rating AS reviewRating, " +
         "r.submitted AS reviewSubmitted, d.name AS dishName, d.coverPhoto AS dishCoverPhoto, d.restaurantId, s.name AS restaurantName, " +
         "f.fileName, f.fileType, f.uploaded AS photoUploaded " +
@@ -118,9 +118,10 @@ async function fetchPendingReviewPhotos(limit) {
         "JOIN restaurants s ON d.restaurantId = s.restaurantId " +
         "JOIN files f ON rp.fileId = f.fileId " +
         "WHERE LOWER(COALESCE(rp.status, 'pending')) = 'pending' " +
-        "ORDER BY f.uploaded DESC, rp.reviewPhotoId DESC LIMIT ?";
+        (targetId ? 'AND rp.reviewPhotoId = ? ' : '') +
+        "ORDER BY f.uploaded ASC, rp.reviewPhotoId ASC LIMIT ?";
 
-    var rows = await db.query(sql, [limit]);
+    var rows = await db.query(sql, targetId ? [targetId, limit] : [limit]);
     rows = rows || [];
 
     return rows.map(function(row) {
