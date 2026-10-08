@@ -39,7 +39,7 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
             : { success: true, data: { dishId: fixture.dishId, restaurantId: fixture.restaurantId, name: state.title || 'Latte', restaurantName: 'Cabra Coffee', itemType: 'drink', coverPhoto: state.cover ? photoUrl : null, score: state.count ? 8.3 : null, reviewCount: state.count } }
         });
     });
-    await page.route('**/api/reviews/dish/' + fixture.dishId + '**', route => {
+    await page.route('**/api/dishes/' + fixture.dishId + '/reviews**', route => {
         const url = new URL(route.request().url());
         const offset = ((Number(url.searchParams.get('page')) || 1) - 1) * 10;
         return route.fulfill({ json: url.pathname.endsWith('/ratings')
@@ -217,7 +217,7 @@ module.exports = async function auditDishLayout(context, base, fixture, output) 
         assert.equal(await page.locator('#adjust-photo-framing').isVisible(), false, 'Visitors cannot adjust another user photo');
         await page.keyboard.press('Escape');
         console.log('FRAMING UI PASS: responsive subject preservation, owner editor and preview, manual save, and visitor control visibility');
-        await page.route('**/api/reviews/dish/' + fixture.dishId + '/ratings', route => route.fulfill({ status: 503, json: { success: false } }));
+        await page.route('**/api/dishes/' + fixture.dishId + '/ratings', route => route.fulfill({ status: 503, json: { success: false } }));
         await page.evaluate(() => dishPage.loadRatingTrend());
         await page.waitForFunction(() => document.getElementById('dish-score').textContent === 'Ratings unavailable');
         assert.equal(await page.locator('#rating-trend').isVisible(), false, 'Failed ratings never show a weighted or stale average');

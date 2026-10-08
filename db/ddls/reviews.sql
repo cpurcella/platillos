@@ -1,6 +1,6 @@
 CREATE TABLE `reviews` (
   `reviewId` int NOT NULL AUTO_INCREMENT,
-  `rating` int NOT NULL,
+  `rating` decimal(3,1) NOT NULL,
   `review` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `modifications` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `dishId` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,

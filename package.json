@@ -1,8 +1,8 @@
 {
   "name": "platillos",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A dish-focused restaurant review app with community profiles and AI-assisted moderation.",
+  "main": "app.js",
   "author": "Corey Purcella",
   "license": "ISC",
   "engines": {
@@ -17,21 +17,21 @@
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
     "handlebars": "^4.7.8",
-    "jimp": "^0.22.12",
+    "jimp": "^1.6.1",
     "multer": "^2.0.2",
     "mysql2": "^3.14.1",
-    "openai": "^4.57.0",
-    "xss-clean": "^0.1.4"
+    "openai": "^4.57.0"
   },
   "scripts": {
     "start": "node app.js",
-    "test": "jest --verbose",
-    "test:ci": "jest --verbose --runInBand",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose",
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js --verbose --runInBand",
     "test:qa": "node scripts/audit-qa.js",
     "test:browser": "node scripts/audit-qa.js --browser"
   },
   "overrides": {
-    "qs": "6.16.0"
+    "qs": "6.16.0",
+    "js-yaml": "^4.1.1"
   },
   "devDependencies": {
     "jest": "^30.3.0",

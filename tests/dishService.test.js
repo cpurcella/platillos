@@ -137,10 +137,10 @@ describe('dishService dish photos', function() {
         expect(result.rows[1].url).toBe('https://platillos-test.s3.amazonaws.com/reviews/photo-two.jpg');
         expect(result.rows[1].avatarUrl).toBeUndefined();
 
-        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(d.status, 'pending')) = 'approved'");
-        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(r.status, 'pending')) = 'approved'");
-        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(rv.status, 'pending')) = 'approved'");
-        expect(db.query.mock.calls[0][0]).toContain("LOWER(COALESCE(rp.status, 'pending')) = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("d.status = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("r.status = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("rv.status = 'approved'");
+        expect(db.query.mock.calls[0][0]).toContain("rp.status = 'approved'");
         expect(db.query.mock.calls[0][1]).toEqual(['dish-1']);
         expect(db.query.mock.calls[1][0]).toContain('ORDER BY rv.submitted DESC, rp.reviewPhotoId ASC');
         expect(db.query.mock.calls[1][1]).toEqual(['dish-1', 100, 100]);
@@ -198,7 +198,7 @@ describe('dishService arithmetic rating summaries', function() {
             { rating: 2, submitted: Date.UTC(2020, 0, 1) },
             { rating: 6, submitted: Date.UTC(2026, 6, 1) },
             { rating: 8, submitted: Date.UTC(2026, 7, 1) },
-            { rating: '10', submitted: now }
+            { rating: 10, submitted: now }
         ], now);
         expect(summary.overall).toEqual({ average: 6.5, count: 4 });
         expect(summary.recent).toEqual({ average: 8, count: 3 });
@@ -225,13 +225,13 @@ describe('dishService arithmetic rating summaries', function() {
         expect(summary.recent).toEqual({ average: null, count: 0 });
     });
 
-    test('excludes invalid ratings, invalid dates, and future reviews', function() {
-        var rows = [null, '', 0, 11, 'bad', Infinity].map(function(rating) { return { rating: rating, submitted: now }; });
-        rows.push({ rating: 9, submitted: null }, { rating: 9, submitted: 'bad' }, { rating: 9, submitted: now + 1 }, { rating: 7, submitted: now });
-        var trend = dishService.buildDishScoreTrend(rows, now);
+    test('excludes reviews after the requested point in time', function() {
+        var trend = dishService.buildDishScoreTrend([
+            { reviewId: 1, rating: 9, submitted: now + 1 },
+            { reviewId: 2, rating: 7, submitted: now }
+        ], now);
         expect(trend.summary.overall).toEqual({ average: 7, count: 1 });
         expect(trend.reviews).toHaveLength(1);
-        expect(trend.reviews[0].overallAverage).toBe(7);
     });
 
     test('rounds once at the end and keeps the graph consistent with the summary', function() {

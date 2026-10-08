@@ -225,7 +225,7 @@ var dishPage = {
                 res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
             } else {
                 // Cast or switch vote
-                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'PUT', data: { value: direction } });
             }
             if (res.success) {
                 $card.attr('data-user-vote', res.userVote);
@@ -240,7 +240,7 @@ var dishPage = {
 
     loadFavoriteState: async function() {
         try {
-            var res = await $.get('/api/users/favorites/ids');
+            var res = await $.get('/api/users/me/favorites/ids');
             if (res.success && Array.isArray(res.data)) {
                 dishPage.isFavorite = res.data.indexOf(dishPage.dishId) !== -1;
                 dishPage.updateFavoriteButton();
@@ -250,7 +250,7 @@ var dishPage = {
 
     loadWatchlistState: async function() {
         try {
-            var res = await $.get('/api/watchlist/ids');
+            var res = await $.get('/api/users/me/watchlist/ids');
             if (res.success && Array.isArray(res.data)) {
                 var onList = res.data.indexOf(dishPage.dishId) !== -1;
                 dishPage.isOnWatchlist = onList;
@@ -266,10 +266,10 @@ var dishPage = {
         $btn.prop('disabled', true);
         try {
             if (dishPage.isOnWatchlist) {
-                await common.secureAjax({ url: '/api/watchlist/' + dishPage.dishId, method: 'DELETE' });
+                await common.secureAjax({ url: '/api/users/me/watchlist/' + dishPage.dishId, method: 'DELETE' });
                 dishPage.isOnWatchlist = false;
             } else {
-                await common.secureAjax({ url: '/api/watchlist/' + dishPage.dishId, method: 'POST' });
+                await common.secureAjax({ url: '/api/users/me/watchlist/' + dishPage.dishId, method: 'PUT' });
                 dishPage.isOnWatchlist = true;
             }
             dishPage.updateWatchlistButton();
@@ -297,10 +297,10 @@ var dishPage = {
         $btn.prop('disabled', true);
         try {
             if (dishPage.isFavorite) {
-                await common.secureAjax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'DELETE' });
+                await common.secureAjax({ url: '/api/users/me/favorites/' + dishPage.dishId, method: 'DELETE' });
                 dishPage.isFavorite = false;
             } else {
-                await common.secureAjax({ url: '/api/users/favorites/' + dishPage.dishId, method: 'POST' });
+                await common.secureAjax({ url: '/api/users/me/favorites/' + dishPage.dishId, method: 'PUT' });
                 dishPage.isFavorite = true;
             }
             dishPage.updateFavoriteButton();
@@ -327,7 +327,7 @@ var dishPage = {
 
     loadTriedState: async function() {
         try {
-            var res = await $.get('/api/users/tried/' + encodeURIComponent(dishPage.dishId));
+            var res = await $.get('/api/users/me/tried/' + encodeURIComponent(dishPage.dishId));
             if (res.success && res.data && res.data.tried) {
                 dishPage.hasTried = true;
                 dishPage.updateTriedButton();
@@ -371,7 +371,7 @@ var dishPage = {
 
         $('#tried-it-save').prop('disabled', true);
         try {
-            var res = await common.secureAjax({ url: '/api/users/diary', method: 'POST', data: payload });
+            var res = await common.secureAjax({ url: '/api/users/me/diary', method: 'POST', data: payload });
             if (res.success) {
                 dishPage.hasTried = true;
                 dishPage.updateTriedButton();
@@ -631,11 +631,11 @@ var dishPage = {
         $('#adjust-photo-framing').toggleClass('hidden', !photo.canAdjust);
 
         var reviewer = (photo.firstName || photo.lastName) ? ((photo.firstName || '') + ' ' + (photo.lastName || '')).trim() : (photo.username || 'Anonymous');
-        var reviewerSafe = $('<div>').text(reviewer).html();
-        var reviewSafe = $('<div>').text(photo.reviewContent || '').html();
-        var ratingSafe = $('<div>').text(photo.rating != null ? 'Rating: ' + photo.rating : '').html();
+        var reviewerSafe = common.escapeHtml(reviewer);
+        var reviewSafe = common.escapeHtml(photo.reviewContent || '');
+        var ratingSafe = common.escapeHtml(photo.rating != null ? 'Rating: ' + photo.rating : '');
         var submittedDate = photo.submitted ? new Date(photo.submitted) : null;
-        var submittedSafe = $('<div>').text(submittedDate ? submittedDate.toLocaleDateString() : '').html();
+        var submittedSafe = common.escapeHtml(submittedDate ? submittedDate.toLocaleDateString() : '');
         var metaParts = [];
         if (ratingSafe) metaParts.push(ratingSafe);
         if (submittedSafe) metaParts.push(submittedSafe);
@@ -702,7 +702,7 @@ var dishPage = {
         $('#reviews-page').text('Page ' + dishPage.currentPage);
 
         try {
-            var res = await $.get('/api/reviews/dish/' + encodeURIComponent(dishPage.dishId), {
+            var res = await $.get('/api/dishes/' + encodeURIComponent(dishPage.dishId) + '/reviews', {
                 page: dishPage.currentPage,
                 pageSize: dishPage.pageSize
             });
@@ -717,7 +717,7 @@ var dishPage = {
     },
 
     renderReviewsError: function(message) {
-        var safeMessage = $('<div>').text(message || 'Error').html();
+        var safeMessage = common.escapeHtml(message || 'Error');
         $('#reviews-list').html('<div class="reviews-error">' + safeMessage + '</div>');
         $('#reviews-prev').prop('disabled', dishPage.currentPage <= 1);
         $('#reviews-next').prop('disabled', true);
@@ -748,20 +748,20 @@ var dishPage = {
                 var submittedDate = review.submitted ? new Date(review.submitted) : null;
                 var submittedText = submittedDate ? submittedDate.toLocaleDateString() : '';
                 var reviewer = (review.firstName || review.lastName) ? ((review.firstName || '') + ' ' + (review.lastName || '')).trim() : (review.username || 'Anonymous');
-                var reviewerSafe = $('<div>').text(reviewer || '').html();
-                var modifications = review.modifications ? '<div class="review-modifications"><strong>Modifications:</strong> ' + $('<div>').text(review.modifications).html() + '</div>' : '';
-                var safeContent = $('<div>').text(review.reviewContent || '').html();
+                var reviewerSafe = common.escapeHtml(reviewer || '');
+                var modifications = review.modifications ? '<div class="review-modifications"><strong>Modifications:</strong> ' + common.escapeHtml(review.modifications) + '</div>' : '';
+                var safeContent = common.escapeHtml(review.reviewContent || '');
                 var ratingText = review.rating != null ? review.rating : 'N/A';
                 var submittedHtml = '';
                 if (submittedText) {
-                    var submittedSafe = $('<div>').text('Submitted: ' + submittedText).html();
+                    var submittedSafe = common.escapeHtml('Submitted: ' + submittedText);
                     submittedHtml = '<div class="review-meta">' + submittedSafe + '</div>';
                 }
 
                 // Build reviewer avatar
                 var avatarHtml = '';
                 if (review.avatarUrl) {
-                    avatarHtml = '<img class="review-author-avatar" src="' + $('<div>').text(review.avatarUrl + '_s').html() + '" alt="">';
+                    avatarHtml = '<img class="review-author-avatar" src="' + common.escapeHtml(review.avatarUrl + '_s') + '" alt="">';
                 } else {
                     var initial = (reviewer || '?').charAt(0).toUpperCase();
                     avatarHtml = '<span class="review-author-avatar review-author-initial">' + initial + '</span>';
@@ -779,7 +779,7 @@ var dishPage = {
                 var photosHtml = '';
                 if (review.photos && review.photos.length) {
                     var photoItems = review.photos.map(function(p) {
-                        var safeUrl = $('<div>').text(p.url + '_s').html();
+                        var safeUrl = common.escapeHtml(p.url + '_s');
                         return '<img class="review-photo" src="' + safeUrl + '" alt="Review photo" loading="lazy">';
                     }).join('');
                     photosHtml = '<div class="review-photos">' + photoItems + '</div>';
@@ -821,7 +821,7 @@ var dishPage = {
     },
 
     loadRatingTrend: function() {
-        $.get('/api/reviews/dish/' + encodeURIComponent(dishPage.dishId) + '/ratings')
+        $.get('/api/dishes/' + encodeURIComponent(dishPage.dishId) + '/ratings')
             .done(function(res) {
                 if (res.success && res.data && res.summary) {
                     dishPage.renderRatingSummary(res.summary);

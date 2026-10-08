@@ -27,10 +27,6 @@ var profilePage = (function() {
         return null;
     }
 
-    function escapeHtml(text) {
-        return $('<div>').text(text || '').html();
-    }
-
     function relativeDate(timestamp) {
         if (!timestamp) return '';
         var diff = Date.now() - timestamp;
@@ -57,7 +53,7 @@ var profilePage = (function() {
         }
 
         try {
-            var res = await $.get('/api/users/profile/' + encodeURIComponent(username));
+            var res = await $.get('/api/users/' + encodeURIComponent(username));
             if (!res.success || !res.data) {
                 $('#profile-header').html('<p class="reviews-empty">User not found.</p>');
                 return;
@@ -101,7 +97,7 @@ var profilePage = (function() {
         // Avatar
         var $avatar = $('#profile-avatar');
         if (profile.avatarUrl) {
-            $avatar.html('<img src="' + escapeHtml(profile.avatarUrl) + '_s" alt="Avatar">');
+            $avatar.html('<img src="' + common.escapeHtml(profile.avatarUrl) + '_s" alt="Avatar">');
         } else {
             $avatar.text(avatarInitial(profile.firstName));
         }
@@ -129,7 +125,7 @@ var profilePage = (function() {
         statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + (profile.reviewCount || 0) + '</span><span class="profile-stat-label">Reviews</span></div>';
         statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + (profile.avgRating || '—') + '</span><span class="profile-stat-label">Avg Rating</span></div>';
         if (joined) {
-            statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + escapeHtml(joined) + '</span><span class="profile-stat-label">Joined</span></div>';
+            statsHtml += '<div class="profile-stat"><span class="profile-stat-value">' + common.escapeHtml(joined) + '</span><span class="profile-stat-label">Joined</span></div>';
         }
         $('#profile-stats').html(statsHtml);
     }
@@ -141,9 +137,9 @@ var profilePage = (function() {
         try {
             var res;
             if (isFollowing) {
-                res = await common.secureAjax({ url: '/api/users/follow/' + profileData.userId, method: 'DELETE' });
+                res = await common.secureAjax({ url: '/api/users/me/following/' + profileData.userId, method: 'DELETE' });
             } else {
-                res = await common.secureAjax({ url: '/api/users/follow/' + profileData.userId, method: 'POST' });
+                res = await common.secureAjax({ url: '/api/users/me/following/' + profileData.userId, method: 'PUT' });
             }
             if (res.success) {
                 if (res.following) {
@@ -168,12 +164,12 @@ var profilePage = (function() {
         }
         favorites.forEach(function(fav) {
             var photoHtml = fav.coverPhoto
-                ? '<img src="' + escapeHtml(fav.coverPhoto) + '_s" alt="' + escapeHtml(fav.dishName) + '">'
+                ? '<img src="' + common.escapeHtml(fav.coverPhoto) + '_s" alt="' + common.escapeHtml(fav.dishName) + '">'
                 : '<div class="favorite-card-placeholder">🍽</div>';
             var html = '<a href="/dishes/' + encodeURIComponent(fav.dishId) + '" class="favorite-card">' +
                 '<div class="favorite-card-photo">' + photoHtml + '</div>' +
-                '<div class="favorite-card-name">' + escapeHtml(fav.dishName) + '</div>' +
-                '<div class="favorite-card-restaurant">' + escapeHtml(fav.restaurantName || '') + '</div>' +
+                '<div class="favorite-card-name">' + common.escapeHtml(fav.dishName) + '</div>' +
+                '<div class="favorite-card-restaurant">' + common.escapeHtml(fav.restaurantName || '') + '</div>' +
                 '</a>';
             $grid.append(html);
         });
@@ -184,7 +180,7 @@ var profilePage = (function() {
         if (favoritesPage > 1 && (favoritesPage - 1) * PAGE_SIZE >= favoritesTotal) return;
         favoritesLoading = true;
         try {
-            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+            var url = '/api/users/' + encodeURIComponent(profileData.username) +
                 '/favorites?page=' + favoritesPage + '&pageSize=' + PAGE_SIZE;
             var res = await $.get(url);
             if (res.success && res.data) {
@@ -211,11 +207,11 @@ var profilePage = (function() {
             var ratingText = r.rating != null ? r.rating + '/10' : '';
             var html = '<div class="profile-review-card">' +
                 '<div class="profile-review-header">' +
-                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(r.dishId) + '?reviewId=' + r.reviewId + '">' + escapeHtml(r.dishName) + '</a></span>' +
-                    '<span class="profile-review-rating">' + escapeHtml(ratingText) + '</span>' +
+                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(r.dishId) + '?reviewId=' + r.reviewId + '">' + common.escapeHtml(r.dishName) + '</a></span>' +
+                    '<span class="profile-review-rating">' + common.escapeHtml(ratingText) + '</span>' +
                 '</div>' +
-                '<div class="profile-review-restaurant">' + escapeHtml(r.restaurantName || '') + '</div>' +
-                (r.reviewContent ? '<div class="profile-review-text">' + escapeHtml(r.reviewContent) + '</div>' : '') +
+                '<div class="profile-review-restaurant">' + common.escapeHtml(r.restaurantName || '') + '</div>' +
+                (r.reviewContent ? '<div class="profile-review-text">' + common.escapeHtml(r.reviewContent) + '</div>' : '') +
                 '<div class="profile-review-date">' + relativeDate(r.submitted) + '</div>' +
                 '</div>';
             $list.append(html);
@@ -227,7 +223,7 @@ var profilePage = (function() {
         if (reviewsPage > 1 && (reviewsPage - 1) * PAGE_SIZE >= reviewsTotal) return;
         reviewsLoading = true;
         try {
-            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+            var url = '/api/users/' + encodeURIComponent(profileData.username) +
                 '/reviews?page=' + reviewsPage + '&pageSize=' + PAGE_SIZE;
             var res = await $.get(url);
             if (res.success && res.data) {
@@ -258,7 +254,7 @@ var profilePage = (function() {
     async function loadDiary() {
         if (!profileData) return;
         try {
-            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+            var url = '/api/users/' + encodeURIComponent(profileData.username) +
                 '/diary?year=' + diaryYear + '&month=' + diaryMonth;
             var res = await $.get(url);
             if (res.success && res.data) {
@@ -275,7 +271,7 @@ var profilePage = (function() {
     function renderDiaryControls() {
         var html = '<div class="diary-nav">' +
             '<button class="btn btn-outline btn-sm diary-prev" aria-label="Previous month">&lsaquo;</button>' +
-            '<span class="diary-month-label">' + escapeHtml(MONTH_NAMES[diaryMonth]) + ' ' + diaryYear + '</span>' +
+            '<span class="diary-month-label">' + common.escapeHtml(MONTH_NAMES[diaryMonth]) + ' ' + diaryYear + '</span>' +
             '<button class="btn btn-outline btn-sm diary-next" aria-label="Next month">&rsaquo;</button>' +
             '</div>';
         $('#diary-controls').html(html);
@@ -331,12 +327,12 @@ var profilePage = (function() {
             var badge = e.entryType === 'log' ? '<span class="diary-badge-log">Quick log</span>' : '';
             var html = '<div class="profile-review-card diary-entry">' +
                 '<div class="profile-review-header">' +
-                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(e.dishId) + '">' + escapeHtml(e.dishName) + '</a></span>' +
-                    '<span class="profile-review-rating">' + escapeHtml(ratingText) + '</span>' +
+                    '<span class="profile-review-dish"><a href="/dishes/' + encodeURIComponent(e.dishId) + '">' + common.escapeHtml(e.dishName) + '</a></span>' +
+                    '<span class="profile-review-rating">' + common.escapeHtml(ratingText) + '</span>' +
                 '</div>' +
-                '<div class="profile-review-restaurant">' + escapeHtml(e.restaurantName || '') + '</div>' +
+                '<div class="profile-review-restaurant">' + common.escapeHtml(e.restaurantName || '') + '</div>' +
                 '<div class="diary-entry-meta">' +
-                    '<span class="diary-entry-date">' + escapeHtml(dateStr) + '</span>' +
+                    '<span class="diary-entry-date">' + common.escapeHtml(dateStr) + '</span>' +
                     badge +
                 '</div>' +
                 '</div>';
@@ -357,7 +353,7 @@ var profilePage = (function() {
         if (watchlistPage > 1 && (watchlistPage - 1) * PAGE_SIZE >= watchlistTotal) return;
         watchlistLoading = true;
         try {
-            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+            var url = '/api/users/' + encodeURIComponent(profileData.username) +
                 '/watchlist?page=' + watchlistPage + '&pageSize=' + PAGE_SIZE;
             var res = await $.get(url);
             if (res.success && res.data) {
@@ -382,12 +378,12 @@ var profilePage = (function() {
         }
         items.forEach(function(item) {
             var photoHtml = item.coverPhoto
-                ? '<img src="' + escapeHtml(item.coverPhoto) + '_s" alt="' + escapeHtml(item.dishName) + '">'
+                ? '<img src="' + common.escapeHtml(item.coverPhoto) + '_s" alt="' + common.escapeHtml(item.dishName) + '">'
                 : '<div class="favorite-card-placeholder">🍽</div>';
             var html = '<a href="/dishes/' + encodeURIComponent(item.dishId) + '" class="favorite-card">' +
                 '<div class="favorite-card-photo">' + photoHtml + '</div>' +
-                '<div class="favorite-card-name">' + escapeHtml(item.dishName) + '</div>' +
-                '<div class="favorite-card-restaurant">' + escapeHtml(item.restaurantName || '') + '</div>' +
+                '<div class="favorite-card-name">' + common.escapeHtml(item.dishName) + '</div>' +
+                '<div class="favorite-card-restaurant">' + common.escapeHtml(item.restaurantName || '') + '</div>' +
                 '</a>';
             $list.append(html);
         });
@@ -417,7 +413,7 @@ var profilePage = (function() {
         var $list = $('#follow-modal-list');
         $list.html('<div class="reviews-empty">Loading...</div>');
         try {
-            var url = '/api/users/profile/' + encodeURIComponent(profileData.username) +
+            var url = '/api/users/' + encodeURIComponent(profileData.username) +
                 '/' + followModalType + '?page=' + followModalPage + '&pageSize=20';
             var res = await $.get(url);
             if (res.success && res.data) {
@@ -439,14 +435,14 @@ var profilePage = (function() {
         }
         items.forEach(function(user) {
             var avatarHtml = user.avatarUrl
-                ? '<img src="' + escapeHtml(user.avatarUrl) + '_s" alt="Avatar">'
+                ? '<img src="' + common.escapeHtml(user.avatarUrl) + '_s" alt="Avatar">'
                 : '<span class="follow-card-initial">' + avatarInitial(user.firstName) + '</span>';
-            var displayName = escapeHtml((user.firstName || '') + ' ' + (user.lastName || '')).trim();
+            var displayName = common.escapeHtml((user.firstName || '') + ' ' + (user.lastName || '')).trim();
             var html = '<a href="/users/' + encodeURIComponent(user.username) + '" class="follow-card">' +
                 '<div class="follow-card-avatar">' + avatarHtml + '</div>' +
                 '<div class="follow-card-info">' +
-                    '<div class="follow-card-name">' + (displayName || escapeHtml(user.username)) + '</div>' +
-                    '<div class="follow-card-username">@' + escapeHtml(user.username) + '</div>' +
+                    '<div class="follow-card-name">' + (displayName || common.escapeHtml(user.username)) + '</div>' +
+                    '<div class="follow-card-username">@' + common.escapeHtml(user.username) + '</div>' +
                 '</div>' +
                 '</a>';
             $list.append(html);
@@ -475,7 +471,7 @@ var profilePage = (function() {
         $('#edit-bio').val(profileData.bio || '');
         var $preview = $('#avatar-preview');
         if (profileData.avatarUrl) {
-            $preview.html('<img src="' + escapeHtml(profileData.avatarUrl) + '_s" alt="Avatar">');
+            $preview.html('<img src="' + common.escapeHtml(profileData.avatarUrl) + '_s" alt="Avatar">');
         } else {
             $preview.text(avatarInitial(profileData.firstName));
         }
@@ -539,7 +535,7 @@ var profilePage = (function() {
         var formData = new FormData();
         formData.append('file', blob, 'avatar.jpg');
         var res = await common.secureAjax({
-            url: '/api/files/upload',
+            url: '/api/files',
             method: 'POST',
             data: formData,
             processData: false,
@@ -581,7 +577,7 @@ var profilePage = (function() {
 
         try {
             var res = await common.secureAjax({
-                url: '/api/users/profile',
+                url: '/api/users/me',
                 method: 'PATCH',
                 data: JSON.stringify(data),
                 contentType: 'application/json',
@@ -668,3 +664,13 @@ var profilePage = (function() {
         load: load
     };
 })();
+
+$(document).on('click', '#logout-btn', async function(event) {
+    event.preventDefault();
+    try {
+        await common.secureAjax({ url: '/api/session', method: 'DELETE' });
+        window.location.href = '/';
+    } catch (err) {
+        common.showAlert('Unable to log out. Please try again.', 'error');
+    }
+});

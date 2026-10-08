@@ -1,0 +1,10 @@
+{
+  "lambda": {
+    "role": "YOUR_LAMBDA_ROLE",
+    "name": "platillos",
+    "region": "us-west-2"
+  },
+  "api": {
+    "id": "YOUR_API_GATEWAY_ID"
+  }
+}

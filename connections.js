@@ -77,7 +77,7 @@ async function queryWithBackoff(sql, params, maxRetries) {
             var [rows] = await getPool().query(sql, params);
             return rows;
         } catch (err) {
-            if (err && err.code === 'ER_LOCK_DEADLOCK' && retries < maxRetries) {
+            if (err.code === 'ER_LOCK_DEADLOCK' && retries < maxRetries) {
                 retries++;
                 var backoff = Math.pow(2, retries) * Math.random() * 100;
                 await new Promise(function(resolve) { setTimeout(resolve, backoff); });

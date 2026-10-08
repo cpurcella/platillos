@@ -23,3 +23,18 @@ coverage/
 
 # Misc
 .DS_Store
+
+# Local notes, audits, editor settings, and deployment metadata
+/docs/*
+!/docs/api.md
+/plans/
+/.github/copilot-instructions.md
+/.vscode/
+/response.json
+/claudia.json
+*.log
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*

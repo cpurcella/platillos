@@ -7,7 +7,7 @@ CREATE TABLE `dishes` (
   `submittedBy` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `score` decimal(3,1) DEFAULT NULL,
   `coverPhoto` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `reviewCount` int NOT NULL,
+  `reviewCount` int NOT NULL DEFAULT '0',
   `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `statusUpdated` bigint DEFAULT NULL,
   `statusUpdatedBy` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

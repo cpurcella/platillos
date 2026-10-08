@@ -91,3 +91,45 @@ describe('restaurantService location WKT', function() {
         expect(sql).not.toContain("AND r.status = 'approved'");
     });
 });
+
+
+describe('restaurant statistics aggregation', function() {
+    var fixture;
+    beforeEach(function() {
+        var DatabaseSync = require('node:sqlite').DatabaseSync;
+        fixture = new DatabaseSync(':memory:');
+        // The aggregate queries use SQL shared by SQLite and MySQL.
+        fixture.exec(`
+            CREATE TABLE dishes (dishId TEXT, restaurantId TEXT, score REAL, reviewCount INTEGER, status TEXT);
+            CREATE TABLE reviews (reviewId INTEGER, dishId TEXT, submitted INTEGER, status TEXT);
+            INSERT INTO dishes VALUES
+                ('dish-1', 'restaurant-1', 8, 3, 'approved'),
+                ('dish-2', 'restaurant-1', 6, 1, 'approved'),
+                ('pending', 'restaurant-1', 10, 4, 'pending');
+        `);
+        var insert = fixture.prepare('INSERT INTO reviews VALUES (?, ?, ?, ?)');
+        var now = Date.now();
+        var old = now - 100 * 24 * 60 * 60 * 1000;
+        [[1, 'dish-1', now, 'approved'], [2, 'dish-1', now, 'approved'],
+            [3, 'dish-1', old, 'approved'], [4, 'dish-2', old, 'approved'],
+            [5, 'dish-1', now, 'rejected'], [6, 'pending', now, 'approved']
+        ].forEach(function(row) { insert.run(...row); });
+        db.query.mockReset();
+        db.query.mockImplementation(async function(sql, params) {
+            return fixture.prepare(sql).all(...params);
+        });
+    });
+    afterEach(function() { fixture.close(); });
+
+    test('counts each dish and review once, with an average across dishes', async function() {
+        await expect(restaurantService.getRestaurantStats('restaurant-1')).resolves.toEqual({
+            dishCount: 2, avgScore: 7, totalReviews: 4, recentReviews: 2
+        });
+    });
+
+    test('returns empty statistics when there are no approved dishes', async function() {
+        await expect(restaurantService.getRestaurantStats('missing')).resolves.toEqual({
+            dishCount: 0, avgScore: null, totalReviews: 0, recentReviews: 0
+        });
+    });
+});

@@ -7,7 +7,17 @@ var authService = require('../api/authService');
 
 // Mock DB and external services
 jest.mock('../connections', function() {
-    return { query: jest.fn() };
+    var query = jest.fn();
+    return {
+        query: query,
+        getConnection: jest.fn().mockResolvedValue({
+            query: query,
+            beginTransaction: jest.fn(),
+            commit: jest.fn(),
+            rollback: jest.fn(),
+            release: jest.fn()
+        })
+    };
 });
 
 jest.mock('bcrypt', function() {
@@ -61,22 +71,22 @@ function validBody() {
     };
 }
 
-describe('POST /api/users/register', function() {
+describe('POST /api/users', function() {
     beforeEach(function() {
         db.query.mockReset();
         authService.verifyRecaptchaToken.mockReset();
         authService.verifyRecaptchaToken.mockResolvedValue();
     });
 
-    test('returns 200 on successful registration', async function() {
+    test('returns 201 on successful registration', async function() {
         db.query.mockResolvedValueOnce([]);  // username check
         db.query.mockResolvedValueOnce([]);  // email check
         db.query.mockResolvedValueOnce({ insertId: 1 }); // users INSERT
         db.query.mockResolvedValueOnce({ insertId: 1 }); // userAuth INSERT
 
-        var res = await postWithCsrf('/api/users/register', validBody());
+        var res = await postWithCsrf('/api/users', validBody());
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(201);
         expect(res.body.success).toBe(true);
     });
 
@@ -84,7 +94,7 @@ describe('POST /api/users/register', function() {
         var body = validBody();
         delete body.email;
 
-        var res = await postWithCsrf('/api/users/register', body);
+        var res = await postWithCsrf('/api/users', body);
 
         expect(res.status).toBe(400);
         expect(res.body.success).toBe(false);
@@ -94,7 +104,7 @@ describe('POST /api/users/register', function() {
     test('returns 400 for duplicate username', async function() {
         db.query.mockResolvedValueOnce([{ userId: 'existing' }]); // username taken
 
-        var res = await postWithCsrf('/api/users/register', validBody());
+        var res = await postWithCsrf('/api/users', validBody());
 
         expect(res.status).toBe(400);
         expect(res.body.message).toContain('Username is already taken');
@@ -104,16 +114,16 @@ describe('POST /api/users/register', function() {
         db.query.mockResolvedValueOnce([]); // username ok
         db.query.mockResolvedValueOnce([{ userId: 'existing' }]); // email taken
 
-        var res = await postWithCsrf('/api/users/register', validBody());
+        var res = await postWithCsrf('/api/users', validBody());
 
         expect(res.status).toBe(400);
         expect(res.body.message).toContain('Email is already registered');
     });
 
     test('returns 400 when recaptcha fails', async function() {
-        authService.verifyRecaptchaToken.mockRejectedValue(new Error('Invalid recaptcha.'));
+        authService.verifyRecaptchaToken.mockRejectedValue(Object.assign(new Error('Invalid recaptcha.'), { status: 400 }));
 
-        var res = await postWithCsrf('/api/users/register', validBody());
+        var res = await postWithCsrf('/api/users', validBody());
 
         expect(res.status).toBe(400);
         expect(res.body.message).toContain('Invalid recaptcha');
@@ -123,7 +133,7 @@ describe('POST /api/users/register', function() {
         var body = validBody();
         body.username = 'no spaces!';
 
-        var res = await postWithCsrf('/api/users/register', body);
+        var res = await postWithCsrf('/api/users', body);
 
         expect(res.status).toBe(400);
         expect(res.body.message).toContain('letters, numbers, and underscores only');

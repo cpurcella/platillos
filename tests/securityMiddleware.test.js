@@ -53,7 +53,7 @@ describe('security middleware', function() {
     });
 
     test('unsafe API requests without a CSRF token are rejected', async function() {
-        var res = await request.post('/api/auth/authenticate').send({ email: 'jane@example.com', password: 'secret' });
+        var res = await request.post('/api/session').send({ email: 'jane@example.com', password: 'secret' });
 
         expect(res.status).toBe(403);
         expect(res.body.success).toBe(false);
@@ -71,7 +71,7 @@ describe('security middleware', function() {
         });
 
         var csrf = getCsrf(await request.get('/login'));
-        var res = await request.post('/api/auth/authenticate')
+        var res = await request.post('/api/session')
             .set('Cookie', csrf.cookie)
             .set('X-CSRF-Token', csrf.token)
             .send({ email: 'jane@example.com', password: 'secret' });
@@ -80,7 +80,7 @@ describe('security middleware', function() {
             return cookie.indexOf('sessionId=') === 0;
         });
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(201);
         expect(res.body.success).toBe(true);
         expect(authService.authenticate).toHaveBeenCalledWith('jane@example.com', 'secret');
         expect(sessionCookie).toContain('HttpOnly');
@@ -89,7 +89,7 @@ describe('security middleware', function() {
     });
 
     test('safe API requests do not require a CSRF header', async function() {
-        var res = await request.get('/api/users/search?q=');
+        var res = await request.get('/api/users?q=');
 
         expect(res.status).toBe(200);
         expect(res.body.success).toBe(true);
@@ -114,14 +114,14 @@ describe('security middleware', function() {
             user: { userId: 'user-1', isAdmin: 0 }
         });
 
-        var res = await request.get('/api/users/admin').set('Cookie', signedSessionCookie('session-1'));
+        var res = await request.get('/api/users?view=admin').set('Cookie', signedSessionCookie('session-1'));
 
         expect(res.status).toBe(403);
         expect(res.body.success).toBe(false);
     });
 
     test('client-supplied auth params cannot satisfy admin users API authorization', async function() {
-        var res = await request.get('/api/users/admin?auth[user][isAdmin]=1');
+        var res = await request.get('/api/users?view=admin&auth[user][isAdmin]=1');
 
         expect(res.status).toBe(401);
         expect(res.body.success).toBe(false);
@@ -136,7 +136,7 @@ describe('security middleware', function() {
             .mockResolvedValueOnce([{ total: 1 }])
             .mockResolvedValueOnce([{ userId: 'user-1', username: 'janedoe' }]);
 
-        var res = await request.get('/api/users/admin?page=1&pageSize=10').set('Cookie', signedSessionCookie('session-1'));
+        var res = await request.get('/api/users?view=admin&page=1&pageSize=10').set('Cookie', signedSessionCookie('session-1'));
 
         expect(res.status).toBe(200);
         expect(res.body).toEqual({

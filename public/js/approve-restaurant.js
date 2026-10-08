@@ -150,7 +150,7 @@ var approveRestaurantModule = {
         $('#ai-restaurant-result').hide();
         try {
             var res = await common.secureAjax({
-                url: '/api/approvals/ai/restaurant/' + encodeURIComponent(restaurantId),
+                url: '/api/restaurants/' + encodeURIComponent(restaurantId) + '/moderations',
                 method: 'POST',
                 dataType: 'json'
             });

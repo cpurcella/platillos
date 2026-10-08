@@ -113,7 +113,7 @@ var dishListModule = {
             if (currentVote === direction) {
                 res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'DELETE' });
             } else {
-                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'POST', data: { value: direction } });
+                res = await common.secureAjax({ url: '/api/reviews/' + reviewId + '/vote', method: 'PUT', data: { value: direction } });
             }
             if (res.success) {
                 $card.attr('data-user-vote', res.userVote);
@@ -129,7 +129,7 @@ var dishListModule = {
     loadWatchlistIds: async function() {
         if (!window._platillosUser) return;
         try {
-            var res = await $.get('/api/watchlist/ids');
+            var res = await $.get('/api/users/me/watchlist/ids');
             if (res.success && Array.isArray(res.data)) {
                 dishListModule.watchlistIds = res.data;
             }
@@ -233,12 +233,12 @@ var dishListModule = {
 
     buildFeedCard: function(review) {
         var reviewer = ((review.firstName || '') + ' ' + (review.lastName || '')).trim() || review.username || 'Anonymous';
-        var reviewerSafe = $('<div>').text(reviewer).html();
+        var reviewerSafe = common.escapeHtml(reviewer);
 
         // Avatar
         var avatarHtml;
         if (review.avatarUrl) {
-            avatarHtml = '<img class="feed-card-avatar" src="' + $('<div>').text(review.avatarUrl + '_s').html() + '" alt="">';
+            avatarHtml = '<img class="feed-card-avatar" src="' + common.escapeHtml(review.avatarUrl + '_s') + '" alt="">';
         } else {
             var initial = (reviewer || '?').charAt(0).toUpperCase();
             avatarHtml = '<span class="feed-card-avatar feed-card-avatar-placeholder">' + initial + '</span>';
@@ -251,28 +251,28 @@ var dishListModule = {
         var slug = (review.dishName || '').toLowerCase().trim()
             .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').substring(0, 80) || 'dish';
         var dishUrl = '/dishes/' + encodeURIComponent(review.dishId) + '/' + slug + '?reviewId=' + review.reviewId;
-        var dishNameSafe = $('<div>').text(review.dishName || 'Untitled').html();
-        var restaurantSafe = $('<div>').text(review.restaurantName || '').html();
+        var dishNameSafe = common.escapeHtml(review.dishName || 'Untitled');
+        var restaurantSafe = common.escapeHtml(review.restaurantName || '');
 
         // Rating stars
         var ratingHtml = review.rating != null ? '<span class="feed-card-rating">' + dishListModule.renderStarsCompact(review.rating) + '</span>' : '';
 
         // Relative time
         var timeText = dishListModule.relativeTime(review.submitted);
-        var timeSafe = $('<div>').text(timeText).html();
+        var timeSafe = common.escapeHtml(timeText);
 
         // Review text (truncate)
         var contentHtml = '';
         if (review.reviewContent) {
             var text = review.reviewContent.length > 280 ? review.reviewContent.substring(0, 280) + '…' : review.reviewContent;
-            contentHtml = '<div class="feed-card-text">' + $('<div>').text(text).html() + '</div>';
+            contentHtml = '<div class="feed-card-text">' + common.escapeHtml(text) + '</div>';
         }
 
         // Photos
         var photosHtml = '';
         if (review.photos && review.photos.length) {
             var items = review.photos.slice(0, 3).map(function(p) {
-                return '<img class="feed-card-photo" src="' + $('<div>').text(p.url + '_s').html() + '" alt="Review photo" loading="lazy">';
+                return '<img class="feed-card-photo" src="' + common.escapeHtml(p.url + '_s') + '" alt="Review photo" loading="lazy">';
             }).join('');
             photosHtml = '<div class="feed-card-photos">' + items + '</div>';
         }
@@ -280,7 +280,7 @@ var dishListModule = {
         // Dish cover image
         var dishPhotoHtml = '';
         if (review.dishCoverPhoto) {
-            dishPhotoHtml = '<img class="feed-card-dish-photo" src="' + $('<div>').text(review.dishCoverPhoto + '_s').html() + '" alt="" loading="lazy">';
+            dishPhotoHtml = '<img class="feed-card-dish-photo" src="' + common.escapeHtml(review.dishCoverPhoto + '_s') + '" alt="" loading="lazy">';
         }
 
         // Vote buttons
@@ -357,7 +357,7 @@ var dishListModule = {
                 ? shelf.dishes.filter(function(dish) { return dish.coverPhoto; })
                 : shelf.dishes;
             var $section = $('<section class="shelf"><h2 class="shelf-title">' +
-                $('<span>').text(shelf.title).html() + '</h2></section>');
+                common.escapeHtml(shelf.title) + '</h2></section>');
             var $track = $('<div class="shelf-track"></div>');
             shelfDishes.forEach(function(dish) {
                 $track.append(dishListModule.buildShelfCard(dish));
@@ -375,9 +375,9 @@ var dishListModule = {
             .substring(0, 80) || 'dish';
         var dishUrl = '/dishes/' + encodeURIComponent(dish.dishId) + '/' + slug + (dish.reviewId ? '?reviewId=' + dish.reviewId : '');
         var photoUrl = dish.coverPhoto ? dishListModule.buildVariantUrl(dish.coverPhoto, '_s') : '';
-        var photoEscaped = photoUrl ? $('<div>').text(photoUrl).html() : '';
-        var nameEscaped = $('<div>').text(dish.name || 'Untitled').html();
-        var restaurantEscaped = $('<div>').text(dish.restaurantName || '').html();
+        var photoEscaped = photoUrl ? common.escapeHtml(photoUrl) : '';
+        var nameEscaped = common.escapeHtml(dish.name || 'Untitled');
+        var restaurantEscaped = common.escapeHtml(dish.restaurantName || '');
         var imageHtml = photoEscaped
             ? '<img src="' + photoEscaped + '" class="shelf-card-img" loading="lazy" alt="' + nameEscaped + '">'
             : '';
@@ -385,7 +385,7 @@ var dishListModule = {
 
         var reviewerHtml = '';
         if (dish.reviewerUsername) {
-            var reviewerEscaped = $('<div>').text(dish.reviewerUsername).html();
+            var reviewerEscaped = common.escapeHtml(dish.reviewerUsername);
             reviewerHtml = '<div class="shelf-card-reviewer">@' + reviewerEscaped + '</div>';
         }
 
@@ -425,7 +425,7 @@ var dishListModule = {
     loadPeople: async function(term) {
         var $section = $('#people-results');
         try {
-            var res = await $.get('/api/users/search', { q: term, limit: 10 });
+            var res = await $.get('/api/users', { q: term, limit: 10 });
             if (res.success && Array.isArray(res.data) && res.data.length) {
                 dishListModule.renderPeople(res.data);
                 $section.show();
@@ -443,11 +443,11 @@ var dishListModule = {
         var $track = $('<div class="shelf-track"></div>');
         users.forEach(function(user) {
             var profileUrl = '/users/' + encodeURIComponent(user.username);
-            var nameEscaped = $('<span>').text((user.firstName || '') + ' ' + (user.lastName || '')).html().trim() || $('<span>').text(user.username).html();
-            var usernameEscaped = $('<span>').text(user.username).html();
+            var nameEscaped = common.escapeHtml((user.firstName || '') + ' ' + (user.lastName || '')).trim() || common.escapeHtml(user.username);
+            var usernameEscaped = common.escapeHtml(user.username);
             var initial = (user.firstName || user.username || '?').charAt(0).toUpperCase();
             var avatarHtml = user.avatarUrl
-                ? '<img src="' + $('<span>').text(user.avatarUrl).html() + '" class="people-shelf-avatar" alt="">'
+                ? '<img src="' + common.escapeHtml(user.avatarUrl) + '" class="people-shelf-avatar" alt="">'
                 : '<div class="people-shelf-avatar people-shelf-avatar-placeholder">' + initial + '</div>';
             var html = '<a href="' + profileUrl + '" class="people-shelf-card">' +
                 avatarHtml +
@@ -506,12 +506,12 @@ var dishListModule = {
                 .substring(0, 80) || 'dish';
             var dishUrl = '/dishes/' + encodeURIComponent(dish.dishId) + '/' + slug;
             var coverPhotoSmall = dish.coverPhoto ? dishListModule.buildVariantUrl(dish.coverPhoto, '_s') : '';
-            var coverPhotoSmallEscaped = coverPhotoSmall ? $('<div>').text(coverPhotoSmall).html() : '';
+            var coverPhotoSmallEscaped = coverPhotoSmall ? common.escapeHtml(coverPhotoSmall) : '';
             var imageMarkup = coverPhotoSmallEscaped
-                ? '<img src="' + coverPhotoSmallEscaped + '" class="dish-cover-photo" loading="lazy" alt="' + $('<div>').text(dish.name || 'Dish photo').html() + '">'
+                ? '<img src="' + coverPhotoSmallEscaped + '" class="dish-cover-photo" loading="lazy" alt="' + common.escapeHtml(dish.name || 'Dish photo') + '">'
                 : '';
             var isOnWatchlist = dishListModule.watchlistIds.indexOf(dish.dishId) !== -1;
-            var escapedDishId = $('<div>').text(dish.dishId).html();
+            var escapedDishId = common.escapeHtml(dish.dishId);
             var wttLabel = isOnWatchlist ? 'On Your List' : 'Want to Try';
             var watchlistBtnHtml = window._platillosUser
                 ? '<button class="want-to-try-card-btn' + (isOnWatchlist ? ' active' : '') + '" data-dish-id="' + escapedDishId + '" title="Want to Try" onclick="event.preventDefault(); event.stopPropagation(); dishListModule.toggleWatchlistCard(this, \'' + escapedDishId + '\')">' + wttLabel + '</button>'
@@ -578,12 +578,12 @@ var dishListModule = {
         var isActive = $btn.hasClass('active');
         try {
             if (isActive) {
-                await common.secureAjax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'DELETE' });
+                await common.secureAjax({ url: '/api/users/me/watchlist/' + encodeURIComponent(dishId), method: 'DELETE' });
                 $btn.removeClass('active').text('Want to Try');
                 var idx = dishListModule.watchlistIds.indexOf(dishId);
                 if (idx !== -1) dishListModule.watchlistIds.splice(idx, 1);
             } else {
-                await common.secureAjax({ url: '/api/watchlist/' + encodeURIComponent(dishId), method: 'POST' });
+                await common.secureAjax({ url: '/api/users/me/watchlist/' + encodeURIComponent(dishId), method: 'PUT' });
                 $btn.addClass('active').text('On Your List');
                 dishListModule.watchlistIds.push(dishId);
             }

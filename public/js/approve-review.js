@@ -148,7 +148,7 @@ var approveReviewModule = {
         $('#ai-review-result').hide();
         try {
             var res = await common.secureAjax({
-                url: '/api/approvals/ai/review/' + encodeURIComponent(reviewId),
+                url: '/api/reviews/' + encodeURIComponent(reviewId) + '/moderations',
                 method: 'POST',
                 dataType: 'json'
             });

@@ -6,17 +6,6 @@ var paginationHelper = require('./paginationHelper');
 
 var DAY_MS = 24 * 60 * 60 * 1000;
 
-function normalizeTimestamp(value) {
-    if (value === null || value === undefined || value === '') {
-        return null;
-    }
-    var timestamp = typeof value === 'number' ? value : Number(value);
-    if (!isFinite(timestamp)) {
-        return null;
-    }
-    return timestamp;
-}
-
 function subtractCalendarMonths(timestamp, months) {
     var d = new Date(timestamp);
     var originalDate = d.getDate();
@@ -39,11 +28,7 @@ function subtractCalendarYears(timestamp, years) {
     return d.getTime();
 }
 
-function getDishScoreThresholds(referenceMs) {
-    var reference = normalizeTimestamp(referenceMs);
-    if (reference === null) {
-        reference = Date.now();
-    }
+function getDishScoreThresholds(reference = Date.now()) {
 
     return [
         { threshold: reference - (30 * DAY_MS), weight: 4 },
@@ -54,14 +39,9 @@ function getDishScoreThresholds(referenceMs) {
 }
 
 function getDishScoreWeight(submitted, referenceMs) {
-    var submittedMs = normalizeTimestamp(submitted);
-    if (submittedMs === null) {
-        return 0;
-    }
-
     var thresholds = getDishScoreThresholds(referenceMs);
     for (var i = 0; i < thresholds.length; i++) {
-        if (submittedMs >= thresholds[i].threshold) {
+        if (submitted >= thresholds[i].threshold) {
             return thresholds[i].weight;
         }
     }
@@ -69,24 +49,18 @@ function getDishScoreWeight(submitted, referenceMs) {
 }
 
 function roundDishScore(value) {
-    if (value === null || value === undefined || !isFinite(value)) {
-        return null;
-    }
     return Math.round(value * 10) / 10;
 }
 
 function calculateDishScore(reviews, referenceMs) {
-    if (!Array.isArray(reviews) || !reviews.length) {
+    if (!reviews.length) {
         return null;
     }
 
     var weightedTotal = 0;
     var weightTotal = 0;
     for (var i = 0; i < reviews.length; i++) {
-        var rating = typeof reviews[i].rating === 'number' ? reviews[i].rating : Number(reviews[i].rating);
-        if (!isFinite(rating)) {
-            continue;
-        }
+        var rating = reviews[i].rating;
 
         var weight = getDishScoreWeight(reviews[i].submitted, referenceMs);
         if (!weight) {
@@ -114,18 +88,16 @@ function buildDishScoreWeightSql(submittedColumn) {
                         END)`;
 }
 
-function buildDishRatingSummary(reviews, referenceMs) {
-    var reference = normalizeTimestamp(referenceMs);
-    if (reference === null) reference = Date.now();
+function buildDishRatingSummary(reviews, reference = Date.now()) {
     var recentSince = subtractCalendarMonths(reference, 6);
     var overall = { average: null, count: 0 };
     var recent = { average: null, count: 0 };
     var overallTotal = 0;
     var recentTotal = 0;
-    (reviews || []).forEach(function(review) {
-        var rating = Number(review.rating);
-        var submitted = normalizeTimestamp(review.submitted);
-        if (!isFinite(rating) || rating < 1 || rating > 10 || submitted === null || submitted > reference) return;
+    reviews.forEach(function(review) {
+        var rating = review.rating;
+        var submitted = review.submitted;
+        if (submitted > reference) return;
         overallTotal += rating;
         overall.count += 1;
         if (submitted >= recentSince) {
@@ -138,25 +110,21 @@ function buildDishRatingSummary(reviews, referenceMs) {
     return { overall: overall, recent: recent, recentSince: recentSince };
 }
 
-function buildDishScoreTrend(rows, referenceMs) {
-    var scoreCalculatedAt = normalizeTimestamp(referenceMs);
-    if (scoreCalculatedAt === null) {
-        scoreCalculatedAt = Date.now();
-    }
+function buildDishScoreTrend(rows, scoreCalculatedAt = Date.now()) {
 
-    var reviews = (rows || []).map(function(row) {
+    var reviews = rows.map(function(row) {
         return {
             reviewId: row.reviewId,
-            rating: typeof row.rating === 'number' ? row.rating : Number(row.rating),
-            submitted: normalizeTimestamp(row.submitted)
+            rating: row.rating,
+            submitted: row.submitted
         };
     }).filter(function(row) {
-        return row.submitted !== null && row.submitted <= scoreCalculatedAt && isFinite(row.rating) && row.rating >= 1 && row.rating <= 10;
+        return row.submitted <= scoreCalculatedAt;
     }).sort(function(a, b) {
         if (a.submitted !== b.submitted) {
             return a.submitted - b.submitted;
         }
-        return (a.reviewId || 0) - (b.reviewId || 0);
+        return a.reviewId - b.reviewId;
     });
 
     var includedReviews = [];
@@ -548,7 +516,7 @@ async function getDishes(params) {
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
     var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
-    var countRows = await db.query(countSql, whereValues) || [];
+    var countRows = await db.query(countSql, whereValues);
     var total = countRows.length ? countRows[0].total : 0;
 
     var pagination = paginationHelper.normalizePagination(params, 10);
@@ -575,7 +543,7 @@ async function getDishes(params) {
     var dataValues = selectExtraValues.slice();
     dataValues = dataValues.concat(whereValues, [pageSize, offset]);
 
-    var rows = await db.query(dataSql, dataValues) || [];
+    var rows = await db.query(dataSql, dataValues);
 
     if (rows.length) {
         rows = rows.map(function(row) {
@@ -613,7 +581,7 @@ async function getDish(params) {
     }
 
     var rows = await db.query(sql, vals);
-    if (!rows || !rows.length) {
+    if (!rows.length) {
         return null;
     }
 
@@ -664,13 +632,13 @@ async function getDishPhotos(params) {
         JOIN files f ON f.fileId = rp.fileId
         LEFT JOIN file_framing ff ON ff.fileId = rp.fileId
         WHERE d.dishId = ?
-            AND LOWER(COALESCE(d.status, 'pending')) = 'approved'
-            AND LOWER(COALESCE(r.status, 'pending')) = 'approved'
-            AND LOWER(COALESCE(rv.status, 'pending')) = 'approved'
-            AND LOWER(COALESCE(rp.status, 'pending')) = 'approved'
+            AND d.status = 'approved'
+            AND r.status = 'approved'
+            AND rv.status = 'approved'
+            AND rp.status = 'approved'
     `;
 
-    var countRows = await db.query('SELECT COUNT(*) AS total ' + whereSql, [params.dishId]) || [];
+    var countRows = await db.query('SELECT COUNT(*) AS total ' + whereSql, [params.dishId]);
     var total = countRows.length ? countRows[0].total : 0;
 
     var rows = await db.query(`
@@ -690,7 +658,7 @@ async function getDishPhotos(params) {
         ` + whereSql + `
         ORDER BY rv.submitted DESC, rp.reviewPhotoId ASC
         LIMIT ? OFFSET ?
-    `, [params.dishId, pageSize, offset]) || [];
+    `, [params.dishId, pageSize, offset]);
 
     rows = rows.map(function(row) {
         row.framing = require('../ai/photoFraming').parseFraming(row.framing);
@@ -812,8 +780,8 @@ async function updateDish(params) {
         await connection.beginTransaction();
 
         var dishRowsResult = await connection.query('SELECT dishId FROM dishes WHERE dishId = ? FOR UPDATE', [dishId]);
-        var dishRows = Array.isArray(dishRowsResult) ? dishRowsResult[0] : dishRowsResult;
-        if (!dishRows || !dishRows.length) {
+        var dishRows = dishRowsResult[0];
+        if (!dishRows.length) {
             err = new Error('Dish not found');
             err.status = 404;
             throw err;
@@ -825,13 +793,7 @@ async function updateDish(params) {
             var statusUpdated = (statusValue === 'pending' || statusValue === 'out_of_area') ? null : nowMs;
             var statusUpdatedBy = (statusValue === 'pending' || statusValue === 'out_of_area') ? null : approverUserId;
             var statusSql = 'UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ? WHERE dishId = ?';
-            var statusResult = await connection.query(statusSql, [statusValue, statusUpdated, statusUpdatedBy, dishId]);
-            var statusAffected = Array.isArray(statusResult) ? statusResult[0] && statusResult[0].affectedRows : statusResult && statusResult.affectedRows;
-            if (!statusAffected) {
-                err = new Error('Dish not found');
-                err.status = 404;
-                throw err;
-            }
+            await connection.query(statusSql, [statusValue, statusUpdated, statusUpdatedBy, dishId]);
         }
 
         if (shouldUpdateName) {
@@ -1018,7 +980,7 @@ async function getHomeShelves(params) {
     var results = await Promise.all(queries);
 
     function resolvePhotos(rows) {
-        if (!rows || !rows.length) return [];
+        if (!rows.length) return [];
         return rows.map(function(row) {
             if (row.coverPhoto) {
                 row.coverPhoto = 'https://' + config.bucket + '.s3.amazonaws.com/' + row.coverPhoto;

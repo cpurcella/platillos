@@ -7,7 +7,7 @@ var framing = require('../ai/photoFraming');
 var user;
 var app = express();
 app.use(express.json());
-app.use(function(req, res, next) { req.allParams = { auth: { user: user } }; next(); });
+app.use(function(req, res, next) { req.auth = { user: user }; next(); });
 app.use('/files', require('../api/files'));
 beforeEach(function() {
     jest.clearAllMocks();

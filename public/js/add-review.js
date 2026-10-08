@@ -297,7 +297,7 @@ var addReviewModule = {
             if (response.success) {
                 var favDishId = (isNewDish && response.data && response.data.dishId) ? response.data.dishId : selectedDishId;
                 if ($('#add-to-favorites').prop('checked') && favDishId && favDishId !== 'new') {
-                    try { await common.secureAjax({ url: '/api/users/favorites/' + encodeURIComponent(favDishId), method: 'POST' }); }
+                    try { await common.secureAjax({ url: '/api/users/me/favorites/' + encodeURIComponent(favDishId), method: 'PUT' }); }
                     catch (e) { common.showAlert('Your review was saved, but the favorite could not be saved. You can favorite the dish from its page.', 'warning'); }
                 }
                 common.showAlert(
@@ -323,7 +323,7 @@ var addReviewModule = {
 
         try {
             var response = await common.secureAjax({
-                url: '/api/files/upload',
+                url: '/api/files',
                 method: 'POST',
                 data: formData,
                 processData: false,

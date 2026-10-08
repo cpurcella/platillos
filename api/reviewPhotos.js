@@ -1,53 +1,35 @@
 var express = require('express');
 var router = express.Router();
+var { requestParams } = require('./middleware');
 var reviewPhotoService = require('./reviewPhotoService');
 var { requireAdmin } = require('./middleware');
 
-router.get('/', async function(req, res) {
+router.get('/', async function(req, res, next) {
     try {
-        var params = req.allParams || {};
+        var params = requestParams(req);
         var result = await reviewPhotoService.getReviewPhotos(params);
         res.json({ success: true, data: result.rows, total: result.total });
     } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ success: false, message: err.message });
-        }
-        res.status(500).json({ success: false, message: err.message });
+        next(err);
     }
 });
 
-router.get('/pending', async function(req, res) {
+router.get('/:reviewPhotoId', async function(req, res, next) {
     try {
-        var params = Object.assign({}, req.allParams || {}, { pending: 1 });
-        var result = await reviewPhotoService.getReviewPhotos(params);
-        res.json({ success: true, data: result.rows, total: result.total });
-    } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ success: false, message: err.message });
-        }
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
-
-router.get('/:reviewPhotoId', async function(req, res) {
-    try {
-        var params = Object.assign({}, req.allParams || {}, { reviewPhotoId: req.params.reviewPhotoId });
+        var params = requestParams(req);
         var photo = await reviewPhotoService.getReviewPhoto(params);
         if (!photo) {
             return res.status(404).json({ success: false, message: 'Photo not found' });
         }
         res.json({ success: true, data: photo });
     } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ success: false, message: err.message });
-        }
-        res.status(500).json({ success: false, message: err.message });
+        next(err);
     }
 });
 
-router.patch('/:reviewPhotoId', requireAdmin, async function(req, res) {
+router.patch('/:reviewPhotoId', requireAdmin, async function(req, res, next) {
     try {
-        var params = Object.assign({}, req.allParams || {}, { reviewPhotoId: req.params.reviewPhotoId });
+        var params = requestParams(req);
         var result = await reviewPhotoService.updateReviewPhoto(params);
         var status = params.status ? String(params.status).toLowerCase() : '';
         var rotation = params.rotateDegreesClockwise !== undefined && params.rotateDegreesClockwise !== null && params.rotateDegreesClockwise !== '';
@@ -61,11 +43,10 @@ router.patch('/:reviewPhotoId', requireAdmin, async function(req, res) {
         }
         res.json({ success: true, message: message, data: result });
     } catch (err) {
-        if (err.status) {
-            return res.status(err.status).json({ success: false, message: err.message });
-        }
-        res.status(500).json({ success: false, message: err.message });
+        next(err);
     }
 });
+
+router.post('/:reviewPhotoId/moderations', requireAdmin, require('./moderation').photo);
 
 module.exports = router;

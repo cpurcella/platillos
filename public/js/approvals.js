@@ -285,7 +285,7 @@ var approvalsModule = {
         $('#photos-status-filter').val(status);
     },
     initUsersGrid: function() {
-        var baseUrl = '/api/users/admin';
+        var baseUrl = '/api/users?view=admin';
         var paginationConfig = approvalsModule.buildPaginationConfig(baseUrl, null);
         var buildUserUrl = function(page, limit) {
             var normalizedLimit = limit || paginationConfig.limit;
@@ -297,7 +297,7 @@ var approvalsModule = {
             if (approvalsModule.userSearch) {
                 paramsObj.q = approvalsModule.userSearch;
             }
-            return baseUrl + '?' + new URLSearchParams(paramsObj).toString();
+            return baseUrl + (baseUrl.includes('?') ? '&' : '?') + new URLSearchParams(paramsObj).toString();
         };
         paginationConfig.server.url = function(prev, page, limit) {
             return buildUserUrl(page, limit);

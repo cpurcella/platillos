@@ -38,7 +38,7 @@ async function onGoToHome() {
             password: $("#password").val()
         };
         var res = await common.secureAjax({
-            url: '/api/auth/authenticate',
+            url: '/api/session',
             method: 'POST',
             dataType: 'json',
             data: data
@@ -102,7 +102,7 @@ async function onRegisterSubmit(e) {
     var $submit = $(form).find('[type="submit"]').prop('disabled', true);
     try {
         var response = await common.secureAjax({
-            url: '/api/users/register',
+            url: '/api/users',
             method: 'POST',
             data: data,
             dataType: 'json'
@@ -110,7 +110,7 @@ async function onRegisterSubmit(e) {
         if (response.success) {
             try {
                 var loginResponse = await common.secureAjax({
-                    url: '/api/auth/authenticate',
+                    url: '/api/session',
                     method: 'POST',
                     dataType: 'json',
                     data: {

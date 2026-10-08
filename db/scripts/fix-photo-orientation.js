@@ -10,7 +10,7 @@
 
 require('dotenv').config();
 
-var Jimp = require('jimp');
+var { Jimp, JimpMime } = require('jimp');
 var { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 var config = require('../../config');
 var buildAwsClientConfig = require('../../awsClientConfig');
@@ -52,21 +52,18 @@ async function fixPhoto(fileId, fileType) {
 
     image.exifRotate();
 
-    var correctedBuffer = await image.getBufferAsync(mimeType);
+    var correctedBuffer = await image.getBuffer(mimeType);
     await uploadToS3(fileId, correctedBuffer, mimeType);
 
-    var variantMime = mimeType === 'image/png' ? Jimp.MIME_PNG : Jimp.MIME_JPEG;
+    var variantMime = mimeType === 'image/png' ? JimpMime.png : JimpMime.jpeg;
     var variants = [
         { suffix: '_m', size: 512 },
         { suffix: '_s', size: 256 }
     ];
 
     await Promise.all(variants.map(async function(def) {
-        var variant = image.clone().cover(def.size, def.size);
-        if (variantMime === Jimp.MIME_JPEG) {
-            variant.quality(80);
-        }
-        var buffer = await variant.getBufferAsync(variantMime);
+        var variant = image.clone().cover({ w: def.size, h: def.size });
+        var buffer = await variant.getBuffer(variantMime, { quality: 80 });
         await uploadToS3(fileId + def.suffix, buffer, variantMime);
     }));
 

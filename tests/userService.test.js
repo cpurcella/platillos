@@ -4,7 +4,17 @@ var userService = require('../api/userService');
 
 // Mock the database
 jest.mock('../connections', function() {
-    return { query: jest.fn() };
+    var query = jest.fn();
+    return {
+        query: query,
+        getConnection: jest.fn().mockResolvedValue({
+            query: query,
+            beginTransaction: jest.fn(),
+            commit: jest.fn(),
+            rollback: jest.fn(),
+            release: jest.fn()
+        })
+    };
 });
 
 // Speed up bcrypt for tests
@@ -388,4 +398,18 @@ describe('userService.getAdminUsers', function() {
         expect(db.query.mock.calls[0][1]).toEqual(['%jane%', '%jane%', '%jane%', '%jane%']);
         expect(db.query.mock.calls[1][1]).toEqual(['%jane%', '%jane%', '%jane%', '%jane%', 10, 0]);
     });
+});
+
+
+test('registration rolls back both account records if password storage fails', async function() {
+    db.query.mockReset();
+    db.query.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+        .mockResolvedValueOnce({ affectedRows: 1 }).mockRejectedValueOnce(new Error('write failed'));
+    var connection = await db.getConnection();
+    connection.commit.mockClear();
+    connection.rollback.mockClear();
+    await expect(userService.registerUser(validData())).rejects.toThrow('write failed');
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
 });

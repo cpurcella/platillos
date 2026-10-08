@@ -2,7 +2,6 @@ var path = require('path');
 var fs = require('fs');
 var handlebars = require('handlebars');
 var config = require('./config');
-var dataProviders = require('./dataProviders');
 
 handlebars.registerHelper('initial', function(str) {
     return (str || '?').charAt(0).toUpperCase();
@@ -24,16 +23,12 @@ var templates = {
                     handlebars.registerPartial(partialName, partialSource);
                 }
             }
-            var context = Object.assign({}, req.allParams.auth || {}, { csrfToken: req.csrfToken || '' });
+            var context = Object.assign({}, req.auth || {}, { csrfToken: req.csrfToken, googleMapsBrowserKey: config.googleMapsBrowserKey, recaptchaSiteKey: config.recaptchaSiteKey });
             if (context.user) {
                 context.user = Object.assign({}, context.user);
             }
             if (context.user && context.user.avatarFileId) {
                 context.user.avatarUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + context.user.avatarFileId + '_s';
-            }
-            if (typeof dataProviders[templateName] === 'function') {
-                var extraData = await dataProviders[templateName](req);
-                context = Object.assign({}, context, extraData, { csrfToken: req.csrfToken || '' });
             }
             var template = handlebars.compile(source);
             var html = template(context);
@@ -42,7 +37,7 @@ var templates = {
             if (err.code === 'ENOENT') {
                 res.status(404).send('Template not found');
             } else {
-                console.error('[template-error]', err && err.stack ? err.stack : err);
+                console.error('[template-error]', err.code || err.name);
                 res.status(500).send('Server error');
             }
         }

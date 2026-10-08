@@ -11,7 +11,7 @@ release_root=$(pwd)
 release_commit=$(git rev-parse HEAD)
 release_dir=$(mktemp -d /tmp/platillos-release.XXXXXX)
 chmod 700 "$release_dir"
-git archive HEAD -- ai api public views certs db aiApprovals.js aiJobQueue.js app.js awsClientConfig.js config.js connections.js dataProviders.js index.js lambda.js softLaunch.js templates.js package.json package-lock.json | tar -x -C "$release_dir"
+git archive HEAD -- ai api public views certs db aiApprovals.js aiJobQueue.js app.js awsClientConfig.js config.js connections.js lambda.js softLaunch.js templates.js package.json package-lock.json | tar -x -C "$release_dir"
 cd "$release_dir"
 npm ci --omit=dev --ignore-scripts --no-fund --no-audit
 # bcrypt ships Linux x86_64 N-API prebuilds in its npm distribution. Require the

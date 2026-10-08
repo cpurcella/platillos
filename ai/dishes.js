@@ -25,7 +25,7 @@ async function fetchPendingDishes(limit, targetId) {
         "FROM dishes d " +
         "JOIN restaurants r ON d.restaurantId = r.restaurantId " +
         "LEFT JOIN cities c ON r.cityId = c.cityId " +
-        "WHERE LOWER(COALESCE(d.status, 'pending')) = 'pending' " +
+        "WHERE d.status = 'pending' " +
         (targetId ? 'AND d.dishId = ? ' : '') +
         "ORDER BY d.submitted ASC, d.dishId ASC LIMIT ?";
 
@@ -47,7 +47,7 @@ async function fetchPendingDishes(limit, targetId) {
 
 async function fetchExistingDishNames(restaurantId, excludeDishId) {
     var rows = await db.query(
-        "SELECT name FROM dishes WHERE restaurantId = ? AND dishId != ? AND LOWER(COALESCE(status, 'pending')) != 'rejected'",
+        "SELECT name FROM dishes WHERE restaurantId = ? AND dishId != ? AND status != 'rejected'",
         [restaurantId, excludeDishId]
     ) || [];
     return rows.map(function(r) { return r.name; });
@@ -464,7 +464,7 @@ async function applyDishDecisions(decisions, lookups) {
                 var nameSql = correctedName ? ', name = ?' : '';
                 var nameParams = correctedName ? [correctedName] : [];
                 var updateResult = await connection.query(
-                    "UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ?" + nameSql + " WHERE dishId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    "UPDATE dishes SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ?" + nameSql + " WHERE dishId = ? AND status = 'pending'",
                     [newStatus, Date.now(), reviewerUserId, aiReasoning].concat(nameParams).concat([decision.dishId])
                 );
 

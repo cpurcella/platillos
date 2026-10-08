@@ -112,17 +112,14 @@ async function hasRecentReview(dishId, userId) {
 }
 
 async function getOrCreateCityId(connection, cityName) {
-    if(!connection) {
-        connection = await db.getConnection();
-    }
     var name = (cityName || '').trim();
     if (!name) name = 'Unknown';
     var result = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
-    var rows = Array.isArray(result) ? result[0] : result;
-    if (rows && rows.length) return rows[0].cityId;
+    var rows = result[0];
+    if (rows.length) return rows[0].cityId;
     var insertResult = await connection.query("INSERT INTO cities (city, state, lat, lng) VALUES (?, '', 0, 0)", [name]);
-    var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
-    return header && header.insertId;
+    var header = insertResult[0];
+    return header.insertId;
 }
 
 async function geocodeRestaurantLocation(restaurantData) {
@@ -219,6 +216,21 @@ async function saveReview(allParams) {
         }
         allParams.photos = photoPayload;
 
+        if (photoPayload.length) {
+            if (photoPayload.some(function(fileId) { return typeof fileId !== 'string'; })) {
+                invalid('Photos must contain file IDs.');
+            }
+            var photoIds = [...new Set(photoPayload)];
+            var [ownedFiles] = await connection.query(
+                'SELECT fileId FROM files WHERE fileId IN (?) AND uploadedBy = ?',
+                [photoIds, userId]
+            );
+            if (ownedFiles.length !== photoIds.length) {
+                invalid('Photos must be files you uploaded.', 403);
+            }
+            allParams.photos = photoIds;
+        }
+
         var restaurantId = allParams.restaurantId || null;
         var holdForSoftLaunch = false;
         var awaitingApproval = false;
@@ -231,7 +243,7 @@ async function saveReview(allParams) {
                 "AND LOWER(TRIM(COALESCE(c.city, ''))) = LOWER(?) AND r.status IN ('approved', 'pending', 'needs_review') LIMIT 1",
                 [submittedRestaurant.name, String(submittedRestaurant.address || '').trim(), String(submittedRestaurant.city || 'Unknown').trim()]
             );
-            if (matches[0] && matches[0].length) {
+            if (matches[0].length) {
                 restaurantId = matches[0][0].restaurantId;
                 isNewRestaurant = false;
             }
@@ -245,13 +257,9 @@ async function saveReview(allParams) {
             var lng = 0;
             var hasGeocodedCoordinates = false;
             if (geocodeResult) {
-                var parsedLat = parseFloat(geocodeResult.lat);
-                var parsedLng = parseFloat(geocodeResult.lng);
-                if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-                    lat = parsedLat;
-                    lng = parsedLng;
-                    hasGeocodedCoordinates = true;
-                }
+                lat = geocodeResult.lat;
+                lng = geocodeResult.lng;
+                hasGeocodedCoordinates = true;
             }
 
             var launchCheck = softLaunch.evaluateLocation({
@@ -476,7 +484,7 @@ async function getReviews(params) {
 
     var statusFilter = params.status ? String(params.status).toLowerCase() : '';
     var shouldFilterPending = String(params.pending) === '1' || statusFilter === 'pending';
-    var normalizedStatusExpr = "LOWER(COALESCE(r.status, 'pending'))";
+    var normalizedStatusExpr = "r.status";
 
     if (!isAdmin) {
         if (shouldFilterPending || statusFilter === 'needs_review' || statusFilter === 'out_of_area' || statusFilter === 'rejected') {
@@ -500,18 +508,18 @@ async function getReviews(params) {
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
     var countSql = 'SELECT COUNT(*) AS total ' + fromClause + whereSql;
-    var countRows = await db.query(countSql, whereValues) || [];
+    var countRows = await db.query(countSql, whereValues);
     var total = countRows.length ? countRows[0].total : 0;
 
     var dataSql = selectClause + fromClause + whereSql + ' ORDER BY r.submitted DESC LIMIT ? OFFSET ?';
     var dataValues = whereValues.slice();
     dataValues.push(pageSize, offset);
-    var reviews = await db.query(dataSql, dataValues) || [];
+    var reviews = await db.query(dataSql, dataValues);
 
     if (reviews.length) {
         var reviewIds = reviews.map(function(r) { return r.reviewId; });
         if (reviewIds.length) {
-            var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND LOWER(COALESCE(status, 'pending')) = 'approved'", [reviewIds]) || [];
+            var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND status = 'approved'", [reviewIds]);
             var photosByReview = {};
             for (var i = 0; i < photoRows.length; i++) {
                 var pr = photoRows[i];
@@ -529,7 +537,7 @@ async function getReviews(params) {
     // Resolve vote counts (and whether current user voted on each review)
     if (reviews.length) {
         var rvIds = reviews.map(function(r) { return r.reviewId; });
-        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]) || [];
+        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]);
         var likeMap = {};
         for (var lc = 0; lc < voteCounts.length; lc++) {
             likeMap[voteCounts[lc].reviewId] = parseInt(voteCounts[lc].likeCount, 10) || 0;
@@ -537,7 +545,7 @@ async function getReviews(params) {
         var currentUserId = params.auth && params.auth.user ? params.auth.user.userId : null;
         var userVoteMap = {};
         if (currentUserId) {
-            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]) || [];
+            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]);
             for (var ul = 0; ul < userVotes.length; ul++) {
                 userVoteMap[userVotes[ul].reviewId] = userVotes[ul].value;
             }
@@ -617,15 +625,15 @@ async function updateReview(params) {
         await connection.beginTransaction();
 
         var rowsResult = await connection.query('SELECT reviewId, dishId, status FROM reviews WHERE reviewId = ? FOR UPDATE', [reviewId]);
-        var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
-        if (!rows || !rows.length) {
+        var rows = rowsResult[0];
+        if (!rows.length) {
             var notFoundErr = new Error('Review not found');
             notFoundErr.status = 404;
             throw notFoundErr;
         }
 
         var reviewRow = rows[0];
-        previousStatus = String(reviewRow.status || 'pending').toLowerCase();
+        previousStatus = reviewRow.status;
         dishId = reviewRow.dishId;
 
         var updates = [];
@@ -700,13 +708,13 @@ async function voteReview(userId, reviewId, value) {
     );
     var rows = await db.query('SELECT COALESCE(SUM(value), 0) AS likeCount FROM reviewLikes WHERE reviewId = ?', [reviewId]);
     var userRow = await db.query('SELECT value FROM reviewLikes WHERE userId = ? AND reviewId = ?', [userId, reviewId]);
-    return { likeCount: parseInt(rows[0].likeCount, 10) || 0, userVote: userRow[0].value };
+    return { likeCount: rows[0].likeCount, userVote: userRow[0].value };
 }
 
 async function removeVote(userId, reviewId) {
     await db.query('DELETE FROM reviewLikes WHERE userId = ? AND reviewId = ?', [userId, reviewId]);
     var rows = await db.query('SELECT COALESCE(SUM(value), 0) AS likeCount FROM reviewLikes WHERE reviewId = ?', [reviewId]);
-    return { likeCount: parseInt(rows[0].likeCount, 10) || 0, userVote: 0 };
+    return { likeCount: rows[0].likeCount, userVote: 0 };
 }
 
 async function getFeed(params) {
@@ -755,18 +763,18 @@ async function getFeed(params) {
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
     var countSql = 'SELECT COUNT(*) AS total ' + fromClause + whereSql;
-    var countRows = await db.query(countSql, whereValues) || [];
+    var countRows = await db.query(countSql, whereValues);
     var total = countRows.length ? countRows[0].total : 0;
 
     var dataSql = selectClause + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
     var dataValues = whereValues.slice();
     dataValues.push(pageSize, offset);
-    var reviews = await db.query(dataSql, dataValues) || [];
+    var reviews = await db.query(dataSql, dataValues);
 
     // Attach photos
     if (reviews.length) {
         var reviewIds = reviews.map(function(r) { return r.reviewId; });
-        var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND LOWER(COALESCE(status, 'pending')) = 'approved'", [reviewIds]) || [];
+        var photoRows = await db.query("SELECT reviewId, fileId FROM reviews_photos WHERE reviewId IN (?) AND status = 'approved'", [reviewIds]);
         var photosByReview = {};
         for (var i = 0; i < photoRows.length; i++) {
             var pr = photoRows[i];
@@ -781,14 +789,14 @@ async function getFeed(params) {
     // Attach vote counts + current user vote
     if (reviews.length) {
         var rvIds = reviews.map(function(r) { return r.reviewId; });
-        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]) || [];
+        var voteCounts = await db.query('SELECT reviewId, SUM(value) AS likeCount FROM reviewLikes WHERE reviewId IN (?) GROUP BY reviewId', [rvIds]);
         var likeMap = {};
         for (var lc = 0; lc < voteCounts.length; lc++) {
             likeMap[voteCounts[lc].reviewId] = parseInt(voteCounts[lc].likeCount, 10) || 0;
         }
         var userVoteMap = {};
         if (currentUserId) {
-            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]) || [];
+            var userVotes = await db.query('SELECT reviewId, value FROM reviewLikes WHERE userId = ? AND reviewId IN (?)', [currentUserId, rvIds]);
             for (var ul = 0; ul < userVotes.length; ul++) {
                 userVoteMap[userVotes[ul].reviewId] = userVotes[ul].value;
             }
@@ -817,7 +825,7 @@ async function getRatingsForDish(dishId) {
         "SELECT rv.reviewId, rv.rating, rv.submitted FROM reviews rv JOIN dishes d ON d.dishId = rv.dishId JOIN restaurants r ON r.restaurantId = d.restaurantId WHERE rv.dishId = ? AND rv.status = 'approved' AND d.status = 'approved' AND r.status = 'approved' ORDER BY rv.submitted ASC, rv.reviewId ASC",
         [dishId]
     );
-    return dishService.buildDishScoreTrend(rows || []);
+    return dishService.buildDishScoreTrend(rows);
 }
 
 module.exports = {

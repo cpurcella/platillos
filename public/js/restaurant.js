@@ -155,7 +155,7 @@ var restaurantPage = {
         var href = '/dishes/' + dish.dishId + '/' + slug;
 
         return '<a href="' + href + '" class="dish-card">' +
-            '<div class="dish-card-name">' + $('<span>').text(dish.name || 'Dish').html() + '</div>' +
+            '<div class="dish-card-name">' + common.escapeHtml(dish.name || 'Dish') + '</div>' +
             '<div class="dish-card-meta">' + score + reviews + '</div>' +
             '</a>';
     },

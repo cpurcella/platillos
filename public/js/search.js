@@ -191,7 +191,7 @@ var searchModule = {
     loadPeople: async function(term) {
         var version = searchModule.requestVersion;
         try {
-            var res = await $.get('/api/users/search', { q: term, limit: 50 });
+            var res = await $.get('/api/users', { q: term, limit: 50 });
             if (version !== searchModule.requestVersion) return;
             if (res.success && res.data.length) {
                 searchModule.renderPeople(res.data);
@@ -212,11 +212,11 @@ var searchModule = {
         $container.empty();
         users.forEach(function(user) {
             var profileUrl = '/users/' + encodeURIComponent(user.username);
-            var nameEscaped = $('<span>').text((user.firstName || '') + ' ' + (user.lastName || '')).html().trim();
-            var usernameEscaped = $('<span>').text(user.username).html();
+            var nameEscaped = common.escapeHtml((user.firstName || '') + ' ' + (user.lastName || '')).trim();
+            var usernameEscaped = common.escapeHtml(user.username);
             var initial = (user.firstName || user.username || '?').charAt(0).toUpperCase();
             var avatarHtml = user.avatarUrl
-                ? '<img src="' + $('<span>').text(user.avatarUrl).html() + '" class="people-card-avatar" alt="">'
+                ? '<img src="' + common.escapeHtml(user.avatarUrl) + '" class="people-card-avatar" alt="">'
                 : '<div class="people-card-avatar people-card-avatar-placeholder">' + initial + '</div>';
             var html = '<a href="' + profileUrl + '" class="people-card">' +
                 avatarHtml +
@@ -299,13 +299,13 @@ var searchModule = {
                 .substring(0, 80) || 'dish';
             var dishUrl = '/dishes/' + encodeURIComponent(dish.dishId) + '/' + slug;
             var coverUrl = dish.coverPhoto ? searchModule.buildVariantUrl(dish.coverPhoto, '_s') : '';
-            var coverEscaped = coverUrl ? $('<div>').text(coverUrl).html() : '';
+            var coverEscaped = coverUrl ? common.escapeHtml(coverUrl) : '';
             var imageMarkup = coverEscaped
-                ? '<img src="' + coverEscaped + '" class="search-dish-photo" loading="lazy" alt="' + $('<div>').text(dish.name || 'Dish photo').html() + '">'
+                ? '<img src="' + coverEscaped + '" class="search-dish-photo" loading="lazy" alt="' + common.escapeHtml(dish.name || 'Dish photo') + '">'
                 : '';
             var cardClass = 'search-dish-card' + (coverEscaped ? '' : ' search-dish-card-no-photo');
 
-            var restaurantName = $('<span>').text(dish.restaurantName || '').html();
+            var restaurantName = common.escapeHtml(dish.restaurantName || '');
             var reviewCount = dish.reviewCount || 0;
             var distanceHtml = '';
             if (dish.distance != null) {
@@ -316,7 +316,7 @@ var searchModule = {
             var html = '<a href="' + dishUrl + '" class="' + cardClass + '">' +
                 imageMarkup +
                 '<div class="search-dish-info">' +
-                    '<div class="search-dish-name">' + $('<span>').text(dish.name).html() + '</div>' +
+                    '<div class="search-dish-name">' + common.escapeHtml(dish.name) + '</div>' +
                     '<div class="search-dish-restaurant">' + restaurantName + '</div>' +
                     '<div class="search-dish-meta">' +
                         '<span class="search-dish-stars">' + searchModule.renderStars(dish.score) + '</span>' +

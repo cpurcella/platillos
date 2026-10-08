@@ -212,7 +212,7 @@ var approvePhotoModule = {
         $('#ai-photo-result').hide();
         try {
             var res = await common.secureAjax({
-                url: '/api/approvals/ai/photo/' + encodeURIComponent(photoId),
+                url: '/api/review-photos/' + encodeURIComponent(photoId) + '/moderations',
                 method: 'POST',
                 dataType: 'json'
             });

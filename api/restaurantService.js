@@ -88,14 +88,14 @@ async function getOrCreateCityId(connection, cityName) {
     }
 
     var result = await connection.query('SELECT cityId FROM cities WHERE city = ? LIMIT 1', [name]);
-    var rows = Array.isArray(result) ? result[0] : result;
-    if (rows && rows.length) {
+    var rows = result[0];
+    if (rows.length) {
         return rows[0].cityId;
     }
 
     var insertResult = await connection.query("INSERT INTO cities (city, state, lat, lng) VALUES (?, '', 0, 0)", [name]);
-    var header = Array.isArray(insertResult) ? insertResult[0] : insertResult;
-    return header && header.insertId;
+    var header = insertResult[0];
+    return header.insertId;
 }
 
 function normalizeStatus(rawStatus) {
@@ -221,7 +221,7 @@ async function getRestaurants(params) {
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
     var countSql = 'SELECT COUNT(*) AS total' + fromClause + whereSql;
-    var countRows = await db.query(countSql, whereValues) || [];
+    var countRows = await db.query(countSql, whereValues);
     var total = countRows.length ? countRows[0].total : 0;
 
     var paginationParams = Object.assign({}, params);
@@ -247,7 +247,7 @@ async function getRestaurants(params) {
     var dataSql = 'SELECT ' + selectClause + selectExtra + fromClause + whereSql + orderClause + ' LIMIT ? OFFSET ?';
     var dataValues = [].concat(selectExtraValues, whereValues, [take, skip]);
 
-    var rows = await db.query(dataSql, dataValues) || [];
+    var rows = await db.query(dataSql, dataValues);
 
     return {
         rows: rows,
@@ -271,7 +271,7 @@ async function getRestaurant(params) {
     }
 
     var rows = await db.query(sql, vals);
-    return rows && rows.length ? rows[0] : null;
+    return rows[0] || null;
 }
 
 async function updateRestaurantLatLngFromGeocode() {
@@ -343,8 +343,8 @@ async function updateRestaurant(params) {
         await connection.beginTransaction();
 
         var rowsResult = await connection.query('SELECT restaurantId FROM restaurants WHERE restaurantId = ? FOR UPDATE', [restaurantId]);
-        var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
-        if (!rows || !rows.length) {
+        var rows = rowsResult[0];
+        if (!rows.length) {
             var notFoundErr = new Error('Restaurant not found');
             notFoundErr.status = 404;
             throw notFoundErr;
@@ -444,25 +444,24 @@ async function updateRestaurant(params) {
 
 async function getRestaurantStats(restaurantId) {
     var threeMonthsAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
-
-    var rows = await db.query(
-        "SELECT " +
-        "  COUNT(DISTINCT d.dishId) AS dishCount, " +
-        "  AVG(d.score) AS avgScore, " +
-        "  SUM(d.reviewCount) AS totalReviews, " +
-        "  SUM(CASE WHEN rv.submitted >= ? THEN 1 ELSE 0 END) AS recentReviews " +
-        "FROM dishes d " +
-        "LEFT JOIN reviews rv ON rv.dishId = d.dishId AND rv.status = 'approved' " +
-        "WHERE d.restaurantId = ? AND d.status = 'approved'",
-        [threeMonthsAgo, restaurantId]
+    var [stats] = await db.query(
+        "SELECT COUNT(*) AS dishCount, AVG(score) AS avgScore, " +
+        "COALESCE(SUM(reviewCount), 0) AS totalReviews " +
+        "FROM dishes WHERE restaurantId = ? AND status = 'approved'",
+        [restaurantId]
     );
-
-    var stats = rows && rows[0] ? rows[0] : {};
+    var [recent] = await db.query(
+        "SELECT COUNT(*) AS recentReviews FROM reviews rv " +
+        "JOIN dishes d ON d.dishId = rv.dishId " +
+        "WHERE d.restaurantId = ? AND d.status = 'approved' " +
+        "AND rv.status = 'approved' AND rv.submitted >= ?",
+        [restaurantId, threeMonthsAgo]
+    );
     return {
-        dishCount: stats.dishCount || 0,
-        avgScore: stats.avgScore ? parseFloat(Number(stats.avgScore).toFixed(1)) : null,
-        totalReviews: parseInt(stats.totalReviews, 10) || 0,
-        recentReviews: parseInt(stats.recentReviews, 10) || 0
+        dishCount: stats.dishCount,
+        avgScore: stats.avgScore === null ? null : Math.round(stats.avgScore * 10) / 10,
+        totalReviews: stats.totalReviews,
+        recentReviews: recent.recentReviews
     };
 }
 

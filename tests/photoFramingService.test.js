@@ -3,13 +3,13 @@ jest.mock('../config', function() { return { bucket: 'framing-test', aiModel: 't
 var sdk = require('@aws-sdk/client-s3');
 var send = jest.spyOn(sdk.S3Client.prototype, 'send');
 var db = require('../connections');
-var Jimp = require('jimp');
+var { Jimp, JimpMime } = require('jimp');
 var service = require('../ai/photoFraming');
 var original;
 var writes;
 var connection;
 beforeEach(async function() {
-    original = await new Jimp(800, 400, 0xccaa88ff).getBufferAsync(Jimp.MIME_JPEG);
+    original = await new Jimp({ width: 800, height: 400, color: 0xccaa88ff }).getBuffer(JimpMime.jpeg);
     writes = [];
     connection = { query: jest.fn(async function(sql) {
         if (sql.includes('GET_LOCK')) return [[{ acquired: 1 }]];
@@ -19,7 +19,7 @@ beforeEach(async function() {
     db.getConnection.mockResolvedValue(connection);
     send.mockImplementation(async function(command) {
         if (command instanceof sdk.HeadObjectCommand) { var err = new Error('Not found'); err.$metadata = { httpStatusCode: 404 }; throw err; }
-        if (command instanceof sdk.GetObjectCommand) return { Body: { transformToByteArray: async function() { return original; } }, ContentType: Jimp.MIME_JPEG };
+        if (command instanceof sdk.GetObjectCommand) return { Body: { transformToByteArray: async function() { return original; } }, ContentType: JimpMime.jpeg };
         if (command instanceof sdk.PutObjectCommand) { writes.push(command.input); return {}; }
         throw new Error('Unexpected command');
     });

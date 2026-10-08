@@ -8,17 +8,22 @@ var userService = require('./userService');
 
 async function verifyRecaptchaToken(recaptcha) {
     if (!recaptcha) {
-        throw new Error('Missing recaptcha.');
+        var err = new Error('Missing recaptcha.');
+        err.status = 400;
+        throw err;
     }
     var secret = _config.recaptchaKey;
     var response = await axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
+        timeout: 10000,
         params: {
             secret: secret,
             response: recaptcha
         }
     });
     if (!response.data || !response.data.success) {
-        throw new Error('Invalid recaptcha.');
+        var err = new Error('Invalid recaptcha.');
+        err.status = 400;
+        throw err;
     }
     return;
 }
@@ -32,29 +37,37 @@ async function startSession(userId) {
 }
 
 async function authenticate(email, password) {
-    if (!email || !password) {
-        throw new Error('Incorrect email or password');
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+        var err = new Error('Incorrect email or password');
+        err.status = 401;
+        throw err;
     }
 
     var sql = 'SELECT userId FROM users WHERE email = ? LIMIT 1';
     var users = await db.query(sql, [email]);
     if (!users.length) {
-        throw new Error('Incorrect email or password');
+        var err = new Error('Incorrect email or password');
+        err.status = 401;
+        throw err;
     }
     var userId = users[0].userId;
 
     var authSql = 'SELECT password FROM userAuth WHERE userId = ? LIMIT 1';
     var authRows = await db.query(authSql, [userId]);
     if (!authRows.length) {
-        throw new Error('Incorrect email or password');
+        var err = new Error('Incorrect email or password');
+        err.status = 401;
+        throw err;
     }
     var match = await bcrypt.compare(password, authRows[0].password);
     if (!match) {
-        throw new Error('Incorrect email or password');
+        var err = new Error('Incorrect email or password');
+        err.status = 401;
+        throw err;
     }
     var session = await startSession(userId);
     var userObj = await userService.getUser(userId);
-    var redirect = (userObj && userObj.isAdmin === 1) ? '/admin' : '/';
+    var redirect = userObj.isAdmin === 1 ? '/admin' : '/';
     return { session: session, redirect: redirect };
 }
 
@@ -92,15 +105,7 @@ async function extendSession(sessionId) {
 }
 
 async function endSession(sessionId) {
-    if (!sessionId) {
-        return;
-    }
-    try {
-        await db.query('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
-    } catch (err) {
-        // Ignore errors during logout to avoid blocking the user
-        console.warn('Failed to delete session during logout', err);
-    }
+    await db.query('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
 }
 
 module.exports = {

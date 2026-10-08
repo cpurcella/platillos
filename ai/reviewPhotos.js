@@ -1,5 +1,5 @@
 var db = require('../connections');
-var Jimp = require('jimp');
+var { Jimp, JimpMime } = require('jimp');
 var { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 var config = require('../config');
 var buildAwsClientConfig = require('../awsClientConfig');
@@ -18,37 +18,37 @@ function buildPublicFileUrl(fileId) {
 function getStoredMimeType(fileType) {
     switch (String(fileType || '').toLowerCase()) {
         case 'png':
-            return Jimp.MIME_PNG;
+            return JimpMime.png;
         case 'bmp':
-            return Jimp.MIME_BMP;
+            return JimpMime.bmp;
         case 'tiff':
         case 'tif':
-            return Jimp.MIME_TIFF;
+            return JimpMime.tiff;
         case 'gif':
-            return Jimp.MIME_GIF;
+            return JimpMime.gif;
         case 'webp':
-            return Jimp.MIME_WEBP;
+            return 'image/webp';
         case 'jpg':
         case 'jpeg':
         default:
-            return Jimp.MIME_JPEG;
+            return JimpMime.jpeg;
     }
 }
 
 function getVariantMimeType(mimeType) {
     switch ((mimeType || '').toLowerCase()) {
-        case Jimp.MIME_PNG:
-            return Jimp.MIME_PNG;
-        case Jimp.MIME_BMP:
-            return Jimp.MIME_BMP;
-        case Jimp.MIME_TIFF:
-            return Jimp.MIME_TIFF;
-        case Jimp.MIME_GIF:
-            return Jimp.MIME_GIF;
-        case Jimp.MIME_WEBP:
-            return Jimp.MIME_WEBP;
+        case JimpMime.png:
+            return JimpMime.png;
+        case JimpMime.bmp:
+            return JimpMime.bmp;
+        case JimpMime.tiff:
+            return JimpMime.tiff;
+        case JimpMime.gif:
+            return JimpMime.gif;
+        case 'image/webp':
+            return 'image/webp';
         default:
-            return Jimp.MIME_JPEG;
+            return JimpMime.jpeg;
     }
 }
 
@@ -107,7 +107,7 @@ async function rotateStoredPhotoUnlocked(fileId, fileType, rotateDegreesClockwis
 
     image.rotate(-rotationDegrees);
 
-    var rotatedOriginalBuffer = await image.getBufferAsync(mimeType);
+    var rotatedOriginalBuffer = await image.getBuffer(mimeType);
     await uploadToS3(fileId, rotatedOriginalBuffer, mimeType);
 
     var variantDefinitions = [
@@ -116,11 +116,8 @@ async function rotateStoredPhotoUnlocked(fileId, fileType, rotateDegreesClockwis
     ];
 
     await Promise.all(variantDefinitions.map(async function(def) {
-        var variant = image.clone().cover(def.size, def.size);
-        if (variantMime === Jimp.MIME_JPEG) {
-            variant.quality(80);
-        }
-        var buffer = await variant.getBufferAsync(variantMime);
+        var variant = image.clone().cover({ w: def.size, h: def.size });
+        var buffer = await variant.getBuffer(variantMime, { quality: 80 });
         await uploadToS3(fileId + def.suffix, buffer, variantMime);
     }));
 
@@ -136,7 +133,7 @@ async function fetchPendingReviewPhotos(limit, targetId) {
         "JOIN dishes d ON r.dishId = d.dishId " +
         "JOIN restaurants s ON d.restaurantId = s.restaurantId " +
         "JOIN files f ON rp.fileId = f.fileId " +
-        "WHERE LOWER(COALESCE(rp.status, 'pending')) = 'pending' " +
+        "WHERE rp.status = 'pending' " +
         (targetId ? 'AND rp.reviewPhotoId = ? ' : '') +
         "ORDER BY f.uploaded ASC, rp.reviewPhotoId ASC LIMIT ?";
 
@@ -474,7 +471,7 @@ async function applyPhotoDecisions(decisions) {
             if (newStatus && currentStatus === 'pending') {
                 var aiReasoning = newStatus === 'needs_review' ? (decision.reasoning || null) : null;
                 var updateResult = await connection.query(
-                    "UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewPhotoId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    "UPDATE reviews_photos SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewPhotoId = ? AND status = 'pending'",
                     [newStatus, Date.now(), reviewerUserId, aiReasoning, decision.reviewPhotoId]
                 );
 

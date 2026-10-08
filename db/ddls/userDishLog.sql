@@ -3,7 +3,7 @@ CREATE TABLE `userDishLog` (
   `userId` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `dishId` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `restaurantId` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `rating` tinyint DEFAULT NULL,
+  `rating` decimal(3,1) DEFAULT NULL,
   `dateTried` date NOT NULL,
   `createdAt` bigint NOT NULL,
   PRIMARY KEY (`logId`),

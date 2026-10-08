@@ -6,13 +6,16 @@ function load(name, exported) {
     const $ = jest.fn(selector => {
         if (!elements[selector]) {
             const element = {};
-            for (const method of ['ready', 'show', 'hide', 'empty', 'text']) element[method] = jest.fn(() => element);
+            for (const method of ['ready', 'show', 'hide', 'empty', 'text', 'ajaxComplete', 'on']) element[method] = jest.fn(() => element);
             elements[selector] = element;
         }
         return elements[selector];
     });
     $.get = jest.fn();
+    $.fn = { serializeArray: jest.fn() };
+    $.ajaxPrefilter = jest.fn();
     const context = { $, window: {}, document: {}, URLSearchParams, console };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/js/common.js'), 'utf8'), context);
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/js/' + name), 'utf8'), context);
     return { module: context[exported], $, elements };
 }
@@ -56,4 +59,17 @@ test('clearing search invalidates an in-flight response', async () => {
     resolve({ success: true, data: [{ name: 'old' }], total: 1 });
     await first;
     expect(search.renderDishes).not.toHaveBeenCalled();
+});
+
+
+test('dish names cannot inject an event handler into shelf image attributes', function() {
+    const dishList = load('dish-list.js', 'dishListModule').module;
+    const html = dishList.buildShelfCard({
+        dishId: 'dish-1',
+        name: 'Latte" onerror="window.pwned=1',
+        coverPhoto: 'https://example.com/photo',
+        score: 8
+    });
+    expect(html).not.toContain(' onerror="');
+    expect(html).toContain('alt="Latte&quot; onerror=&quot;window.pwned=1"');
 });

@@ -20,7 +20,7 @@ function sendInvalid(req, res, reason) {
         event: 'csrf_rejected',
         reason: reason,
         method: req.method,
-        path: req.originalUrl || req.path
+        path: req.path
     }));
     return res.status(403).json({
         success: false,

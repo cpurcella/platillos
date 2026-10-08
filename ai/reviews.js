@@ -19,7 +19,7 @@ async function fetchPendingReviews(limit, targetId) {
         "JOIN dishes d ON r.dishId = d.dishId " +
         "JOIN restaurants s ON d.restaurantId = s.restaurantId " +
         "JOIN users u ON r.submittedBy = u.userId " +
-        "WHERE LOWER(COALESCE(r.status, 'pending')) = 'pending' " +
+        "WHERE r.status = 'pending' " +
         (targetId ? 'AND r.reviewId = ? ' : '') +
         "ORDER BY r.submitted ASC, r.reviewId ASC LIMIT ?";
 
@@ -338,7 +338,7 @@ async function applyReviewDecisions(decisions) {
             if (newStatus && currentStatus === 'pending') {
                 var aiReasoning = newStatus === 'needs_review' ? (decision.reasoning || null) : null;
                 var updateResult = await connection.query(
-                    "UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewId = ? AND LOWER(COALESCE(status, 'pending')) = 'pending'",
+                    "UPDATE reviews SET status = ?, statusUpdated = ?, statusUpdatedBy = ?, aiReasoning = ? WHERE reviewId = ? AND status = 'pending'",
                     [newStatus, Date.now(), reviewerUserId, aiReasoning, decision.reviewId]
                 );
 

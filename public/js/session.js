@@ -86,13 +86,13 @@ var session = (function() {
         }
 
         bootstrapPromise = Promise.resolve($.ajax({
-            url: '/api/auth/session',
+            url: '/api/session',
             method: 'GET',
             dataType: 'json',
             cache: false
         })).then(function(response) {
-            common.setCsrfToken(response && response.csrfToken);
-            if (response && response.authenticated) {
+            common.setCsrfToken(response.csrfToken);
+            if (response.authenticated) {
                 setState('authenticated', response.user);
             } else {
                 setState('anonymous', null);
@@ -112,11 +112,11 @@ var session = (function() {
         if (state !== 'authenticated') return;
         try {
             var response = await $.ajax({
-                url: '/api/auth/extendSession',
-                method: 'POST',
+                url: '/api/session',
+                method: 'PATCH',
                 dataType: 'json'
             });
-            if (response && response.user) {
+            if (response.user) {
                 setState('authenticated', response.user);
             }
         } catch (err) {

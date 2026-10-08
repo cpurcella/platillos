@@ -1,15 +1,20 @@
 // common.js - Utility functions for Platillos
 
 var common = (function() {
+    var htmlEntities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, function(character) {
+            return htmlEntities[character];
+        });
+    }
+
     function isUnsafeMethod(method) {
         return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(method || 'GET').toUpperCase());
     }
 
     function isSameOrigin(url) {
-        if (!url || url.charAt(0) === '/') return true;
-        var parsed = document.createElement('a');
-        parsed.href = url;
-        return parsed.protocol === window.location.protocol && parsed.host === window.location.host;
+        return new URL(url || window.location.href, window.location.href).origin === window.location.origin;
     }
 
     function getCsrfToken() {
@@ -43,25 +48,18 @@ var common = (function() {
     }
 
     async function secureAjax(settings) {
-        if (window.session && typeof window.session.ready === 'function') {
-            await window.session.ready();
-            if (typeof window.session.getState === 'function' &&
-                ['checking', 'unavailable'].indexOf(window.session.getState()) !== -1) {
-                await window.session.bootstrap({ force: true });
-            }
+        await window.session.ready();
+        if (['checking', 'unavailable'].includes(window.session.getState())) {
+            await window.session.bootstrap({ force: true });
         }
 
         try {
             return await $.ajax($.extend({}, settings));
         } catch (err) {
             if (responseCode(err) !== 'CSRF_INVALID') {
-                if (responseCode(err) === 'AUTH_REQUIRED' && window.session) {
+                if (responseCode(err) === 'AUTH_REQUIRED') {
                     window.session.handleAuthRequired();
                 }
-                throw err;
-            }
-
-            if (!window.session || typeof window.session.bootstrap !== 'function') {
                 throw err;
             }
 
@@ -74,7 +72,7 @@ var common = (function() {
             try {
                 return await $.ajax($.extend({}, settings));
             } catch (retryErr) {
-                if (responseCode(retryErr) === 'AUTH_REQUIRED' && window.session) {
+                if (responseCode(retryErr) === 'AUTH_REQUIRED') {
                     window.session.handleAuthRequired();
                 }
                 throw retryErr;
@@ -212,6 +210,7 @@ var common = (function() {
         }, 350); // Match the animation duration
     });
     return {
+        escapeHtml: escapeHtml,
         showAlert: showAlert,
         tooltip: tooltip,
         showModal: showModal,

@@ -301,7 +301,7 @@ var approveDishModule = {
         $('#ai-dish-metadata-suggestions').empty();
         try {
             var res = await common.secureAjax({
-                url: '/api/approvals/ai/dish/' + encodeURIComponent(dishId),
+                url: '/api/dishes/' + encodeURIComponent(dishId) + '/moderations',
                 method: 'POST',
                 dataType: 'json'
             });

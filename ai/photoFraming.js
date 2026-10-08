@@ -1,6 +1,6 @@
 var db = require('../connections');
 var config = require('../config');
-var Jimp = require('jimp');
+var { Jimp, JimpMime } = require('jimp');
 var crypto = require('crypto');
 var { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 var s3 = new S3Client(require('../awsClientConfig')());
@@ -35,8 +35,8 @@ async function evaluate(client, file) {
     var stored = parseFraming(file.framing);
     if (stored && stored.originalHash === hash && (stored.source === 'manual' || stored.version === VERSION)) return { decision: { fileId: file.fileId, skipped: true } };
     var image = await Jimp.read(original.buffer);
-    var preview = image.clone().scaleToFit(1024, 1024).quality(85);
-    var buffer = await preview.getBufferAsync(Jimp.MIME_JPEG);
+    var preview = image.clone().scaleToFit({ w: 1024, h: 1024 });
+    var buffer = await preview.getBuffer(JimpMime.jpeg, { quality: 85 });
     var response = await client.responses.create({
         model: config.aiModel,
         store: false,
@@ -79,16 +79,18 @@ async function apply(decision) {
         var box = framing.box;
         var rect = geometry.subjectRect(image.bitmap.width, image.bitmap.height, box);
         var x = rect.x, y = rect.y, width = rect.width, height = rect.height;
-        var centered = image.clone().crop(x, y, width, height);
+        var centered = image.clone().crop({ x: x, y: y, w: width, h: height });
         var cropHash = crypto.createHash('sha256').update(hash + JSON.stringify(box)).digest('hex').slice(0, 16);
         var displayKey = decision.fileId + '_framed_v1_' + cropHash;
         framing.displayUrl = 'https://' + config.bucket + '.s3.amazonaws.com/' + displayKey;
         framing.displayBox = { x: (box.x * image.bitmap.width - x) / width, y: (box.y * image.bitmap.height - y) / height, width: box.width * image.bitmap.width / width, height: box.height * image.bitmap.height / height };
-        await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: displayKey, Body: await centered.clone().quality(90).getBufferAsync(Jimp.MIME_JPEG), ContentType: Jimp.MIME_JPEG, ACL: 'public-read', CacheControl: 'public, max-age=31536000, immutable' }));
+        await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: displayKey, Body: await centered.clone().getBuffer(JimpMime.jpeg, { quality: 90 }), ContentType: JimpMime.jpeg, ACL: 'public-read', CacheControl: 'public, max-age=31536000, immutable' }));
         for (var variant of [{ suffix: '_s', size: 256 }, { suffix: '_m', size: 512 }]) {
-            var resized = centered.clone().background(0xf5f9f8ff).contain(variant.size, variant.size);
-            var body = await resized.quality(85).getBufferAsync(Jimp.MIME_JPEG);
-            await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: decision.fileId + variant.suffix, Body: body, ContentType: Jimp.MIME_JPEG, ACL: 'public-read', CacheControl: 'no-cache' }));
+            var resized = centered.clone();
+            resized.background = 0xf5f9f8ff;
+            resized.contain({ w: variant.size, h: variant.size });
+            var body = await resized.getBuffer(JimpMime.jpeg, { quality: 85 });
+            await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: decision.fileId + variant.suffix, Body: body, ContentType: JimpMime.jpeg, ACL: 'public-read', CacheControl: 'no-cache' }));
         }
         await connection.query('INSERT INTO file_framing (fileId, framing, updatedAt) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE framing = VALUES(framing), updatedAt = VALUES(updatedAt)', [decision.fileId, JSON.stringify(framing), Date.now()]);
         return framing;

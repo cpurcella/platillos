@@ -128,7 +128,7 @@ async function getReviewPhotos(params) {
 
     var shouldFilterPending = String(params.pending) === '1' || normalizedFilter === 'pending';
 
-    var normalizedColumn = "LOWER(COALESCE(rp.status, 'pending'))";
+    var normalizedColumn = "rp.status";
 
     if (shouldFilterPending) {
         if (!isAdmin) {
@@ -157,7 +157,7 @@ async function getReviewPhotos(params) {
     var whereSql = ' WHERE ' + whereClauses.join(' AND ');
 
     var countSql = 'SELECT COUNT(*) AS total ' + fromClause + whereSql;
-    var countRows = await db.query(countSql, whereValues) || [];
+    var countRows = await db.query(countSql, whereValues);
     var total = (countRows[0] && countRows[0].total) || 0;
 
     var pagination = paginationHelper.normalizePagination(params, 10);
@@ -166,7 +166,7 @@ async function getReviewPhotos(params) {
 
     var dataSql = selectClause + fromClause + whereSql + ' ORDER BY rp.reviewPhotoId DESC LIMIT ? OFFSET ?';
     var dataValues = whereValues.concat([pageSize, offset]);
-    var rows = await db.query(dataSql, dataValues) || [];
+    var rows = await db.query(dataSql, dataValues);
 
     return {
         rows: rows.map(mapPhotoRow).map(function(row) {
@@ -188,7 +188,7 @@ async function getReviewPhoto(params) {
     });
 
     var result = await getReviewPhotos(queryParams);
-    return (result.rows && result.rows.length) ? result.rows[0] : null;
+    return result.rows[0] || null;
 }
 
 async function updateReviewPhoto(params) {
@@ -223,8 +223,8 @@ async function updateReviewPhoto(params) {
             'WHERE rp.reviewPhotoId = ? FOR UPDATE',
             [reviewPhotoId]
         );
-        var rows = Array.isArray(rowsResult) ? rowsResult[0] : rowsResult;
-        if (!rows || !rows.length) {
+        var rows = rowsResult[0];
+        if (!rows.length) {
             var notFoundErr = new Error('Photo not found');
             notFoundErr.status = 404;
             throw notFoundErr;

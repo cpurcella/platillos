@@ -101,7 +101,7 @@ describe('reviewService.saveReview soft-launch behavior', function() {
         var connection = createConnection();
         connection.query
             .mockResolvedValueOnce([[]])
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([[]])
@@ -143,7 +143,7 @@ describe('reviewService.saveReview soft-launch behavior', function() {
         var connection = createConnection();
         connection.query
             .mockResolvedValueOnce([[]])
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([[]])
@@ -199,7 +199,7 @@ describe('reviewService.saveReview soft-launch behavior', function() {
         var connection = createConnection();
         connection.query
             .mockResolvedValueOnce([[]])
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([[]])
@@ -220,7 +220,7 @@ describe('reviewService.saveReview soft-launch behavior', function() {
         var connection = createConnection();
         connection.query
             .mockResolvedValueOnce([[]])
-            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([[]])
             .mockResolvedValueOnce([{ insertId: 7 }])
             .mockResolvedValueOnce([{ affectedRows: 1 }])
             .mockResolvedValueOnce([[]])
@@ -351,7 +351,7 @@ describe('reviewService.getReviews public response shape', function() {
         var dataSql = db.query.mock.calls[1][0];
         var row = result.rows[0];
 
-        expect(countSql).toContain("LOWER(COALESCE(r.status, 'pending')) = 'approved'");
+        expect(countSql).toContain("r.status = 'approved'");
         expect(dataSql).not.toContain('u.email');
         expect(dataSql).not.toContain('r.aiReasoning');
         expect(row.email).toBeUndefined();
@@ -421,4 +421,19 @@ describe('reviewService.getReviews public response shape', function() {
 
         expect(db.query.mock.calls[1][1].slice(-2)).toEqual([100, 100]);
     });
+});
+
+
+test('review submissions cannot attach another users uploads', async function() {
+    var connection = createConnection();
+    connection.query.mockResolvedValueOnce([[]]);
+    db.getConnection.mockResolvedValue(connection);
+    await expect(reviewService.saveReview(buildParams({ photos: ['someone-elses-photo'] })))
+        .rejects.toMatchObject({ status: 403 });
+    expect(connection.query).toHaveBeenCalledWith(
+        'SELECT fileId FROM files WHERE fileId IN (?) AND uploadedBy = ?',
+        [['someone-elses-photo'], 'user-1']
+    );
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
 });

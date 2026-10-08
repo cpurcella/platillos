@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 var env = process.env.env || 'dev';
 
@@ -6,6 +6,8 @@ var openAiKey = process.env.openAiApiKey || process.env.OPENAI_API_KEY || proces
 
 var config = {
     recaptchaKey: process.env.recaptchaKey || '',
+    recaptchaSiteKey: process.env.recaptchaSiteKey || '',
+    googleMapsBrowserKey: process.env.googleMapsBrowserKey || '',
     googleMapsKey: process.env.googleMapsKey || '',
     dbPassword: process.env.dbPassword || '',
     dbUrl: process.env.dbUrl || '',

@@ -10,3 +10,10 @@ dist/
 
 # Project configs not needed when publishing
 .vscode/
+
+# Local generated notes and deployment metadata
+docs/
+plans/
+.github/
+response.json
+claudia.json

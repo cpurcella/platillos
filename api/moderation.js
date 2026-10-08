@@ -1,21 +1,17 @@
-var express = require('express');
-var router = express.Router();
-var { requireAdmin } = require('./middleware');
 var { getOpenAiClient } = require('../ai/client');
 var reviewAi = require('../ai/reviews');
 var dishAi = require('../ai/dishes');
 var restaurantAi = require('../ai/restaurants');
 var photoAi = require('../ai/reviewPhotos');
 
-// POST /api/approvals/ai/review/:reviewId — Run AI moderation on a single review
-router.post('/ai/review/:reviewId', requireAdmin, async function(req, res) {
+async function review(req, res, next) {
     try {
         var reviewId = parseInt(req.params.reviewId, 10);
         if (!reviewId) {
             return res.status(400).json({ success: false, message: 'Invalid reviewId' });
         }
-        var reviews = await reviewAi.fetchPendingReviews(50);
-        var review = reviews.find(function(r) { return r.reviewId === reviewId; });
+        var reviews = await reviewAi.fetchPendingReviews(1, reviewId);
+        var review = reviews[0];
         if (!review) {
             return res.status(404).json({ success: false, message: 'Review not found or not pending' });
         }
@@ -23,19 +19,15 @@ router.post('/ai/review/:reviewId', requireAdmin, async function(req, res) {
         var result = await reviewAi.evaluateSingleReview(client, review);
         res.json({ success: true, data: result.decision, summary: result.summary });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, message: err.message });
+        next(err);
     }
-});
+}
 
-// POST /api/approvals/ai/dish/:dishId — Run AI moderation on a single dish
-router.post('/ai/dish/:dishId', requireAdmin, async function(req, res) {
+async function dish(req, res, next) {
     try {
         var dishId = req.params.dishId;
-        if (!dishId) {
-            return res.status(400).json({ success: false, message: 'Invalid dishId' });
-        }
-        var dishes = await dishAi.fetchPendingDishes(50);
-        var dish = dishes.find(function(d) { return String(d.dishId) === String(dishId); });
+        var dishes = await dishAi.fetchPendingDishes(1, dishId);
+        var dish = dishes[0];
         if (!dish) {
             return res.status(404).json({ success: false, message: 'Dish not found or not pending' });
         }
@@ -43,19 +35,15 @@ router.post('/ai/dish/:dishId', requireAdmin, async function(req, res) {
         var result = await dishAi.evaluateSingleDish(client, dish);
         res.json({ success: true, data: result.decision, summary: result.summary });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, message: err.message });
+        next(err);
     }
-});
+}
 
-// POST /api/approvals/ai/restaurant/:restaurantId — Run AI moderation on a single restaurant
-router.post('/ai/restaurant/:restaurantId', requireAdmin, async function(req, res) {
+async function restaurant(req, res, next) {
     try {
         var restaurantId = req.params.restaurantId;
-        if (!restaurantId) {
-            return res.status(400).json({ success: false, message: 'Invalid restaurantId' });
-        }
-        var restaurants = await restaurantAi.fetchPendingRestaurants(50);
-        var restaurant = restaurants.find(function(r) { return String(r.restaurantId) === String(restaurantId); });
+        var restaurants = await restaurantAi.fetchPendingRestaurants(1, restaurantId);
+        var restaurant = restaurants[0];
         if (!restaurant) {
             return res.status(404).json({ success: false, message: 'Restaurant not found or not pending' });
         }
@@ -63,19 +51,18 @@ router.post('/ai/restaurant/:restaurantId', requireAdmin, async function(req, re
         var result = await restaurantAi.evaluateSingleRestaurant(client, restaurant);
         res.json({ success: true, data: result.decision, summary: result.summary });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, message: err.message });
+        next(err);
     }
-});
+}
 
-// POST /api/approvals/ai/photo/:reviewPhotoId — Run AI moderation on a single photo
-router.post('/ai/photo/:reviewPhotoId', requireAdmin, async function(req, res) {
+async function photo(req, res, next) {
     try {
         var photoId = parseInt(req.params.reviewPhotoId, 10);
         if (!photoId) {
             return res.status(400).json({ success: false, message: 'Invalid reviewPhotoId' });
         }
-        var photos = await photoAi.fetchPendingReviewPhotos(50);
-        var photo = photos.find(function(p) { return p.reviewPhotoId === photoId; });
+        var photos = await photoAi.fetchPendingReviewPhotos(1, photoId);
+        var photo = photos[0];
         if (!photo) {
             return res.status(404).json({ success: false, message: 'Photo not found or not pending' });
         }
@@ -83,8 +70,8 @@ router.post('/ai/photo/:reviewPhotoId', requireAdmin, async function(req, res) {
         var result = await photoAi.evaluateSingleReviewPhoto(client, photo);
         res.json({ success: true, data: result.decision, summary: result.summary });
     } catch (err) {
-        res.status(err.status || 500).json({ success: false, message: err.message });
+        next(err);
     }
-});
+}
 
-module.exports = router;
+module.exports = { review: review, dish: dish, restaurant: restaurant, photo: photo };

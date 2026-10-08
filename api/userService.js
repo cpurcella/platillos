@@ -50,6 +50,14 @@ async function registerUser(data) {
         }
     }
 
+    ['firstName', 'lastName', 'dob', 'email', 'phone', 'password', 'username'].forEach(function(field) {
+        if (typeof data[field] !== 'string') {
+            var err = new Error('Invalid ' + field);
+            err.status = 400;
+            throw err;
+        }
+    });
+
     var username = sanitizeUsername(data.username);
     if (await isUsernameTaken(username)) {
         var err = new Error('Username is already taken.');
@@ -95,16 +103,23 @@ async function registerUser(data) {
         data.optInUpdates,
         data.agreedToTerms,
         data.consentSms,
-        createdTimestamp, // emailVerified
-        createdTimestamp, // phoneVerified
+        null, // emailVerified
+        null, // phoneVerified
         createdTimestamp  // created
     ];
-    await db.query(sql, params);
-    // Insert sensitive fields into userAuth
-    var authSql = `INSERT INTO userAuth (userId, password, emailToken, phoneCode) VALUES (?, ?, ?, NULL)`;
-    var authParams = [userId, hashedPassword, emailToken];
-    await db.query(authSql, authParams);
-    return;
+    var connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.query(sql, params);
+        await connection.query('INSERT INTO userAuth (userId, password, emailToken, phoneCode) VALUES (?, ?, ?, NULL)',
+            [userId, hashedPassword, emailToken]);
+        await connection.commit();
+    } catch (err) {
+        await connection.rollback();
+        throw err;
+    } finally {
+        connection.release();
+    }
 }
 
 async function getUser(userId) {
@@ -145,9 +160,9 @@ async function getProfile(username) {
 
     // Stats
     var statsSql = `SELECT COUNT(*) AS reviewCount, AVG(rating) AS avgRating
-                    FROM reviews WHERE submittedBy = ? AND LOWER(COALESCE(status,'pending')) = 'approved'`;
+                    FROM reviews WHERE submittedBy = ? AND status = 'approved'`;
     var statsRows = await db.query(statsSql, [profile.userId]);
-    profile.reviewCount = statsRows[0].reviewCount || 0;
+    profile.reviewCount = statsRows[0].reviewCount;
     profile.avgRating = statsRows[0].avgRating ? parseFloat(statsRows[0].avgRating).toFixed(1) : null;
 
     // Follow counts
@@ -280,7 +295,7 @@ async function getRecentReviews(userId, limit) {
                FROM reviews r
                JOIN dishes d ON r.dishId = d.dishId
                JOIN restaurants s ON d.restaurantId = s.restaurantId
-               WHERE r.submittedBy = ? AND LOWER(COALESCE(r.status,'pending')) = 'approved'
+               WHERE r.submittedBy = ? AND r.status = 'approved'
                ORDER BY r.submitted DESC
                LIMIT ?`;
     var rows = await db.query(sql, [userId, limit]);
@@ -298,7 +313,7 @@ async function getPaginatedReviews(userId, page, pageSize) {
     pageSize = pagination.pageSize;
     var offset = pagination.offset;
     var countRows = await db.query(
-        "SELECT COUNT(*) AS total FROM reviews WHERE submittedBy = ? AND LOWER(COALESCE(status,'pending')) = 'approved'",
+        "SELECT COUNT(*) AS total FROM reviews WHERE submittedBy = ? AND status = 'approved'",
         [userId]
     );
     var total = countRows[0].total;
@@ -307,7 +322,7 @@ async function getPaginatedReviews(userId, page, pageSize) {
                FROM reviews r
                JOIN dishes d ON r.dishId = d.dishId
                JOIN restaurants s ON d.restaurantId = s.restaurantId
-               WHERE r.submittedBy = ? AND LOWER(COALESCE(r.status,'pending')) = 'approved'
+               WHERE r.submittedBy = ? AND r.status = 'approved'
                ORDER BY r.submitted DESC
                LIMIT ? OFFSET ?`;
     var rows = await db.query(sql, [userId, pageSize, offset]);
@@ -335,7 +350,7 @@ async function getDiaryEntries(userId, year, month) {
         FROM reviews r
         JOIN dishes d ON r.dishId = d.dishId
         JOIN restaurants s ON d.restaurantId = s.restaurantId
-        WHERE r.submittedBy = ? AND LOWER(COALESCE(r.status,'pending')) = 'approved'
+        WHERE r.submittedBy = ? AND r.status = 'approved'
           AND DATE(FROM_UNIXTIME(r.submitted / 1000)) >= ? AND DATE(FROM_UNIXTIME(r.submitted / 1000)) < ?
 
         UNION ALL
@@ -395,7 +410,7 @@ async function getDiaryYears(userId) {
     var sql = `
         SELECT DISTINCT yr FROM (
             SELECT YEAR(FROM_UNIXTIME(r.submitted / 1000)) AS yr
-            FROM reviews r WHERE r.submittedBy = ? AND LOWER(COALESCE(r.status,'pending')) = 'approved'
+            FROM reviews r WHERE r.submittedBy = ? AND r.status = 'approved'
             UNION
             SELECT YEAR(l.dateTried) AS yr
             FROM userDishLog l WHERE l.userId = ?
@@ -406,12 +421,12 @@ async function getDiaryYears(userId) {
 
 async function hasTriedDish(userId, dishId) {
     var sql = `SELECT 1 AS tried FROM (
-        SELECT 1 FROM reviews WHERE submittedBy = ? AND dishId = ? AND LOWER(COALESCE(status,'pending')) = 'approved'
+        SELECT 1 FROM reviews WHERE submittedBy = ? AND dishId = ? AND status = 'approved'
         UNION ALL
         SELECT 1 FROM userDishLog WHERE userId = ? AND dishId = ?
     ) t LIMIT 1`;
     var rows = await db.query(sql, [userId, dishId, userId, dishId]);
-    return rows && rows.length > 0;
+    return rows.length > 0;
 }
 
 // ── Follow System ──
@@ -529,7 +544,7 @@ async function getAdminUsers(params) {
 
     var whereSql = whereClauses.length ? ' WHERE ' + whereClauses.join(' AND ') : '';
     var countRows = await db.query('SELECT COUNT(*) AS total FROM users' + whereSql, whereValues);
-    var total = countRows && countRows[0] ? countRows[0].total : 0;
+    var total = countRows[0].total;
     var sql = `SELECT userId, username, firstName, lastName, email, phone,
                       addressCity, addressState, isAdmin, emailVerified,
                       phoneVerified, created, lastLogin
@@ -539,7 +554,7 @@ async function getAdminUsers(params) {
     var rows = await db.query(sql, whereValues.concat([pagination.pageSize, pagination.offset]));
 
     return {
-        items: rows || [],
+        items: rows,
         total: total,
         page: pagination.page,
         pageSize: pagination.pageSize
